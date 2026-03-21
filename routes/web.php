@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CropProgressController;
 use App\Http\Controllers\PsgcController;
 use App\Http\Controllers\RainfallTrendsController;
 use App\Http\Controllers\SettingsController;
@@ -40,6 +41,8 @@ Route::middleware(['auth', 'verified.email'])->group(function () {
     Route::get('/api/weather/by-coordinates', [WeatherController::class, 'byCoordinates'])->name('api.weather.by-coordinates');
     Route::get('/weather', [WeatherDetailsController::class, 'show'])->name('weather-details');
     Route::get('/weather/rainfall', [RainfallTrendsController::class, 'show'])->name('rainfall-trends');
+    Route::get('/crop-progress', [CropProgressController::class, 'index'])->name('crop-progress.index');
+    Route::put('/crop-progress/stage', [CropProgressController::class, 'updateStage'])->name('crop-progress.update-stage');
     Route::redirect('/weather-details', '/weather', 301);
     Route::redirect('/rainfall-trends', '/weather/rainfall', 301);
 

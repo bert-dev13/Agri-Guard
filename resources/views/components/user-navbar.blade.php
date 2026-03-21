@@ -16,6 +16,10 @@
                 <span class="user-navbar-link-icon"><i data-lucide="cloud-sun" aria-hidden="true"></i></span>
                 <span>Weather</span>
             </a>
+            <a href="{{ route('crop-progress.index') }}" class="user-navbar-link {{ request()->routeIs('crop-progress.*') ? 'active' : '' }}">
+                <span class="user-navbar-link-icon"><i data-lucide="sprout" aria-hidden="true"></i></span>
+                <span>Crop Progress</span>
+            </a>
         </nav>
 
         <div class="user-navbar-user">
@@ -60,6 +64,10 @@
             <a href="{{ route('weather-details') }}" class="user-navbar-mobile-link {{ request()->routeIs('weather-details') ? 'active' : '' }}">
                 <span class="user-navbar-mobile-link-icon"><i data-lucide="cloud-sun"></i></span>
                 Weather
+            </a>
+            <a href="{{ route('crop-progress.index') }}" class="user-navbar-mobile-link {{ request()->routeIs('crop-progress.*') ? 'active' : '' }}">
+                <span class="user-navbar-mobile-link-icon"><i data-lucide="sprout"></i></span>
+                Crop Progress
             </a>
             <a href="{{ route('settings') }}" class="user-navbar-mobile-link {{ request()->routeIs('settings') ? 'active' : '' }}">
                 <span class="user-navbar-mobile-link-icon"><i data-lucide="settings"></i></span>

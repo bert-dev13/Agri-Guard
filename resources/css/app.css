@@ -19,4 +19,5 @@
 @import './user/dashboard.css';
 @import './user/weather.css';
 @import './user/rainfall-trends.css';
+@import './user/crop-progress.css';
 @import './user/settings.css';
