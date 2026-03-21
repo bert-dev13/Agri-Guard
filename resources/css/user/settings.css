@@ -1,0 +1,27 @@
+/* Settings page (body.settings-page) */
+.settings-page .ag-card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+.settings-page .ag-toggle {
+    width: 48px;
+    height: 28px;
+    border-radius: 14px;
+    background: #e2e8f0;
+    transition: background 0.2s;
+}
+.settings-page .ag-toggle.active {
+    background: #2e7d32;
+}
+.settings-page .ag-toggle-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s;
+}
+.settings-page .ag-toggle.active .ag-toggle-dot {
+    transform: translateX(20px);
+}

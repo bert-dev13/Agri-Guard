@@ -1,0 +1,129 @@
+.rainfall-page .ag-card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.rainfall-page .ag-card:hover {
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.rainfall-page .ag-welcome-gradient {
+    background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 40%, #388e3c 70%, #43a047 100%);
+}
+
+.rainfall-page .weather-dashboard-card {
+    border: 1px solid #d8e7de;
+    background: linear-gradient(180deg, #f8fcfa 0%, #eef6f2 100%);
+    overflow: hidden;
+}
+
+.rainfall-page .rainfall-header-meta {
+    display: grid;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.rainfall-page .rainfall-date-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.18);
+    color: #f8fafc;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0.38rem 0.7rem;
+}
+
+.rainfall-page .rainfall-date-chip--muted {
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.92);
+}
+
+.rainfall-page .rainfall-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.rainfall-page .rainfall-filter-tabs {
+    margin-top: 0.8rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+}
+
+.rainfall-page .rainfall-filter-tab {
+    border-radius: 999px;
+    border: 1px solid #d7e7dc;
+    background: #fff;
+    color: #475569;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 0.45rem 0.7rem;
+    transition: all 0.2s ease;
+}
+
+.rainfall-page .rainfall-filter-tab:hover {
+    border-color: #b9d7c3;
+    color: #166534;
+}
+
+.rainfall-page .rainfall-filter-tab.is-active {
+    border-color: #2e7d32;
+    background: #2e7d32;
+    color: #fff;
+}
+
+.rainfall-page .rainfall-trend-unit {
+    border-radius: 999px;
+    border: 1px solid #d7e7dc;
+    background: #fff;
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.28rem 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.rainfall-page .ag-chart-wrap {
+    position: relative;
+    width: 100%;
+    min-height: 280px;
+}
+
+.rainfall-page .rainfall-chart-helper {
+    margin-top: 0.7rem;
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.rainfall-page .rainfall-history-item .forecast-vertical-rain {
+    color: #14532d;
+}
+
+@media (min-width: 640px) {
+    .rainfall-page .rainfall-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rainfall-page .rainfall-header-meta {
+        width: auto;
+        justify-items: end;
+    }
+
+    .rainfall-page .rainfall-filter-tabs {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .rainfall-page .ag-chart-wrap {
+        min-height: 240px;
+    }
+}

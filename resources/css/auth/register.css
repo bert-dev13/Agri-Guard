@@ -1,0 +1,29 @@
+/* Auth base + forms come from login.css (imported before this file in resources/css/app.css). */
+
+/* Register pages have more fields, so slightly widen the card container.
+   Ensure this wins over the later `.auth-container` rule (imported by verify-email.css). */
+body.auth-layout .auth-container.auth-container-register {
+    max-width: 36rem;
+}
+
+@media (min-width: 1024px) {
+    body.auth-layout .auth-container.auth-container-register {
+        max-width: 40rem;
+    }
+}
+
+/* Keep inputs visually consistent across types used on the register form. */
+.auth-form input[type="number"],
+.auth-form input[type="date"] {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
+}
+

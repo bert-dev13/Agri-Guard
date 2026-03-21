@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../views/**/*.blade.php';
+
+@theme {
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+@import './public/navbar.css';
+@import './public/footer.css';
+@import './public/landing.css';
+@import './auth/login.css';
+@import './auth/register.css';
+@import './auth/verify-email.css';
+@import './auth/forgot-password.css';
+@import './user/user-navbar.css';
+@import './user/dashboard.css';
+@import './user/weather.css';
+@import './user/rainfall-trends.css';
+@import './user/settings.css';
