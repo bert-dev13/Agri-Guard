@@ -11,8 +11,16 @@ class UserSeeder extends Seeder
 {
     private const MUNICIPALITY = 'Amulung';
 
+    /** Fixed farmer accounts for staging / Render smoke tests (skipped if email already exists). */
+    public const DEPLOY_TEST_FARMER_1_EMAIL = 'farmer-test-1@agriguard.test';
+
+    public const DEPLOY_TEST_FARMER_2_EMAIL = 'farmer-test-2@agriguard.test';
+
+    /** Password for both deploy test farmers (plain; stored via same hashing as other seeded users). */
+    public const DEPLOY_TEST_FARMER_PASSWORD = 'FarmerTest123!';
+
     /**
-     * Seed 30 realistic user accounts (28 farmers, 2 admins).
+     * Seed realistic user accounts (2 admins, 2 deploy-test farmers, 28 random farmers).
      *
      * - Does not overwrite existing users (skips if email exists)
      * - Uses real Amulung barangays (from DB if seeded; fallback to data file)
@@ -20,6 +28,7 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         $password = Hash::make('AgriGuard123!');
+        $deployTestPassword = Hash::make(self::DEPLOY_TEST_FARMER_PASSWORD);
 
         $cropTypes = ['Rice', 'Corn'];
         // Keep values consistent with CropTimelineService::STAGE_ORDER (snake_case).
@@ -53,6 +62,17 @@ class UserSeeder extends Seeder
                 'role' => 'admin',
                 'name' => 'Jose Miguel Santos',
                 'email' => 'josemiguel.santos@agriguard.ph',
+            ],
+            // Deploy / QA: log in on production after migrate + db:seed (see Dockerfile CMD).
+            [
+                'role' => 'farmer',
+                'name' => 'Deploy Test Farmer One',
+                'email' => self::DEPLOY_TEST_FARMER_1_EMAIL,
+            ],
+            [
+                'role' => 'farmer',
+                'name' => 'Deploy Test Farmer Two',
+                'email' => self::DEPLOY_TEST_FARMER_2_EMAIL,
             ],
         ];
 
@@ -94,10 +114,14 @@ class UserSeeder extends Seeder
             $userCrop = $isAdmin ? null : $cropType;
             $userStage = $isAdmin ? null : $stage;
 
+            $rowPassword = in_array($email, [self::DEPLOY_TEST_FARMER_1_EMAIL, self::DEPLOY_TEST_FARMER_2_EMAIL], true)
+                ? $deployTestPassword
+                : $password;
+
             User::create([
                 'name' => $row['name'],
                 'email' => $email,
-                'password' => $password,
+                'password' => $rowPassword,
                 'role' => $row['role'] ?? 'farmer',
 
                 'farm_municipality' => self::MUNICIPALITY,
