@@ -14,6 +14,42 @@
         }
     }
 
+    /** Laravel XSRF-TOKEN cookie (HttpOnly=false); send as X-XSRF-TOKEN so CSRF matches the session cookie. */
+    function readXsrfCookie() {
+        var prefix = 'XSRF-TOKEN=';
+        var chunks = document.cookie.split(';');
+        for (var i = 0; i < chunks.length; i += 1) {
+            var c = chunks[i].trim();
+            if (c.indexOf(prefix) !== 0) continue;
+            var raw = c.slice(prefix.length);
+            try {
+                return decodeURIComponent(raw);
+            } catch (_) {
+                return raw;
+            }
+        }
+        return '';
+    }
+
+    function csrfFetchHeaders(extra) {
+        var h = Object.assign(
+            {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            extra || {}
+        );
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        var metaToken = meta && meta.getAttribute('content');
+        var xsrf = readXsrfCookie();
+        if (xsrf) {
+            h['X-XSRF-TOKEN'] = xsrf;
+        } else if (metaToken) {
+            h['X-CSRF-TOKEN'] = metaToken;
+        }
+        return h;
+    }
+
     function splitParagraphs(text) {
         return String(text || '')
             .split(/\n{2,}/)
@@ -217,21 +253,49 @@
             fetch(chatUrl, {
                 method: 'POST',
                 signal: state.requestController.signal,
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '',
-                },
+                credentials: 'same-origin',
+                headers: csrfFetchHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({ message: message }),
             })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (!data || data.ok !== true) {
+                .then(function (r) {
+                    if (r.status === 419) {
+                        window.location.reload();
+                        return Promise.reject(new Error('csrf'));
+                    }
+                    return r.text().then(function (text) {
+                        return { ok: r.ok, status: r.status, text: text };
+                    });
+                })
+                .then(function (wrapped) {
+                    if (!wrapped || wrapped instanceof Response) return;
+                    var data = parseJson(wrapped.text, {});
+                    if (!wrapped.ok) {
+                        var rawMsg = (data && data.message) ? String(data.message) : '';
+                        var isCsrfMsg = /csrf|token mismatch|page expired/i.test(rawMsg);
+                        var userMsg = isCsrfMsg
+                            ? 'Your session was refreshed. Please send your message again.'
+                            : rawMsg || 'Something went wrong. Please try again in a moment.';
+                        if (wrapped.status === 419 || isCsrfMsg) {
+                            window.location.reload();
+                            return;
+                        }
                         state.messages.push({
                             role: 'assistant',
                             payload: {
-                                message: (data && data.message) || 'I cannot answer right now, but please check your field and drainage first while weather is uncertain.',
+                                message: userMsg,
+                                meta: { fallback_mode: true, fallback_note: 'Using basic farm guidance' },
+                            },
+                        });
+                        setFallbackBadge(state.messages[state.messages.length - 1].payload);
+                        render();
+                        return;
+                    }
+                    if (!data || data.ok !== true) {
+                        var failText = (data && data.message) ? String(data.message) : '';
+                        state.messages.push({
+                            role: 'assistant',
+                            payload: {
+                                message: failText || 'I cannot answer right now, but please check your field and drainage first while weather is uncertain.',
                                 meta: { fallback_mode: true, fallback_note: 'Using basic farm guidance' },
                             },
                         });
@@ -246,6 +310,7 @@
                 })
                 .catch(function (error) {
                     if (error && error.name === 'AbortError') return;
+                    if (error && error.message === 'csrf') return;
                     state.messages.push({
                         role: 'assistant',
                         payload: {
@@ -320,19 +385,24 @@
                 if (!clearUrl || state.isLoading) return;
                 fetch(clearUrl, {
                     method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '',
-                    },
+                    credentials: 'same-origin',
+                    headers: csrfFetchHeaders({}),
                 })
-                    .then(function (r) { return r.json(); })
+                    .then(function (r) {
+                        if (r.status === 419) {
+                            window.location.reload();
+                            return Promise.reject(new Error('csrf'));
+                        }
+                        return r.json();
+                    })
                     .then(function (data) {
+                        if (!data) return;
                         history = data && data.ok && Array.isArray(data.history) ? data.history : [];
                         hydrate();
                         render();
                         setFallbackBadge({});
-                    });
+                    })
+                    .catch(function () {});
             });
         }
 
