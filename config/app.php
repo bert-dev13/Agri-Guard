@@ -52,7 +52,27 @@ return [
     |
     */
 
-    'url' => env('APP_URL') ?: env('RENDER_EXTERNAL_URL', 'http://127.0.0.1:8000'),
+    /*
+    | On Render, RENDER_EXTERNAL_URL is set automatically. If APP_URL was copied from
+    | local dev (127.0.0.1 / localhost) or left empty, prefer the public Render URL so
+    | generated links, cookies, and CSRF/session handling stay aligned with HTTPS.
+    */
+    'url' => (static function (): string {
+        $appUrl = (string) env('APP_URL', '');
+        $renderUrl = (string) env('RENDER_EXTERNAL_URL', '');
+        $onRender = filter_var(env('RENDER', false), FILTER_VALIDATE_BOOLEAN);
+        $looksLocal = static fn (string $u): bool => $u === '' || (bool) preg_match('/localhost|127\.0\.0\.1/i', $u);
+
+        if ($onRender && $renderUrl !== '' && $looksLocal($appUrl)) {
+            return $renderUrl;
+        }
+
+        if ($appUrl !== '') {
+            return $appUrl;
+        }
+
+        return $renderUrl !== '' ? $renderUrl : 'http://127.0.0.1:8000';
+    })(),
 
     /*
     |--------------------------------------------------------------------------

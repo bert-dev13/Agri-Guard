@@ -62,5 +62,11 @@ services:
           envVarKey: MYSQL_PASSWORD
       - key: APP_KEY
         sync: false
+      # Render sets RENDER=true and RENDER_EXTERNAL_URL. Prefer fixing a mistaken local APP_URL in config/app.php.
+      # Set APP_URL explicitly to your public https URL if you use a custom domain.
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_SECURE_COOKIE
+        value: "true"
       - key: MAIL_MAILER
         value: log

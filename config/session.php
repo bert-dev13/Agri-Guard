@@ -169,9 +169,15 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE') === null
-        ? filter_var(env('RENDER', false), FILTER_VALIDATE_BOOLEAN)
-        : filter_var(env('SESSION_SECURE_COOKIE'), FILTER_VALIDATE_BOOLEAN),
+    /*
+    | Use explicit true/false from SESSION_SECURE_COOKIE when set. Otherwise treat
+    | production as HTTPS-only cookies (Render, etc.). Avoid relying on an empty
+    | SESSION_SECURE_COOKIE= entry, which would otherwise coerce to insecure cookies.
+    */
+    'secure' => filter_var(
+        env('SESSION_SECURE_COOKIE', env('APP_ENV') === 'production'),
+        FILTER_VALIDATE_BOOLEAN
+    ),
 
     /*
     |--------------------------------------------------------------------------
