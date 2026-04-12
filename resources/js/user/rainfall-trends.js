@@ -20,8 +20,8 @@
     }
 
     function init() {
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
+        if (typeof window.lucide !== 'undefined') {
+            window.lucide.createIcons();
         }
 
         if (typeof Chart === 'undefined') {

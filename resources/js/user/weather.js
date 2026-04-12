@@ -13,8 +13,8 @@
     var SECONDARY_LIGHT = 'rgba(102, 187, 106, 0.25)';
 
     function initLucide() {
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
+        if (typeof window.lucide !== 'undefined') {
+            window.lucide.createIcons();
         }
     }
 

@@ -1,7 +1,7 @@
 /**
  * AGRIGUARD Public navbar: Lucide icons, mobile drawer, scroll shadow, smooth in-page nav
+ * (Lucide is initialized on `window` from resources/js/bootstrap.js.)
  */
-import { createIcons, icons } from 'lucide';
 
 document.addEventListener('DOMContentLoaded', function () {
     const navbar = document.getElementById('navbar');
@@ -11,7 +11,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     try {
         /* Whole document: landing + auth guest pages use Lucide outside the header too. */
-        createIcons({ icons });
+        if (typeof window.lucide !== 'undefined') {
+            window.lucide.createIcons();
+        }
     } catch (e) {
         console.warn('Lucide icons (public shell):', e);
     }

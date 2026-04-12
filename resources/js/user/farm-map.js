@@ -1128,8 +1128,8 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
         }
 
         function lucideRefresh() {
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
+            if (typeof window.lucide !== 'undefined') {
+                window.lucide.createIcons();
             }
         }
 
@@ -1514,8 +1514,8 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                     })
                     .finally(function () {
                         advRefresh.disabled = false;
-                        if (typeof lucide !== 'undefined') {
-                            lucide.createIcons();
+                        if (typeof window.lucide !== 'undefined') {
+                            window.lucide.createIcons();
                         }
                     });
             });
