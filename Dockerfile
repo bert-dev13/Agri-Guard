@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Laravel + Vite build for Render (Docker web service). Uses PostgreSQL via DATABASE_URL.
+# Laravel + Vite build for Render (Docker web service). Uses MySQL (pdo_mysql).
 
 FROM node:22-bookworm-slim AS frontend
 WORKDIR /app
@@ -11,7 +11,7 @@ RUN npm run build
 FROM php:8.2-cli-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
+    default-libmysqlclient-dev \
     libzip-dev \
     zlib1g-dev \
     libpng-dev \
@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libwebp-dev \
     libxml2-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j"$(nproc)" opcache pdo pdo_pgsql zip gd dom \
+    && docker-php-ext-install -j"$(nproc)" opcache pdo pdo_mysql zip gd dom \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

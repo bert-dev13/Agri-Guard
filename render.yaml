@@ -1,14 +1,32 @@
-# AgriGuard on Render: PostgreSQL + Docker web service.
-# First-time Blueprint: set APP_KEY when prompted (php artisan key:generate --show).
-# After deploy: run `php artisan db:seed --force` once in Render Shell if you want the seeded admin user.
-
-databases:
-  - name: agriguard-db
-    plan: free
-    databaseName: agriguard
-    user: agriguard
+# AgriGuard on Render: MySQL (private service) + Docker web app.
+#
+# Render Blueprint `databases:` is Postgres-only. MySQL runs as a private service from
+# Render's template (persistent disk). Private DB instances are not on the free tier.
+#
+# On first Blueprint apply: set APP_KEY when prompted (`php artisan key:generate --show`).
+# Optional: in the web Shell run `php artisan db:seed --force` once for the default admin.
 
 services:
+  - type: pserv
+    name: agriguard-mysql
+    runtime: docker
+    repo: https://github.com/render-examples/mysql.git
+    plan: starter
+    autoDeploy: false
+    disk:
+      name: mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - key: MYSQL_DATABASE
+        value: agriguard
+      - key: MYSQL_USER
+        value: agriguard
+      - key: MYSQL_PASSWORD
+        generateValue: true
+      - key: MYSQL_ROOT_PASSWORD
+        generateValue: true
+
   - type: web
     name: agriguard
     runtime: docker
@@ -22,11 +40,26 @@ services:
       - key: LOG_CHANNEL
         value: stderr
       - key: DB_CONNECTION
-        value: pgsql
-      - key: DATABASE_URL
-        fromDatabase:
-          name: agriguard-db
-          property: connectionString
+        value: mysql
+      - key: DB_HOST
+        fromService:
+          name: agriguard-mysql
+          type: pserv
+          property: host
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_DATABASE
+        value: agriguard
+      - key: DB_USERNAME
+        fromService:
+          name: agriguard-mysql
+          type: pserv
+          envVarKey: MYSQL_USER
+      - key: DB_PASSWORD
+        fromService:
+          name: agriguard-mysql
+          type: pserv
+          envVarKey: MYSQL_PASSWORD
       - key: APP_KEY
         sync: false
       - key: MAIL_MAILER
