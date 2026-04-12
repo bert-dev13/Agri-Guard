@@ -26,9 +26,11 @@ class AuthController extends Controller
     private const DEFAULT_FARM_MUNICIPALITY = 'Amulung';
 
     /**
-     * Generate a 6-digit numeric OTP and send verification email; store hashed code and expiry on user.
+     * Generate a 6-digit OTP, hash it, and persist expiry + attempt state on the user row.
+     *
+     * @return string Plain-text code (only for sending by mail in the same request).
      */
-    private function sendVerificationCode(User $user): void
+    private function generateAndStoreVerificationCode(User $user): string
     {
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $hashed = Hash::make($code);
@@ -43,7 +45,7 @@ class AuthController extends Controller
         ]);
 
         if ($updated === 0) {
-            Log::error('sendVerificationCode: user row not updated', [
+            Log::error('generateAndStoreVerificationCode: user row not updated', [
                 'user_id' => $user->getKey(),
             ]);
             throw new \RuntimeException('Could not store email verification data.');
@@ -51,13 +53,38 @@ class AuthController extends Controller
 
         $user->refresh();
 
-        Mail::to($user->email)->send(new EmailVerificationCodeMail(
-            $code,
-            (string) self::VERIFICATION_CODE_EXPIRY_MINUTES
-        ));
+        return $code;
+    }
 
+    /**
+     * Send the verification email. Failures are logged; callers decide whether to surface an error.
+     */
+    private function deliverVerificationCodeMail(User $user, string $plainCode): bool
+    {
+        try {
+            Mail::to($user->email)->send(new EmailVerificationCodeMail(
+                $plainCode,
+                (string) self::VERIFICATION_CODE_EXPIRY_MINUTES
+            ));
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Email verification mail delivery failed', [
+                'user_id' => $user->getKey(),
+                'email' => $user->email,
+                'mailer' => config('mail.default'),
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    private function flashDevVerificationCodeIfApplicable(string $plainCode): void
+    {
         if (config('mail.default') === 'log' && config('app.debug')) {
-            session()->flash('dev_verification_code', $code);
+            session()->flash('dev_verification_code', $plainCode);
         }
     }
 
@@ -96,14 +123,33 @@ class AuthController extends Controller
             }
 
             if ($user->email_verified_at === null) {
+                $pendingUserId = $user->id;
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
-                $request->session()->put('pending_email_verification_user_id', $user->id);
-                $this->sendVerificationCode($user->fresh());
+                $request->session()->put('pending_email_verification_user_id', $pendingUserId);
+
+                $fresh = User::query()->find($pendingUserId);
+                if (! $fresh instanceof User) {
+                    Log::error('Login unverified: user row missing after session reset', [
+                        'user_id' => $pendingUserId,
+                    ]);
+
+                    return redirect()->route('register')
+                        ->with('message', 'Your account could not be loaded. Please register again.');
+                }
+
+                $plain = $this->generateAndStoreVerificationCode($fresh);
+                $mailOk = $this->deliverVerificationCodeMail($fresh, $plain);
+                $this->flashDevVerificationCodeIfApplicable($plain);
 
                 return redirect()->route('verification.verify')
-                    ->with('message', 'Please verify your email. A new code has been sent to your email address.');
+                    ->with(
+                        'message',
+                        $mailOk
+                            ? 'Please verify your email. A new code has been sent to your email address.'
+                            : 'Please verify your email. We could not send a new code just now — use “Resend code” on this page or try again shortly.'
+                    );
             }
             $request->session()->regenerate();
             $home = $user->isAdmin() ? route('admin.dashboard') : route('dashboard');
@@ -204,11 +250,28 @@ class AuthController extends Controller
             'reality_check_answered' => false,
         ]);
 
-        $this->sendVerificationCode($user);
+        // Persist OTP first, bind session, then send mail. On Render, SMTP timeouts or bad credentials
+        // must not prevent the redirect — otherwise the user sees a blank 500 and the OTP flow breaks.
+        $plain = $this->generateAndStoreVerificationCode($user);
         $request->session()->put('pending_email_verification_user_id', $user->id);
 
+        $mailOk = $this->deliverVerificationCodeMail($user, $plain);
+        $this->flashDevVerificationCodeIfApplicable($plain);
+
+        if (! $mailOk) {
+            Log::warning('Registration: user created but verification email was not delivered', [
+                'user_id' => $user->id,
+                'mailer' => config('mail.default'),
+            ]);
+        }
+
         return redirect()->route('verification.verify')
-            ->with('message', 'We sent a verification code to your email. Enter it below to activate your account.');
+            ->with(
+                'message',
+                $mailOk
+                    ? 'We sent a verification code to your email. Enter it below to activate your account.'
+                    : 'Your account was created. We could not reach the mail server to send the code — use “Resend code” below, or contact support if this keeps happening.'
+            );
     }
 
     /**
@@ -489,7 +552,15 @@ class AuthController extends Controller
             ]);
         }
         RateLimiter::hit($key, 60);
-        $this->sendVerificationCode($user->fresh());
+
+        $user = $user->fresh();
+        $plain = $this->generateAndStoreVerificationCode($user);
+        if (! $this->deliverVerificationCodeMail($user, $plain)) {
+            return back()->withErrors([
+                'resend' => 'We could not send the email right now. Please wait a moment and try again.',
+            ]);
+        }
+        $this->flashDevVerificationCodeIfApplicable($plain);
 
         return back()->with('message', 'A new verification code has been sent to your email.');
     }

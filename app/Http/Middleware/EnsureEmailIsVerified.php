@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureEmailIsVerified
@@ -13,17 +14,25 @@ class EnsureEmailIsVerified
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->user() || $request->user()->email_verified_at === null) {
-            if ($request->user()) {
-                auth()->logout();
-                $request->session()->invalidate();
-                $request->session()->regenerateToken();
-                $request->session()->put('pending_email_verification_user_id', $request->user()->id);
-            }
+        $user = $request->user();
+
+        if (! $user) {
             return redirect()->route('verification.verify')
                 ->with('message', 'Please verify your email address to continue.');
         }
 
-        return $next($request);
+        if ($user->email_verified_at !== null) {
+            return $next($request);
+        }
+
+        $pendingUserId = $user->getAuthIdentifier();
+
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        $request->session()->put('pending_email_verification_user_id', $pendingUserId);
+
+        return redirect()->route('verification.verify')
+            ->with('message', 'Please verify your email address to continue.');
     }
 }
