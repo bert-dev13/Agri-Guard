@@ -1,0 +1,33 @@
+# AgriGuard on Render: PostgreSQL + Docker web service.
+# First-time Blueprint: set APP_KEY when prompted (php artisan key:generate --show).
+# After deploy: run `php artisan db:seed --force` once in Render Shell if you want the seeded admin user.
+
+databases:
+  - name: agriguard-db
+    plan: free
+    databaseName: agriguard
+    user: agriguard
+
+services:
+  - type: web
+    name: agriguard
+    runtime: docker
+    plan: free
+    healthCheckPath: /up
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agriguard-db
+          property: connectionString
+      - key: APP_KEY
+        sync: false
+      - key: MAIL_MAILER
+        value: log

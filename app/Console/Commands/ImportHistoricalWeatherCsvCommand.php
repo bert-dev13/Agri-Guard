@@ -176,6 +176,7 @@ class ImportHistoricalWeatherCsvCommand extends Command
             }
 
             $batch[] = [
+                'city' => '',
                 'year' => $year,
                 'month' => $month,
                 'day' => $day,
@@ -187,7 +188,7 @@ class ImportHistoricalWeatherCsvCommand extends Command
             if (count($batch) >= 500) {
                 HistoricalWeather::query()->upsert(
                     $batch,
-                    ['year', 'month', 'day'],
+                    ['city', 'year', 'month', 'day'],
                     ['rainfall', 'wind_speed', 'wind_direction']
                 );
                 $imported += count($batch);
@@ -200,7 +201,7 @@ class ImportHistoricalWeatherCsvCommand extends Command
         if ($batch !== []) {
             HistoricalWeather::query()->upsert(
                 $batch,
-                ['year', 'month', 'day'],
+                ['city', 'year', 'month', 'day'],
                 ['rainfall', 'wind_speed', 'wind_direction']
             );
             $imported += count($batch);

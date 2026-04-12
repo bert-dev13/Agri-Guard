@@ -9,10 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('password_reset_code', 255)->nullable()->after('verification_locked_until');
-            $table->timestamp('password_reset_expires_at')->nullable()->after('password_reset_code');
-            $table->unsignedTinyInteger('password_reset_attempts')->default(0)->after('password_reset_expires_at');
-            $table->timestamp('password_reset_locked_until')->nullable()->after('password_reset_attempts');
+            // No ->after(): PostgreSQL (e.g. Render) does not support column positioning in migrations.
+            $table->string('password_reset_code', 255)->nullable();
+            $table->timestamp('password_reset_expires_at')->nullable();
+            $table->unsignedTinyInteger('password_reset_attempts')->default(0);
+            $table->timestamp('password_reset_locked_until')->nullable();
         });
     }
 

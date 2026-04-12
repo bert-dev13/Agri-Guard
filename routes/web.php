@@ -10,24 +10,16 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BarangayApiController;
 use App\Http\Controllers\CropProgressController;
 use App\Http\Controllers\FarmMapController;
+use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\RainfallTrendsController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\WeatherDetailsController;
-use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Landing page: show to guests; redirect authenticated users to dashboard
-Route::get('/', function (Request $request) {
-    $user = $request->user();
-    if (! $user instanceof User) {
-        return view('public.landing');
-    }
-
-    return redirect()->route($user->isAdmin() ? 'admin.dashboard' : 'dashboard');
-})->name('landing');
+Route::get('/', LandingController::class)->name('landing');
 
 // Guest-only routes (redirect to dashboard if already logged in)
 Route::middleware('guest')->group(function () {
@@ -90,7 +82,7 @@ Route::middleware(['auth', 'verified.email'])->group(function () {
     Route::put('/settings/farm', [SettingsController::class, 'updateFarm'])->name('settings.farm.update');
 
     // Redirect legacy farm-profile URL to settings
-    Route::get('/farm-profile', fn () => redirect()->route('settings'))->name('farm-profile');
+    Route::permanentRedirect('/farm-profile', '/settings')->name('farm-profile');
 
 });
 
