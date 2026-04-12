@@ -35,7 +35,7 @@
                     </div>
                 </header>
 
-                <div class="ag-card mb-5 p-5 sm:p-6">
+                <div id="user-profile" class="ag-card mb-5 p-5 sm:p-6 scroll-mt-24">
                     <h2 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
                         <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-[#66BB6A]/20 shrink-0">
                             <i data-lucide="user" class="w-5 h-5 text-[#2E7D32]"></i>
@@ -55,20 +55,30 @@
                             <input type="email" id="email" name="email" value="{{ old('email', $user->email) }}" required class="{{ $inputClass }} @error('email') {{ $inputErrorClass }} @enderror" placeholder="your@email.com" />
                             @error('email')<p class="mt-1.5 text-sm text-red-600" role="alert">{{ $message }}</p>@enderror
                         </div>
+                        <div>
+                            <p class="{{ $labelClass }}">Email verification</p>
+                            @if ($user->email_verified_at)
+                                <p class="text-sm text-slate-600 bg-[#E8F5E9]/60 border border-[#66BB6A]/25 rounded-xl px-4 py-3">
+                                    Verified on {{ $user->email_verified_at->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A') }}.
+                                    <span class="block mt-1 text-xs text-slate-500">The one-time code is removed from the database after verification; that is normal.</span>
+                                </p>
+                            @else
+                                <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3">This address is not verified yet. Complete verification from the link sent when you registered.</p>
+                            @endif
+                        </div>
                         <button type="submit" class="{{ $btnPrimary }}">
                             <i data-lucide="save" class="w-4 h-4"></i>
                             Update profile
                         </button>
                     </form>
-                    <div class="mt-5 pt-5 border-t border-slate-100">
-                        <p class="text-sm font-semibold text-slate-700 mb-2">Password</p>
-                        <button type="button" onclick="document.getElementById('password-form').classList.toggle('hidden')" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-[#2E7D32] bg-[#66BB6A]/15 hover:bg-[#66BB6A]/25 transition-colors">
-                            <i data-lucide="key" class="w-4 h-4"></i>
-                            Change Password
-                        </button>
-                    </div>
-                    <div id="password-form" class="hidden mt-5 pt-5 border-t border-slate-100">
-                        <form method="POST" action="{{ route('settings.password.update') }}" class="space-y-4">
+                    <div id="password-section" class="mt-5 pt-5 border-t border-slate-100 scroll-mt-24">
+                        <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <span class="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 shrink-0">
+                                <i data-lucide="key" class="w-4 h-4 text-slate-600"></i>
+                            </span>
+                            Password
+                        </h3>
+                        <form id="password-form" method="POST" action="{{ route('settings.password.update') }}" class="space-y-4">
                             @csrf
                             @method('PUT')
                             <div>
@@ -93,175 +103,110 @@
                     </div>
                 </div>
 
-                <div id="farm-profile" class="ag-card mb-5 p-5 sm:p-6 scroll-mt-24">
-                    <h2 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-[#66BB6A]/20 shrink-0">
-                            <i data-lucide="tractor" class="w-5 h-5 text-[#2E7D32]"></i>
-                        </span>
-                        Farm Profile
-                    </h2>
-                    @php
-                        $coverageDefault = config('agriguard.coverage_area.default', 'amulung');
-                        $coverageArea = config('agriguard.coverage_area.areas.' . $coverageDefault, []);
-                        $coverageLabel = $coverageArea['label'] ?? 'Amulung, Cagayan';
-                    @endphp
-                    <p class="text-sm text-slate-600 bg-[#E8F5E9]/60 border border-[#66BB6A]/30 rounded-xl px-4 py-3 mb-4 flex items-start gap-2">
-                        <i data-lucide="info" class="w-5 h-5 text-[#2E7D32] shrink-0 mt-0.5"></i>
-                        <span>AGRIGUARD currently supports farms within <strong>{{ $coverageLabel }}</strong> only.</span>
-                    </p>
-                    <form method="POST" action="{{ route('settings.farm.update') }}" class="space-y-4">
+                @php
+                    $coverageDefault = config('agriguard.coverage_area.default', 'amulung');
+                    $coverageArea = config('agriguard.coverage_area.areas.' . $coverageDefault, []);
+                    $coverageLabel = $coverageArea['label'] ?? 'Amulung, Cagayan';
+                @endphp
+                <div id="farm-profile" class="ag-card mb-5 p-5 sm:p-6 scroll-mt-24 settings-farm-profile">
+                    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                        <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-[#66BB6A]/20 shrink-0">
+                                <i data-lucide="tractor" class="w-5 h-5 text-[#2E7D32]"></i>
+                            </span>
+                            Farm Profile
+                        </h2>
+                        <p class="text-xs text-slate-500 max-w-[16rem] md:max-w-none md:text-right leading-snug">{{ $coverageLabel }} only.</p>
+                    </div>
+                    <form method="POST" action="{{ route('settings.farm.update') }}" class="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
                         @csrf
                         @method('PUT')
-                        <input type="hidden" name="farm_municipality" value="Amulung" />
                         <div>
-                            <label for="farm_location_display" class="{{ $labelClass }}">Farm Location</label>
-                            <p class="text-sm text-slate-600 bg-[#F4F6F5] rounded-xl px-4 py-3">{{ $locationFull }}</p>
+                            <label for="farm_municipality" class="{{ $labelClass }}">Municipality</label>
+                            <select
+                                id="farm_municipality"
+                                name="farm_municipality"
+                                required
+                                class="{{ $inputClass }} @error('farm_municipality') {{ $inputErrorClass }} @enderror"
+                                data-old="{{ old('farm_municipality', $user->farm_municipality) }}"
+                            >
+                                <option value="">Select municipality</option>
+                                @foreach ($municipalities as $mun)
+                                    <option value="{{ $mun }}" @selected(old('farm_municipality', $user->farm_municipality) === $mun)>{{ $mun }}</option>
+                                @endforeach
+                            </select>
+                            @error('farm_municipality')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label for="crop_type" class="{{ $labelClass }}">Crop Type</label>
-                                <select id="crop_type" name="crop_type" required class="{{ $inputClass }} @error('crop_type') {{ $inputErrorClass }} @enderror">
-                                    <option value="">Select crop...</option>
-                                    <option value="Rice" {{ old('crop_type', $user->crop_type) === 'Rice' ? 'selected' : '' }}>Rice</option>
-                                    <option value="Corn" {{ old('crop_type', $user->crop_type) === 'Corn' ? 'selected' : '' }}>Corn</option>
-                                </select>
-                                @error('crop_type')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
-                            </div>
-                            <div>
-                                <label for="farming_stage" class="{{ $labelClass }}">Farming Stage</label>
-                                <select id="farming_stage" name="farming_stage" class="{{ $inputClass }} @error('farming_stage') {{ $inputErrorClass }} @enderror">
-                                    <option value="">Select stage...</option>
-                                    <option value="land_preparation" {{ old('farming_stage', $user->farming_stage) === 'land_preparation' ? 'selected' : '' }}>Land Preparation</option>
-                                    <option value="planting" {{ old('farming_stage', $user->farming_stage) === 'planting' ? 'selected' : '' }}>Planting</option>
-                                    <option value="early_growth" {{ old('farming_stage', $user->farming_stage) === 'early_growth' ? 'selected' : '' }}>Early Growth</option>
-                                    <option value="growing" {{ old('farming_stage', $user->farming_stage) === 'growing' ? 'selected' : '' }}>Growing Stage</option>
-                                    <option value="flowering_fruiting" {{ old('farming_stage', $user->farming_stage) === 'flowering_fruiting' ? 'selected' : '' }}>Flowering / Fruiting</option>
-                                    <option value="harvesting" {{ old('farming_stage', $user->farming_stage) === 'harvesting' ? 'selected' : '' }}>Harvesting</option>
-                                </select>
-                                @error('farming_stage')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
-                            </div>
-                            <div>
-                                <label for="planting_date" class="{{ $labelClass }}">Planting Date</label>
-                                <input type="date" id="planting_date" name="planting_date" value="{{ old('planting_date', $user->planting_date?->format('Y-m-d')) }}" required class="{{ $inputClass }} @error('planting_date') {{ $inputErrorClass }} @enderror" />
-                                @error('planting_date')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                        <div>
+                            <label for="farm_barangay_code" class="{{ $labelClass }}">Barangay</label>
+                            <select id="farm_barangay_code" name="farm_barangay_code" required class="{{ $inputClass }} @error('farm_barangay_code') {{ $inputErrorClass }} @enderror" data-api-url="{{ url('/api/barangays') }}" data-municipality-select="farm_municipality" data-old="{{ old('farm_barangay_code', $user->farm_barangay_code ?? '') }}">
+                                <option value="">Select barangay</option>
+                            </select>
+                            @error('farm_barangay_code')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="md:col-span-2">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Farm location</p>
+                            <p class="text-sm text-slate-700 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">{{ $locationFull }}</p>
+                        </div>
+                        <div>
+                            <label for="crop_type" class="{{ $labelClass }}">Crop</label>
+                            <select id="crop_type" name="crop_type" required class="{{ $inputClass }} @error('crop_type') {{ $inputErrorClass }} @enderror">
+                                <option value="">Select crop</option>
+                                <option value="Rice" {{ old('crop_type', $user->crop_type) === 'Rice' ? 'selected' : '' }}>Rice</option>
+                                <option value="Corn" {{ old('crop_type', $user->crop_type) === 'Corn' ? 'selected' : '' }}>Corn</option>
+                            </select>
+                            @error('crop_type')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Growth stage</p>
+                            <p class="text-sm text-slate-700 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                                {{ app(\App\Services\CropTimelineService::class)->inferExpectedStageFromPlanting($user)['label'] }}
+                                <span class="block text-xs text-slate-500 mt-1 font-normal normal-case">Set from crop type and planting date. Adjust in Crop Progress if the field differs.</span>
+                            </p>
+                        </div>
+                        <div>
+                            <label for="planting_date" class="{{ $labelClass }}">Planting date</label>
+                            <input type="date" id="planting_date" name="planting_date" value="{{ old('planting_date', $user->planting_date?->format('Y-m-d')) }}" max="{{ now()->format('Y-m-d') }}" required class="{{ $inputClass }} @error('planting_date') {{ $inputErrorClass }} @enderror" />
+                            @error('planting_date')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="farm_area" class="{{ $labelClass }}">Area (m²)</label>
+                            <input type="number" id="farm_area" name="farm_area" value="{{ old('farm_area', $user->farm_area) }}" placeholder="1200" min="0.01" step="any" required class="{{ $inputClass }} @error('farm_area') {{ $inputErrorClass }} @enderror" inputmode="decimal" />
+                            @error('farm_area')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="md:col-span-2 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Map pin</p>
+                                    <input type="hidden" id="farm_lat" name="farm_lat" value="{{ old('farm_lat', $user->farm_lat) }}" />
+                                    <input type="hidden" id="farm_lng" name="farm_lng" value="{{ old('farm_lng', $user->farm_lng) }}" />
+                                    <p id="farm-coords-display" class="text-sm text-slate-800 tabular-nums font-medium @if(!old('farm_lat', $user->farm_lat)) hidden @endif"><span id="farm-coords-text">{{ old('farm_lat', $user->farm_lat) && old('farm_lng', $user->farm_lng) ? number_format((float)old('farm_lat', $user->farm_lat), 5) . ', ' . number_format((float)old('farm_lng', $user->farm_lng), 5) : '' }}</span></p>
+                                    <p id="farm-coords-placeholder" class="text-sm text-slate-400 @if(old('farm_lat', $user->farm_lat)) hidden @endif">Not set</p>
+                                </div>
+                                <button type="button" id="btn-use-current-location" class="inline-flex items-center justify-center gap-2 shrink-0 px-4 py-2 rounded-xl text-sm font-medium text-[#2E7D32] bg-white border border-[#66BB6A]/40 hover:bg-[#66BB6A]/10 transition-colors">
+                                    <i data-lucide="map-pin" class="w-4 h-4"></i>
+                                    Use location
+                                </button>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label for="farm_area" class="{{ $labelClass }}">Farm Area (m²)</label>
-                                <input type="number" id="farm_area" name="farm_area" value="{{ old('farm_area', $user->farm_area) }}" placeholder="e.g. 1200" min="0.01" step="any" required class="{{ $inputClass }} @error('farm_area') {{ $inputErrorClass }} @enderror" inputmode="decimal" />
-                                @error('farm_area')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
-                            </div>
-                            <div>
-                                <label for="farm_barangay" class="{{ $labelClass }}">Barangay</label>
-                                <select id="farm_barangay" name="farm_barangay" required class="{{ $inputClass }} @error('farm_barangay') {{ $inputErrorClass }} @enderror" data-api-url="{{ url('/api/amulung-barangays') }}" data-old="{{ old('farm_barangay', $user->farm_barangay) }}">
-                                    <option value="">Select barangay</option>
-                                </select>
-                                @error('farm_barangay')<p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>@enderror
-                            </div>
-                        </div>
-                        <div class="pt-2 border-t border-slate-100">
-                            <p class="text-sm font-semibold text-slate-700 mb-1.5">Farm map location</p>
-                            <p class="text-xs text-slate-500 mb-2">Set your farm coordinates for weather and advisory. Optional: use current location.</p>
-                            <input type="hidden" id="farm_lat" name="farm_lat" value="{{ old('farm_lat', $user->farm_lat) }}" />
-                            <input type="hidden" id="farm_lng" name="farm_lng" value="{{ old('farm_lng', $user->farm_lng) }}" />
-                            <p id="farm-coords-display" class="text-sm text-slate-600 mb-2 @if(!old('farm_lat', $user->farm_lat)) hidden @endif">Coordinates: <span id="farm-coords-text">{{ old('farm_lat', $user->farm_lat) && old('farm_lng', $user->farm_lng) ? number_format((float)old('farm_lat', $user->farm_lat), 5) . ', ' . number_format((float)old('farm_lng', $user->farm_lng), 5) : '' }}</span></p>
-                            <button type="button" id="btn-use-current-location" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-[#2E7D32] bg-[#66BB6A]/15 hover:bg-[#66BB6A]/25 transition-colors">
-                                <i data-lucide="map-pin" class="w-4 h-4"></i>
-                                Use current location
+                        <div class="md:col-span-2 pt-1">
+                            <button type="submit" class="{{ $btnPrimary }} w-full sm:w-auto justify-center">
+                                <i data-lucide="save" class="w-4 h-4"></i>
+                                Save farm
                             </button>
                         </div>
-                        <button type="submit" class="{{ $btnPrimary }}">
-                            <i data-lucide="save" class="w-4 h-4"></i>
-                            Edit Farm Information
-                        </button>
                     </form>
-                </div>
-
-                <div class="ag-card mb-5 p-5 sm:p-6">
-                    <h2 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-[#FFCA28]/20 shrink-0">
-                            <i data-lucide="bell" class="w-5 h-5 text-[#F9A825]"></i>
-                        </span>
-                        Notification Settings
-                    </h2>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between py-2">
-                            <div class="flex items-center gap-3">
-                                <i data-lucide="cloud-rain" class="w-5 h-5 text-[#2E7D32]"></i>
-                                <span class="text-sm font-medium text-slate-800">Rain Alerts</span>
-                            </div>
-                            <button type="button" class="ag-toggle active" data-pref="rain" aria-pressed="true" role="switch" title="Toggle rain alerts">
-                                <span class="ag-toggle-dot block"></span>
-                            </button>
-                        </div>
-                        <div class="flex items-center justify-between py-2">
-                            <div class="flex items-center gap-3">
-                                <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600"></i>
-                                <span class="text-sm font-medium text-slate-800">Heavy Rain Warnings</span>
-                            </div>
-                            <button type="button" class="ag-toggle active" data-pref="heavy" aria-pressed="true" role="switch">
-                                <span class="ag-toggle-dot block"></span>
-                            </button>
-                        </div>
-                        <div class="flex items-center justify-between py-2">
-                            <div class="flex items-center gap-3">
-                                <i data-lucide="waves" class="w-5 h-5 text-red-600"></i>
-                                <span class="text-sm font-medium text-slate-800">Flood Risk Alerts</span>
-                            </div>
-                            <button type="button" class="ag-toggle active" data-pref="flood" aria-pressed="true" role="switch">
-                                <span class="ag-toggle-dot block"></span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="ag-card mb-5 p-5 sm:p-6">
-                    <h2 class="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-[#66BB6A]/20 shrink-0">
-                            <i data-lucide="thermometer" class="w-5 h-5 text-[#2E7D32]"></i>
-                        </span>
-                        Weather Preferences
-                    </h2>
-                    <div class="space-y-5">
-                        <div>
-                            <p class="text-sm font-semibold text-slate-700 mb-2">Temperature Unit</p>
-                            <div class="flex gap-3">
-                                <label class="flex-1 flex items-center gap-2 p-3 rounded-xl border-2 border-[#2E7D32] bg-[#2E7D32]/5 cursor-pointer">
-                                    <input type="radio" name="temp_unit" value="C" class="sr-only" checked>
-                                    <span class="text-sm font-medium text-slate-800">Celsius (°C)</span>
-                                </label>
-                                <label class="flex-1 flex items-center gap-2 p-3 rounded-xl border-2 border-slate-200 hover:border-slate-300 cursor-pointer">
-                                    <input type="radio" name="temp_unit" value="F" class="sr-only">
-                                    <span class="text-sm font-medium text-slate-800">Fahrenheit (°F)</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div>
-                            <p class="text-sm font-semibold text-slate-700 mb-2">Rainfall Unit</p>
-                            <div class="flex gap-3">
-                                <label class="flex-1 flex items-center gap-2 p-3 rounded-xl border-2 border-[#2E7D32] bg-[#2E7D32]/5 cursor-pointer">
-                                    <input type="radio" name="rain_unit" value="mm" class="sr-only" checked>
-                                    <span class="text-sm font-medium text-slate-800">mm</span>
-                                </label>
-                                <label class="flex-1 flex items-center gap-2 p-3 rounded-xl border-2 border-slate-200 hover:border-slate-300 cursor-pointer">
-                                    <input type="radio" name="rain_unit" value="in" class="sr-only">
-                                    <span class="text-sm font-medium text-slate-800">inches</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="ag-card p-5 sm:p-6">
                     <h2 class="text-base font-bold text-slate-900 mb-4">Account Actions</h2>
                     <div class="space-y-3">
-                        <button type="button" onclick="document.getElementById('password-form').classList.remove('hidden'); document.getElementById('password-form').scrollIntoView({behavior:'smooth'})" class="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-left">
+                        <a href="#password-section" class="w-full flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-left no-underline text-inherit">
                             <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-100 shrink-0">
                                 <i data-lucide="lock" class="w-5 h-5 text-slate-600"></i>
                             </span>
-                            <span class="font-medium text-slate-800">Change Password</span>
-                        </button>
+                            <span class="font-medium text-slate-800">Change password</span>
+                        </a>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="w-full flex items-center gap-3 p-4 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 transition-colors text-left">
@@ -276,7 +221,3 @@
             </div>
         </section>
 @endsection
-
-@push('scripts')
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-@endpush

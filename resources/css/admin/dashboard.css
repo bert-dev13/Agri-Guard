@@ -1,0 +1,507 @@
+/**
+ * Admin dashboard — clean overview (AgriGuard teal / light)
+ */
+
+.admin-dashboard-page {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    background: linear-gradient(165deg, #ecfdf5 0%, #f0fdfa 40%, #f8fafc 100%);
+    color: #0f172a;
+}
+
+.admin-dashboard-page .admin-main {
+    padding-bottom: 1.25rem;
+}
+
+.admin-dashboard-page .admin-page {
+    padding-inline: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .admin-dashboard-page .admin-page {
+        padding-inline: 0;
+    }
+}
+
+/* ---- Header (shared: dashboard, user management, etc.) ---- */
+.admin-dash-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.45rem 1.45rem 1.5rem;
+    margin-bottom: 2.2rem;
+    border-radius: 16px;
+    background:
+        linear-gradient(120deg, rgb(20 184 166 / 0.08), transparent 45%),
+        #fff;
+    border: 1px solid rgb(226 232 240 / 0.95);
+    box-shadow: 0 4px 24px rgb(15 23 42 / 0.06);
+    width: 100%;
+    animation: adminHeaderEnter 420ms ease-out both;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.admin-dash-header:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 30px rgb(15 118 110 / 0.08);
+    border-color: rgb(20 184 166 / 0.28);
+}
+
+@media (min-width: 768px) {
+    .admin-dash-header {
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.75rem;
+        padding: 1.75rem 1.95rem 1.8rem;
+    }
+}
+
+.admin-dash-header__title {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+}
+
+@media (min-width: 640px) {
+    .admin-dash-header__title {
+        font-size: 1.72rem;
+    }
+}
+
+.admin-dash-header__subtitle {
+    margin: 0.45rem 0 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: #6b7280;
+}
+
+.admin-dash-header__date {
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.72rem;
+    border-radius: 999px;
+    border: 1px solid rgb(15 118 110 / 0.2);
+    background: rgb(240 253 250 / 0.9);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f766e;
+}
+
+.admin-dash-header__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.admin-dash-header__meta {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.admin-dash-header__title-icon,
+.admin-dash-header__date-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-dash-header__title-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 10px;
+    background: rgb(20 184 166 / 0.12);
+    color: #0f766e;
+}
+
+.admin-dash-header__title-icon svg,
+.admin-dash-header__date-icon svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.admin-dash-header__date-icon {
+    color: #0f766e;
+}
+
+@media (max-width: 767px) {
+    .admin-dash-header__meta {
+        margin-top: 0.15rem;
+    }
+}
+
+@keyframes adminHeaderEnter {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ---- Sections ---- */
+.admin-dash-section {
+    margin-bottom: 2.4rem;
+}
+
+@media (min-width: 1024px) {
+    .admin-dash-section {
+        margin-bottom: 2.25rem;
+    }
+}
+
+.admin-dash-section__title {
+    margin: 0 0 0.85rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.admin-dash-section__header .admin-dash-section__title {
+    margin-bottom: 0.35rem;
+}
+
+.admin-dash-section__subtitle {
+    margin: 0 0 1.1rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #64748b;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* ---- Quick Actions (below Overview) ---- */
+.admin-dash-section--quick-actions {
+    margin-top: 0.35rem;
+}
+
+.admin-quick-actions {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+    width: 100%;
+}
+
+@media (min-width: 640px) {
+    .admin-quick-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem 1.1rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .admin-quick-actions {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1.1rem 1.2rem;
+    }
+}
+
+.admin-quick-action-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    padding: 1.1rem 1.15rem 1.15rem;
+    min-width: 0;
+    text-decoration: none;
+    color: inherit;
+    border-radius: 1.125rem;
+    background: #fff;
+    border: 1px solid rgb(226 232 240 / 0.95);
+    box-shadow: 0 4px 18px rgb(15 23 42 / 0.055);
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.admin-quick-action-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgb(15 118 110 / 0.12);
+    border-color: rgb(45 212 191 / 0.35);
+}
+
+.admin-quick-action-card:active {
+    transform: translateY(-1px) scale(0.99);
+    box-shadow: 0 6px 20px rgb(15 23 42 / 0.08);
+}
+
+.admin-quick-action-card:focus-visible {
+    outline: 2px solid #0d9488;
+    outline-offset: 2px;
+}
+
+.admin-quick-action-card__icon {
+    flex-shrink: 0;
+    width: 2.65rem;
+    height: 2.65rem;
+    border-radius: 0.875rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(20 184 166 / 0.12);
+    color: #0f766e;
+}
+
+.admin-quick-action-card__icon svg {
+    width: 1.3rem;
+    height: 1.3rem;
+}
+
+.admin-quick-action-card:nth-child(2) .admin-quick-action-card__icon {
+    background: rgb(22 163 74 / 0.11);
+    color: #15803d;
+}
+
+.admin-quick-action-card:nth-child(3) .admin-quick-action-card__icon {
+    background: rgb(14 165 233 / 0.11);
+    color: #0369a1;
+}
+
+.admin-quick-action-card:nth-child(4) .admin-quick-action-card__icon {
+    background: rgb(100 116 139 / 0.1);
+    color: #475569;
+}
+
+.admin-quick-action-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.admin-quick-action-card__title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.admin-quick-action-card__desc {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+/* ---- Stat grids (3- or 4-up on large screens) ---- */
+.admin-stat-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+    width: 100%;
+}
+
+.admin-stat-grid--four {
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+    .admin-stat-grid--four {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-stat-grid--three {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .admin-stat-grid--four {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1.15rem 1.25rem;
+    }
+
+    .admin-stat-grid--three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1.15rem 1.25rem;
+    }
+}
+
+.admin-stat-grid--three {
+    grid-template-columns: 1fr;
+}
+
+.admin-stat-card {
+    position: relative;
+    padding: 1.2rem 1.25rem 1.3rem;
+    min-width: 0;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgb(226 232 240 / 0.9);
+    box-shadow: 0 4px 20px rgb(15 23 42 / 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.admin-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgb(15 118 110 / 0.1);
+    border-color: rgb(45 212 191 / 0.3);
+}
+
+.admin-stat-card__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.25rem;
+}
+
+.admin-stat-card__icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.admin-stat-card--farmers .admin-stat-card__icon {
+    background: rgb(22 163 74 / 0.1);
+    color: #166534;
+}
+
+.admin-stat-card--users .admin-stat-card__icon {
+    background: rgb(20 184 166 / 0.13);
+    color: #0f766e;
+}
+
+.admin-stat-card--admins .admin-stat-card__icon {
+    background: rgb(13 148 136 / 0.12);
+    color: #0f766e;
+}
+
+.admin-stat-card--active .admin-stat-card__icon {
+    background: rgb(14 165 233 / 0.1);
+    color: #0369a1;
+}
+
+.admin-stat-card--risk .admin-stat-card__icon {
+    background: rgb(245 158 11 / 0.12);
+    color: #b45309;
+}
+
+.admin-stat-card__value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    order: 0;
+}
+
+.admin-stat-card__label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    order: 1;
+}
+
+.admin-stat-card__meta {
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    line-height: 1.35;
+    margin-top: 0.15rem;
+    order: 2;
+}
+
+.admin-stat-card__icon {
+    order: -1;
+}
+
+.admin-dash-panel {
+    padding: 1.4rem 1.45rem;
+    min-width: 0;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgb(226 232 240 / 0.9);
+    box-shadow: 0 4px 20px rgb(15 23 42 / 0.05);
+}
+
+.admin-dash-panel__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.admin-dash-panel__hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: #475569;
+}
+
+.admin-dash-panel--overview {
+    margin-bottom: 2.35rem;
+}
+
+.admin-dash-panel--chart {
+    padding: 1.2rem 1.2rem 1rem;
+}
+
+.admin-dash-chart__header {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 0.7rem;
+}
+
+.admin-dash-chart__canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 320px;
+}
+
+@media (max-width: 767px) {
+    .admin-dash-chart__header {
+        align-items: flex-start;
+    }
+
+    .admin-dash-chart__canvas-wrap {
+        height: 300px;
+        overflow-x: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-stat-card,
+    .admin-dash-header,
+    .admin-quick-action-card {
+        transition: none;
+    }
+
+    .admin-dash-header {
+        animation: none;
+    }
+
+    .admin-stat-card:hover,
+    .admin-dash-header:hover {
+        transform: none;
+    }
+
+    .admin-quick-action-card:hover,
+    .admin-quick-action-card:active {
+        transform: none;
+    }
+}

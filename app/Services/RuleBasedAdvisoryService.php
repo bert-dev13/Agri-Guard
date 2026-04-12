@@ -13,12 +13,17 @@ use App\Models\User;
 class RuleBasedAdvisoryService
 {
     public const THRESHOLD_HIGH_MM = 60;
+
     public const THRESHOLD_MODERATE_MM = 30;
+
     public const RAIN_PROBABILITY_STRENGTHEN_PERCENT = 70;
+
     public const HISTORICAL_HIGH_RAIN_MM = 50;
 
     public const RISK_LOW = 'LOW';
+
     public const RISK_MODERATE = 'MODERATE';
+
     public const RISK_HIGH = 'HIGH';
 
     /**
@@ -54,7 +59,7 @@ class RuleBasedAdvisoryService
         // Base risk from forecast rainfall
         $riskLevel = $this->resolveBaseRiskLevel($rainMm);
         if ($rainMm >= self::THRESHOLD_HIGH_MM) {
-            $contributingFactors[] = 'Heavy rainfall forecast (' . round($rainMm) . ' mm or more)';
+            $contributingFactors[] = 'Heavy rainfall forecast ('.round($rainMm).' mm or more)';
         } elseif ($rainMm >= self::THRESHOLD_MODERATE_MM) {
             $contributingFactors[] = 'Moderate rainfall expected';
         }
@@ -65,7 +70,7 @@ class RuleBasedAdvisoryService
         $recommendedAction = $messages['action'];
 
         if ($rainProb !== null && $rainProb >= self::RAIN_PROBABILITY_STRENGTHEN_PERCENT) {
-            $contributingFactors[] = 'High rain probability (' . $rainProb . '%)';
+            $contributingFactors[] = 'High rain probability ('.$rainProb.'%)';
             $strengthened = $this->strengthenForHighRainProbability(
                 $riskLevel, $advisoryTitle, $advisoryMessage, $recommendedAction
             );
@@ -76,7 +81,7 @@ class RuleBasedAdvisoryService
         }
 
         if ($historicalAvg !== null && $historicalAvg >= self::HISTORICAL_HIGH_RAIN_MM) {
-            $contributingFactors[] = 'Historically wet month (avg ' . round($historicalAvg) . ' mm)';
+            $contributingFactors[] = 'Historically wet month (avg '.round($historicalAvg).' mm)';
             $strengthened = $this->strengthenForHistoricalWetMonth(
                 $riskLevel, $advisoryTitle, $advisoryMessage, $recommendedAction, $historicalAvg
             );
@@ -100,7 +105,7 @@ class RuleBasedAdvisoryService
         }
 
         if ($farmingStage) {
-            $contributingFactors[] = 'Crop in ' . $this->farmingStageLabel($farmingStage) . ' stage';
+            $contributingFactors[] = 'Crop in '.$this->farmingStageLabel($farmingStage).' stage';
             $tailored = $this->tailorForFarmingStage(
                 $farmingStage, $riskLevel, $advisoryTitle, $advisoryMessage, $recommendedAction
             );
@@ -168,6 +173,7 @@ class RuleBasedAdvisoryService
         if ($rainMm >= self::THRESHOLD_MODERATE_MM && $rainMm < self::THRESHOLD_HIGH_MM) {
             return self::RISK_MODERATE;
         }
+
         return self::RISK_LOW;
     }
 
@@ -204,6 +210,7 @@ class RuleBasedAdvisoryService
         if ($riskLevel === self::RISK_HIGH) {
             $message .= ' Rain chance is high — expect wet conditions for some time.';
             $action = 'Check drainage, secure tools, and protect stored crops. Stay updated on forecasts.';
+
             return ['risk_level' => $riskLevel, 'advisory_title' => $title, 'advisory_message' => $message, 'recommended_action' => $action];
         }
         if ($riskLevel === self::RISK_MODERATE) {
@@ -214,6 +221,7 @@ class RuleBasedAdvisoryService
                 'recommended_action' => 'Prepare drainage, secure tools, and watch updates. Be ready to limit field work if it gets worse.',
             ];
         }
+
         return [
             'risk_level' => self::RISK_MODERATE,
             'advisory_title' => 'Higher chance of rain',
@@ -229,7 +237,7 @@ class RuleBasedAdvisoryService
         string $action,
         float $historicalAvg
     ): array {
-        $message .= ' This month often has strong rain (avg ' . round($historicalAvg) . ' mm).';
+        $message .= ' This month often has strong rain (avg '.round($historicalAvg).' mm).';
 
         if ($riskLevel === self::RISK_LOW) {
             return [
@@ -262,6 +270,7 @@ class RuleBasedAdvisoryService
             $message .= ' Your field may collect water easily.';
             $action = 'Clear drainage paths and watch water levels. Protect seeds or crops near low areas.';
         }
+
         return ['advisory_title' => $title, 'advisory_message' => $message, 'recommended_action' => $action];
     }
 
@@ -276,14 +285,18 @@ class RuleBasedAdvisoryService
             'land_preparation' => 'Check soil moisture and prepare drainage before planting.',
             'planting' => 'Protect seeds and seedlings. Heavy rain may wash them away.',
             'early_growth' => 'Watch root growth. Avoid waterlogging in the field.',
+            'vegetative' => 'Keep drainage clear. Too much rain can wash away nutrients.',
             'growing' => 'Keep drainage clear. Too much rain can wash away nutrients.',
+            'flowering' => 'Lessen crop stress. Check for disease after rain.',
             'flowering_fruiting' => 'Lessen crop stress. Check for disease after rain.',
+            'harvest' => 'Harvest ready crops first. Avoid spoilage and flooding.',
             'harvesting' => 'Harvest ready crops first. Avoid spoilage and flooding.',
         ];
         $stageAction = $stageActions[$farmingStage] ?? null;
         if ($stageAction && in_array($riskLevel, [self::RISK_MODERATE, self::RISK_HIGH], true)) {
-            $action = $stageAction . ' ' . $action;
+            $action = $stageAction.' '.$action;
         }
+
         return ['advisory_title' => $title, 'advisory_message' => $message, 'recommended_action' => trim($action)];
     }
 
@@ -301,6 +314,7 @@ class RuleBasedAdvisoryService
             if (in_array($riskLevel, [self::RISK_MODERATE, self::RISK_HIGH], true)) {
                 $action = 'Check field drainage and water level. Clear canals. Protect stored grain.';
             }
+
             return ['advisory_title' => $title, 'advisory_message' => $message, 'recommended_action' => $action];
         }
 
@@ -325,6 +339,7 @@ class RuleBasedAdvisoryService
                 return true;
             }
         }
+
         return false;
     }
 
@@ -334,9 +349,12 @@ class RuleBasedAdvisoryService
             'land_preparation' => 'land preparation',
             'planting' => 'planting',
             'early_growth' => 'early growth',
-            'growing' => 'growing',
-            'flowering_fruiting' => 'flowering or fruiting',
-            'harvesting' => 'harvesting',
+            'vegetative' => 'vegetative',
+            'growing' => 'vegetative',
+            'flowering' => 'flowering',
+            'flowering_fruiting' => 'flowering',
+            'harvest' => 'harvest',
+            'harvesting' => 'harvest',
             default => $stage,
         };
     }

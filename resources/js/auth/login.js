@@ -1,28 +1,31 @@
-// AGRIGUARD login interactions
+// AGRIGUARD login + auth password fields
 // - Toggle password visibility without relying on Lucide's DOM replacement.
 
 document.addEventListener('DOMContentLoaded', () => {
-    const toggleBtn = document.querySelector('[data-password-toggle]');
-    const passwordInput = document.querySelector('[data-password-input]');
-    if (!toggleBtn || !passwordInput) return;
+    document.querySelectorAll('.input-wrap.with-password-toggle').forEach((wrap) => {
+        const toggleBtn = wrap.querySelector('[data-password-toggle]');
+        const passwordInput = wrap.querySelector('[data-password-input]');
+        if (!toggleBtn || !passwordInput) {
+            return;
+        }
 
-    const eyeIconWrap = toggleBtn.querySelector('[data-eye-icon]');
-    const eyeOffIconWrap = toggleBtn.querySelector('[data-eye-off-icon]');
+        const eyeIconWrap = toggleBtn.querySelector('[data-eye-icon]');
+        const eyeOffIconWrap = toggleBtn.querySelector('[data-eye-off-icon]');
 
-    const sync = () => {
-        const isPasswordHidden = passwordInput.type === 'password';
+        const sync = () => {
+            const isPasswordHidden = passwordInput.type === 'password';
 
-        if (eyeIconWrap) eyeIconWrap.classList.toggle('hidden', !isPasswordHidden);
-        if (eyeOffIconWrap) eyeOffIconWrap.classList.toggle('hidden', isPasswordHidden);
+            if (eyeIconWrap) eyeIconWrap.classList.toggle('hidden', !isPasswordHidden);
+            if (eyeOffIconWrap) eyeOffIconWrap.classList.toggle('hidden', isPasswordHidden);
 
-        toggleBtn.setAttribute('aria-label', isPasswordHidden ? 'Show password' : 'Hide password');
-    };
+            toggleBtn.setAttribute('aria-label', isPasswordHidden ? 'Show password' : 'Hide password');
+        };
 
-    toggleBtn.addEventListener('click', () => {
-        passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+        toggleBtn.addEventListener('click', () => {
+            passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+            sync();
+        });
+
         sync();
     });
-
-    sync();
 });
-

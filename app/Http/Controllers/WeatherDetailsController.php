@@ -2,12 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Services\TogetherAiService;
+use App\Services\AiAdvisory\AiAdvisoryService;
 use App\Services\WeatherAdvisoryService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class WeatherDetailsController extends Controller
@@ -15,7 +12,7 @@ class WeatherDetailsController extends Controller
     /**
      * Show the Weather Details page with full forecast, metrics, and charts.
      */
-    public function show(WeatherAdvisoryService $weatherService, TogetherAiService $togetherAiService): View
+    public function show(WeatherAdvisoryService $weatherService, AiAdvisoryService $aiAdvisory): View
     {
         $user = Auth::user();
         $data = $weatherService->getAdvisoryData($user);
@@ -80,23 +77,27 @@ class WeatherDetailsController extends Controller
             $user->farming_stage
         );
 
-        $hourlySummary = $this->summarizeHourlyRainChances($data['hourly_forecast'] ?? []);
-        $todayRainfallMm = $weather['today_expected_rainfall'] ?? null;
+        $todayRainfallMm = is_array($weather) ? ($weather['today_expected_rainfall'] ?? null) : null;
         $weekRainfallMm = is_numeric($todayRainfallMm) ? ((float) $todayRainfallMm * 7) : null;
         $monthRainfallMm = is_numeric($todayRainfallMm) ? ((float) $todayRainfallMm * 30) : null;
 
-        $smartRecommendation = $this->generateWeatherSmartRecommendation(
+        $weatherInput = $aiAdvisory->buildWeatherInput(
             $user,
-            $togetherAiService,
             $weather,
             $forecast,
-            $hourlySummary,
+            $data['hourly_forecast'] ?? [],
+            $locationDisplay,
             $rainProbDisplay,
             $todayRainfallMm,
             $weekRainfallMm,
-            $monthRainfallMm,
-            $locationDisplay
+            $monthRainfallMm
         );
+        $modelName = (string) (config('togetherai.model') ?? config('services.togetherai.model', ''));
+        $weatherRun = $aiAdvisory->run(AiAdvisoryService::PAGE_WEATHER, $user, $weatherInput);
+        $smartRecommendation = [
+            'recommendation' => $aiAdvisory->formatWeatherRecommendation($weatherRun, $modelName),
+            'failed' => (($weatherRun['_meta']['ai_status'] ?? 'failed') !== 'success'),
+        ];
 
         return view('user.weather.weather-details', [
             'weather' => $weather,
@@ -127,287 +128,6 @@ class WeatherDetailsController extends Controller
         ]);
     }
 
-    private function summarizeHourlyRainChances(array $hourlyForecast): array
-    {
-        $segments = [
-            'morning_rain_chance' => [],
-            'afternoon_rain_chance' => [],
-            'evening_rain_chance' => [],
-        ];
-
-        foreach ($hourlyForecast as $row) {
-            $time = (string) ($row['time'] ?? '');
-            $hour = is_numeric(substr($time, 0, 2)) ? (int) substr($time, 0, 2) : null;
-            $pop = is_numeric($row['pop'] ?? null) ? (float) $row['pop'] : null;
-
-            if ($hour === null || $pop === null) {
-                continue;
-            }
-
-            if ($hour < 12) {
-                $segments['morning_rain_chance'][] = $pop;
-            } elseif ($hour < 18) {
-                $segments['afternoon_rain_chance'][] = $pop;
-            } else {
-                $segments['evening_rain_chance'][] = $pop;
-            }
-        }
-
-        return [
-            'morning_rain_chance' => ! empty($segments['morning_rain_chance']) ? (int) round(array_sum($segments['morning_rain_chance']) / count($segments['morning_rain_chance'])) : null,
-            'afternoon_rain_chance' => ! empty($segments['afternoon_rain_chance']) ? (int) round(array_sum($segments['afternoon_rain_chance']) / count($segments['afternoon_rain_chance'])) : null,
-            'evening_rain_chance' => ! empty($segments['evening_rain_chance']) ? (int) round(array_sum($segments['evening_rain_chance']) / count($segments['evening_rain_chance'])) : null,
-        ];
-    }
-
-    private function generateWeatherSmartRecommendation(
-        User $user,
-        TogetherAiService $togetherAiService,
-        ?array $weather,
-        array $forecast,
-        array $hourlySummary,
-        mixed $rainProbDisplay,
-        mixed $todayRainfallMm,
-        mixed $weekRainfallMm,
-        mixed $monthRainfallMm,
-        string $locationDisplay
-    ): array {
-        $payload = [
-            'crop_type' => $user->crop_type,
-            'growth_stage' => $user->farming_stage,
-            'farm_location' => $locationDisplay,
-            'current_weather' => [
-                'condition' => $weather['condition']['main'] ?? ($weather['condition']['description'] ?? 'Unknown'),
-                'temperature' => is_numeric($weather['temp'] ?? null) ? (float) $weather['temp'] : null,
-                'humidity' => is_numeric($weather['humidity'] ?? null) ? (int) round((float) $weather['humidity']) : null,
-                'rain_chance' => is_numeric($rainProbDisplay) ? (int) round((float) $rainProbDisplay) : null,
-                'wind_speed' => is_numeric($weather['wind_speed'] ?? null) ? (float) $weather['wind_speed'] : null,
-            ],
-            'forecast_data' => array_map(static function (array $day): array {
-                return [
-                    'day' => (string) ($day['day_name'] ?? ''),
-                    'condition' => (string) ($day['condition']['main'] ?? ($day['condition']['description'] ?? 'Unknown')),
-                    'temp_min' => is_numeric($day['temp_min'] ?? null) ? (float) $day['temp_min'] : null,
-                    'temp_max' => is_numeric($day['temp_max'] ?? null) ? (float) $day['temp_max'] : null,
-                    'rain_chance' => is_numeric($day['pop'] ?? null) ? (int) round((float) $day['pop']) : null,
-                    'wind_speed' => is_numeric($day['wind_speed'] ?? null) ? (float) $day['wind_speed'] : null,
-                ];
-            }, array_slice($forecast, 0, 5)),
-            'hourly_rain_chance' => $hourlySummary,
-            'rainfall_indicators' => [
-                'today_mm' => is_numeric($todayRainfallMm) ? (float) $todayRainfallMm : null,
-                'week_mm' => is_numeric($weekRainfallMm) ? (float) $weekRainfallMm : null,
-                'month_mm' => is_numeric($monthRainfallMm) ? (float) $monthRainfallMm : null,
-                'flood_risk' => is_numeric($rainProbDisplay) && (int) $rainProbDisplay >= 75,
-                'soil_saturation_risk' => is_numeric($monthRainfallMm) && (float) $monthRainfallMm >= 220,
-            ],
-        ];
-
-        $fallback = $this->weatherRecommendationFallback($payload);
-        $modelName = (string) (config('togetherai.model') ?? config('services.togetherai.model', ''));
-
-        try {
-            $response = $togetherAiService->generateRecommendation($payload, $this->weatherRecommendationPrompt());
-            $decoded = $this->decodeRecommendationJson((string) ($response['raw_content'] ?? ''));
-
-            if (! is_array($decoded)) {
-                throw new \RuntimeException('Together AI returned malformed JSON payload.');
-            }
-
-            return [
-                'recommendation' => array_merge(
-                    $this->normalizeWeatherRecommendation($decoded, $fallback),
-                    [
-                        'ai_status' => 'success',
-                        'ai_model' => (string) ($response['model_used'] ?? $modelName),
-                        'ai_error' => '',
-                    ]
-                ),
-                'failed' => false,
-                'meta' => [
-                    'ai_status' => 'success',
-                    'ai_model' => (string) ($response['model_used'] ?? $modelName),
-                    'ai_error' => '',
-                ],
-            ];
-        } catch (\Throwable $e) {
-            Log::error('Weather page AI recommendation failed', [
-                'user_id' => $user->id,
-                'message' => $e->getMessage(),
-                'exception' => $e::class,
-                'location' => $locationDisplay,
-                'payload' => $payload,
-            ]);
-
-            return [
-                'recommendation' => array_merge(
-                    $fallback,
-                    [
-                        'ai_status' => 'failed',
-                        'ai_model' => $modelName,
-                        'ai_error' => 'Weather recommendation AI unavailable.',
-                    ]
-                ),
-                'failed' => true,
-                'meta' => [
-                    'ai_status' => 'failed',
-                    'ai_model' => $modelName,
-                    'ai_error' => 'Weather recommendation AI unavailable.',
-                ],
-            ];
-        }
-    }
-
-    private function weatherRecommendationPrompt(): string
-    {
-        return <<<'PROMPT'
-You are an agricultural weather advisor for smallholder farmers.
-Analyze only the provided JSON input and produce one compact recommendation for today.
-
-Return valid JSON only with exactly these keys:
-{
-  "main_recommendation": "string",
-  "farm_score": 1-10 integer,
-  "ai_confidence": "Low|Medium|High",
-  "why": "string",
-  "today_plan": {
-    "morning": "string",
-    "afternoon": "string",
-    "evening": "string"
-  },
-  "avoid": "string",
-  "water_strategy": "string",
-  "risk_level": "Low|Moderate|High"
-}
-
-Rules:
-- Keep language simple for farmers.
-- Keep each field concise and actionable.
-- Respect crop_type and growth_stage.
-- Use weather, humidity, rain chance, wind, forecast_data, and rainfall_indicators.
-- Do not add markdown, code fences, or extra keys.
-PROMPT;
-    }
-
-    private function decodeRecommendationJson(string $rawContent): ?array
-    {
-        $trimmed = trim($rawContent);
-        if ($trimmed === '') {
-            return null;
-        }
-
-        $decoded = json_decode($trimmed, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            return $decoded;
-        }
-
-        if (preg_match('/\{.*\}/s', $trimmed, $matches) === 1) {
-            $decoded = json_decode((string) $matches[0], true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return $decoded;
-            }
-        }
-
-        return null;
-    }
-
-    private function normalizeWeatherRecommendation(array $raw, array $fallback): array
-    {
-        $farmScore = is_numeric($raw['farm_score'] ?? null) ? (int) round((float) $raw['farm_score']) : (int) $fallback['farm_score'];
-        $farmScore = max(1, min(10, $farmScore));
-
-        $confidence = strtolower((string) ($raw['ai_confidence'] ?? ''));
-        $confidence = match ($confidence) {
-            'high' => 'High',
-            'medium', 'med' => 'Medium',
-            'low' => 'Low',
-            default => $fallback['ai_confidence'],
-        };
-
-        $risk = strtolower((string) ($raw['risk_level'] ?? ''));
-        $risk = match ($risk) {
-            'high' => 'High',
-            'moderate', 'medium' => 'Moderate',
-            'low' => 'Low',
-            default => $fallback['risk_level'],
-        };
-
-        $planRaw = is_array($raw['today_plan'] ?? null) ? $raw['today_plan'] : [];
-
-        return [
-            'main_recommendation' => trim((string) ($raw['main_recommendation'] ?? '')) !== ''
-                ? trim((string) $raw['main_recommendation'])
-                : $fallback['main_recommendation'],
-            'farm_score' => $farmScore,
-            'ai_confidence' => $confidence,
-            'why' => trim((string) ($raw['why'] ?? '')) !== ''
-                ? trim((string) $raw['why'])
-                : $fallback['why'],
-            'today_plan' => [
-                'morning' => trim((string) ($planRaw['morning'] ?? '')) !== ''
-                    ? trim((string) $planRaw['morning'])
-                    : $fallback['today_plan']['morning'],
-                'afternoon' => trim((string) ($planRaw['afternoon'] ?? '')) !== ''
-                    ? trim((string) $planRaw['afternoon'])
-                    : $fallback['today_plan']['afternoon'],
-                'evening' => trim((string) ($planRaw['evening'] ?? '')) !== ''
-                    ? trim((string) $planRaw['evening'])
-                    : $fallback['today_plan']['evening'],
-            ],
-            'avoid' => trim((string) ($raw['avoid'] ?? '')) !== ''
-                ? trim((string) $raw['avoid'])
-                : $fallback['avoid'],
-            'water_strategy' => trim((string) ($raw['water_strategy'] ?? '')) !== ''
-                ? trim((string) $raw['water_strategy'])
-                : $fallback['water_strategy'],
-            'risk_level' => $risk,
-        ];
-    }
-
-    private function weatherRecommendationFallback(array $payload): array
-    {
-        $rainChance = $payload['current_weather']['rain_chance'] ?? null;
-        $windSpeed = $payload['current_weather']['wind_speed'] ?? null;
-        $cropType = (string) ($payload['crop_type'] ?? 'your crop');
-
-        $riskLevel = 'Moderate';
-        if (is_numeric($rainChance) && (int) $rainChance >= 75) {
-            $riskLevel = 'High';
-        } elseif (is_numeric($rainChance) && (int) $rainChance < 35) {
-            $riskLevel = 'Low';
-        }
-
-        $mainRecommendation = 'Do light farm work early, then monitor weather changes before noon.';
-        if ($riskLevel === 'High') {
-            $mainRecommendation = 'Prioritize drainage and crop protection, and postpone non-urgent field work.';
-        } elseif ($riskLevel === 'Low') {
-            $mainRecommendation = 'Good weather window for key field tasks and careful water management.';
-        }
-
-        return [
-            'main_recommendation' => $mainRecommendation,
-            'farm_score' => $riskLevel === 'High' ? 4 : ($riskLevel === 'Low' ? 8 : 6),
-            'ai_confidence' => 'Medium',
-            'why' => 'Based on current rain chance, wind, and short-term forecast trends for your location.',
-            'today_plan' => [
-                'morning' => "Inspect {$cropType} field condition and finish priority tasks while weather is manageable.",
-                'afternoon' => $riskLevel === 'High'
-                    ? 'Limit field exposure and secure drainage lines before heavier rain.'
-                    : 'Continue moderate tasks and recheck rain updates.',
-                'evening' => 'Prepare tools and field channels for overnight weather changes.',
-            ],
-            'avoid' => is_numeric($windSpeed) && (float) $windSpeed >= 20
-                ? 'Avoid spraying during strong winds and before possible rain.'
-                : 'Avoid heavy fertilizer application right before possible rain.',
-            'water_strategy' => $riskLevel === 'High'
-                ? 'Reduce irrigation and focus on draining excess water from low areas.'
-                : ($riskLevel === 'Low'
-                    ? 'Use normal irrigation with moisture checks in the late afternoon.'
-                    : 'Apply balanced irrigation and adjust based on rain updates.'),
-            'risk_level' => $riskLevel,
-        ];
-    }
-
     /**
      * Map OpenWeatherMap condition id to simple farmer-friendly label.
      */
@@ -434,6 +154,7 @@ PROMPT;
         if ($conditionId === 804) {
             return 'Overcast';
         }
+
         return 'Cloudy';
     }
 
@@ -454,10 +175,74 @@ PROMPT;
         if ($conditionId === 800) {
             return 'sun';
         }
-        if ($conditionId === 801 || $conditionId === 802) {
-            return 'cloud-sun';
+        if ($conditionId >= 801 && $conditionId <= 804) {
+            return 'cloud';
         }
+
         return 'cloud';
+    }
+
+    /**
+     * Map OpenWeatherMap condition id to clay-style SVG variant (see x-clay-weather-icon).
+     */
+    public static function simpleWeatherClayType(int $conditionId): string
+    {
+        if ($conditionId >= 200 && $conditionId < 300) {
+            return 'storm';
+        }
+        if ($conditionId >= 300 && $conditionId < 600) {
+            return 'rain';
+        }
+        if ($conditionId >= 600 && $conditionId < 700) {
+            return 'snow';
+        }
+        if ($conditionId === 800) {
+            return 'sun';
+        }
+        if ($conditionId === 801) {
+            return 'partly_cloudy';
+        }
+        if ($conditionId === 802) {
+            return 'cloud';
+        }
+        if ($conditionId === 803) {
+            return 'cloud';
+        }
+        if ($conditionId === 804) {
+            return 'overcast';
+        }
+
+        return 'cloud';
+    }
+
+    /**
+     * Map OpenWeatherMap condition id to a single emoji (matches dashboard farm-summary style).
+     */
+    public static function simpleWeatherEmoji(int $conditionId): string
+    {
+        if ($conditionId >= 200 && $conditionId < 300) {
+            return '⛈️';
+        }
+        if ($conditionId >= 300 && $conditionId < 600) {
+            return '🌧️';
+        }
+        if ($conditionId >= 600 && $conditionId < 700) {
+            return '❄️';
+        }
+        if ($conditionId === 800) {
+            return '☀️';
+        }
+        if ($conditionId === 801) {
+            return '🌤️';
+        }
+        if ($conditionId === 802) {
+            return '⛅';
+        }
+        if ($conditionId >= 803 && $conditionId <= 804) {
+            return '☁️';
+        }
+
+        return '☁️';
     }
 
     /**
@@ -480,6 +265,7 @@ PROMPT;
             if (str_contains($cropLower, 'vegetable')) {
                 return 'Rain may damage sensitive vegetables. Protect raised beds and harvest ready produce early if needed.';
             }
+
             return 'Rain may cause water buildup in low areas. Prepare drainage and monitor field conditions.';
         }
 
@@ -490,7 +276,7 @@ PROMPT;
             if ($farmingStage === 'early_growth' && str_contains($cropLower, 'corn')) {
                 return 'Young corn plants may be affected by prolonged wet soil. Watch for root stress.';
             }
-            if ($farmingStage === 'harvesting') {
+            if (in_array($farmingStage, ['harvest', 'harvesting'], true)) {
                 return 'Harvest-ready crops may need early harvest if heavy rain continues. Avoid spoilage and water damage.';
             }
         }
@@ -526,6 +312,7 @@ PROMPT;
         if ($maxPop >= 40 || $rainyDays >= 1) {
             return 'Some rain possible. Keep an eye on the forecast.';
         }
+
         return 'Weather looks stable. Low chance of rain.';
     }
 

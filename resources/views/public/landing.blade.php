@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'AGRIGUARD – Smart Weather Insights for Safer Farming')
+@section('title', 'AGRIGUARD – Farm Decisions Powered by Weather, Crop Data, and AI')
 
 @section('body-class', 'min-h-screen flex flex-col bg-[#F8FAFC]')
 
@@ -8,7 +8,7 @@
     {{-- Hero — bg #F8FAFC --}}
     <section id="home" class="landing-section-hero relative min-h-[90vh] flex items-center pt-24 pb-28 lg:pt-32 lg:pb-36 overflow-hidden bg-[#F8FAFC]">
         <div class="absolute inset-0 pointer-events-none bg-[#F8FAFC]">
-            <div class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90 hero-bg-image" style="background-image: url('{{ asset('images/background-image.png') }}');"></div>
+            <div class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90 hero-bg-image"></div>
             <div class="absolute inset-0 bg-gradient-to-r from-[#F8FAFC] via-[#F8FAFC]/85 to-[#F8FAFC]/40 pointer-events-none"></div>
             <div class="absolute inset-0 bg-gradient-to-br from-[#00809D]/[0.04] via-transparent to-[#10B981]/[0.04] pointer-events-none"></div>
             <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-[#00809D]/[0.05] rounded-full blur-3xl"></div>
@@ -25,13 +25,13 @@
                         <span class="hero-brand-wordmark text-[#00809D]">AGRIGUARD</span>
                     </div>
                     <h1 class="hero-subheadline text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] tracking-tight mt-2">
-                        Smart Weather Insights for <span class="text-[#00809D]">Safer Farming</span>
+                        Smarter Farm Decisions with <span class="text-[#00809D]">Weather, Crop Insights, and AI</span>
                     </h1>
                     <p class="hero-description mt-6 text-lg text-slate-600 leading-relaxed">
-                        A decision support system that helps farmers prepare for heavy rain and flood risks using real-time weather insights.
+                        A weather-informed decision support system that helps farmers use real-time weather, crop conditions, map insights, and AI recommendations for smarter daily farm decisions.
                     </p>
                     <div class="hero-buttons mt-10 flex flex-wrap gap-4">
-                        <a href="{{ url('/register') }}" class="inline-flex items-center justify-center px-7 py-3.5 rounded-xl bg-[#00809D] text-white font-semibold shadow-lg shadow-[#00809D]/25 hover:bg-[#00809D]/90 hover:shadow-xl hover:shadow-[#00809D]/30 hover:-translate-y-0.5 transition-all duration-300">
+                        <a href="{{ url('/register') }}" class="hero-get-started-btn inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold">
                             Get Started
                             <i data-lucide="arrow-right" class="w-4 h-4 ml-2"></i>
                         </a>
@@ -42,7 +42,7 @@
                 </div>
                 <div class="order-1 lg:order-2 flex items-center justify-center lg:justify-end min-w-0">
                     <div class="hero-image-focal hero-image-reveal">
-                        <img src="{{ asset('images/hero_image.png') }}" alt="Smart Weather Insights for Safer Farming" class="hero-image-main" />
+                        <img src="{{ asset('images/hero_image.png') }}" alt="Farm Decisions Powered by Weather, Crop Data, and AI" class="hero-image-main" />
                     </div>
                 </div>
             </div>
@@ -54,13 +54,13 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto scroll-reveal mb-14 lg:mb-16">
                 <h2 class="text-3xl sm:text-4xl font-bold text-slate-900">See AGRIGUARD in Action</h2>
-                <p class="mt-4 text-lg text-slate-600">Dashboard, weather results, and advisories in one place.</p>
+                <p class="mt-4 text-lg text-slate-600">Dashboard, Weather, Rainfall Trends, Crop, Map, and Assistant in one place.</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
                 <div class="scroll-reveal space-y-6 order-2 lg:order-1">
                     <p class="text-slate-600 leading-relaxed">
-                        AGRIGUARD brings weather data, flood risk, and preparedness advice into one simple interface. View forecasts, check risk levels, and get actionable advisories tailored to your farm.
+                        AGRIGUARD brings weather, rainfall, crop, map, and AI assistance into one simple interface. View farm conditions, monitor crop progress, and get smart recommendations tailored to your location.
                     </p>
                     <ul class="space-y-4">
                         <li class="flex items-start gap-3">
@@ -68,8 +68,8 @@
                                 <i data-lucide="cloud-rain" class="w-5 h-5"></i>
                             </span>
                             <div>
-                                <span class="font-semibold text-slate-900">Weather &amp; risk at a glance</span>
-                                <p class="text-sm text-slate-600 mt-0.5">Rainfall forecast and flood risk for your area in one view.</p>
+                                <span class="font-semibold text-slate-900">Weather and rainfall at a glance</span>
+                                <p class="text-sm text-slate-600 mt-0.5">Access real-time weather conditions and rainfall trends in one view.</p>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
@@ -77,8 +77,8 @@
                                 <i data-lucide="clipboard-list" class="w-5 h-5"></i>
                             </span>
                             <div>
-                                <span class="font-semibold text-slate-900">Clear advisories</span>
-                                <p class="text-sm text-slate-600 mt-0.5">Actionable recommendations when conditions change.</p>
+                                <span class="font-semibold text-slate-900">AI farm guidance</span>
+                                <p class="text-sm text-slate-600 mt-0.5">Ask questions and receive AI-powered, farm-specific recommendations.</p>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
@@ -87,7 +87,7 @@
                             </span>
                             <div>
                                 <span class="font-semibold text-slate-900">One dashboard</span>
-                                <p class="text-sm text-slate-600 mt-0.5">Dashboard, Weather, My Farms, and Advisories in a single app.</p>
+                                <p class="text-sm text-slate-600 mt-0.5">Dashboard, Weather, Rainfall Trends, Crop Monitoring, Map, and AI Assistant in one integrated system.</p>
                             </div>
                         </li>
                     </ul>
@@ -98,8 +98,10 @@
                         <div class="flex items-center gap-1 px-4 py-3 bg-slate-50 border-b border-slate-200">
                             <span class="px-3 py-1.5 rounded-lg bg-[#00809D] text-white text-xs font-medium">Dashboard</span>
                             <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Weather</span>
-                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">My Farms</span>
-                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Advisories</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Rainfall Trends</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Crop</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Map</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Assistant</span>
                         </div>
                         <div class="p-5 space-y-4 min-h-[280px]">
                             <div class="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between gap-3">
@@ -116,7 +118,7 @@
                             </div>
                             <div class="rounded-xl border border-[#10B981]/30 bg-[#10B981]/5 p-4">
                                 <p class="text-xs font-semibold text-[#10B981] uppercase tracking-wide">Advisory Active</p>
-                                <p class="text-sm font-medium text-slate-900 mt-1">Preparedness advisory</p>
+                                <p class="text-sm font-medium text-slate-900 mt-1">AI Smart Advisory (Based on Weather, Crop Stage, and Location)</p>
                                 <p class="text-xs text-slate-600 mt-2 leading-relaxed">Consider draining excess water from low-lying areas. Secure stored harvest. Monitor livestock locations.</p>
                             </div>
                         </div>
@@ -131,15 +133,15 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <header class="how-it-works__header text-center max-w-2xl mx-auto mb-14 lg:mb-16 scroll-reveal">
                 <h2 class="how-it-works__title text-3xl sm:text-4xl font-bold text-slate-900">How It Works</h2>
-                <p class="how-it-works__subtitle mt-4 text-lg text-slate-600">Four simple steps from sign-up to smart advisories.</p>
+                <p class="how-it-works__subtitle mt-4 text-lg text-slate-600">Four simple steps from sign-up to smart farm guidance.</p>
             </header>
 
             <ol class="how-it-works__grid relative z-10">
                 @foreach([
                     ['num' => '01', 'icon' => 'user-plus', 'title' => 'Register Account', 'desc' => 'Create your account in minutes. No complex setup.'],
                     ['num' => '02', 'icon' => 'map-pinned', 'title' => 'Enter Farm Details', 'desc' => 'Add your farm location and key details for accurate risk analysis.'],
-                    ['num' => '03', 'icon' => 'cloud-sun', 'title' => 'Analyze Weather & Flood Risk', 'desc' => 'We process weather data and classify flood risk for your area.'],
-                    ['num' => '04', 'icon' => 'bell', 'title' => 'Receive Smart Advisories', 'desc' => 'Get clear, actionable preparedness advice when you need it.'],
+                    ['num' => '03', 'icon' => 'cloud-sun', 'title' => 'Analyze Weather, Rainfall Patterns, and Farm Conditions', 'desc' => 'We combine weather data, rainfall trends, and your farm conditions to support better decisions.'],
+                    ['num' => '04', 'icon' => 'bell', 'title' => 'Receive Smart Actions and AI-Powered Recommendations', 'desc' => 'Get clear actions and AI recommendations based on your farm location, weather, and crop stage.'],
                 ] as $step)
                     <li class="scroll-reveal">
                         <article class="how-step-card h-full">
@@ -163,16 +165,16 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16 lg:mb-20 scroll-reveal">
                 <h2 class="text-3xl sm:text-4xl font-bold text-slate-900">Features</h2>
-                <p class="mt-4 text-lg text-slate-600">Everything you need to stay ahead of rain and flood risks.</p>
+                <p class="mt-4 text-lg text-slate-600">Tools that match your daily workflow across Dashboard, Weather, Rainfall, Crop, Map, and Assistant.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                 @foreach([
-                    ['icon' => 'cloud', 'title' => 'Real-Time Weather Monitoring', 'desc' => 'Live rainfall and storm tracking for your area.'],
-                    ['icon' => 'cloud-rain', 'title' => 'Rainfall Forecast Analysis', 'desc' => 'See expected rainfall and intensity ahead of time.'],
-                    ['icon' => 'alert-triangle', 'title' => 'Flood Risk Classification', 'desc' => 'Clear risk levels so you know when to take action.'],
-                    ['icon' => 'leaf', 'title' => 'Farm-Specific Preparedness Advice', 'desc' => 'Recommendations tailored to your farm and crops.'],
-                    ['icon' => 'layout-dashboard', 'title' => 'Simple Farmer Dashboard', 'desc' => 'One place for weather, risk, and advisories.'],
-                    ['icon' => 'users', 'title' => 'Community Agriculture Support', 'desc' => 'Support for cooperatives and local agriculture offices.'],
+                    ['icon' => 'layout-dashboard', 'title' => 'Dashboard', 'desc' => 'View your farm\'s daily snapshot, weather summary, and smart actions in one place.'],
+                    ['icon' => 'cloud', 'title' => 'Weather', 'desc' => 'Access real-time weather conditions and short-term forecasts for your farm.'],
+                    ['icon' => 'cloud-rain', 'title' => 'Rainfall Trends', 'desc' => 'Analyze historical rainfall patterns to support better planning.'],
+                    ['icon' => 'sprout', 'title' => 'Crop Stage Monitoring', 'desc' => 'Track crop growth stages and receive stage-based recommendations.'],
+                    ['icon' => 'map-pinned', 'title' => 'Map-Based Farm Insights', 'desc' => 'Visualize your farm location with GPS, rainfall, and flood risk insights.'],
+                    ['icon' => 'bot', 'title' => 'AI Farm Assistant', 'desc' => 'Ask questions and get AI-powered, farm-specific recommendations.'],
                 ] as $feature)
                     <div class="scroll-reveal features-card group h-full">
                         <div class="h-full flex flex-col p-6 lg:p-8 rounded-2xl bg-[#F8FAFC] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-[#00809D]/8 hover:-translate-y-1.5 hover:border-[#00809D]/20 transition-all duration-300">
@@ -191,6 +193,35 @@
 
 @push('head')
     <style>
+        .hero-get-started-btn {
+            min-height: 2.75rem;
+            color: #0f766e;
+            background: #ecfeff;
+            border: 1px solid rgba(15, 118, 110, 0.28);
+            box-shadow: 0 8px 20px -16px rgba(15, 23, 42, 0.7);
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .hero-get-started-btn:hover {
+            background: #dff7fa;
+            border-color: rgba(15, 118, 110, 0.42);
+            color: #0f766e;
+            transform: translateY(-1px);
+        }
+
+        .hero-get-started-btn:focus-visible {
+            outline: 2px solid rgba(15, 118, 110, 0.35);
+            outline-offset: 2px;
+        }
+
+        .hero-get-started-btn:active {
+            transform: translateY(0);
+        }
+
+        .hero-bg-image {
+            background-image: url("/images/background-image.png");
+        }
+
         .how-it-works__grid {
             --how-card-radius: 1rem;
             --how-card-border: rgba(148, 163, 184, 0.22);

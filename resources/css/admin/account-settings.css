@@ -1,0 +1,194 @@
+.admin-account-settings-page {
+    background: linear-gradient(165deg, #ecfdf5 0%, #f0fdfa 40%, #f8fafc 100%);
+}
+
+.admin-account-settings-page .admin-main {
+    padding-bottom: 1.25rem;
+}
+
+.admin-account-settings-page .admin-page {
+    padding-inline: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .admin-account-settings-page .admin-page {
+        padding-inline: 0;
+    }
+}
+
+.admin-account-settings__header {
+    margin-top: 0;
+    margin-bottom: 1.2rem;
+}
+
+.admin-account-settings__flash {
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    border: 1px solid transparent;
+}
+
+.admin-account-settings__flash--success {
+    background: rgb(22 163 74 / 0.08);
+    border-color: rgb(22 163 74 / 0.25);
+    color: #166534;
+}
+
+.admin-account-settings__flash--error {
+    background: rgb(239 68 68 / 0.06);
+    border-color: rgb(239 68 68 / 0.22);
+    color: #b91c1c;
+}
+
+.admin-account-settings__errors {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+.admin-account-settings__card {
+    width: 100%;
+    background: #fff;
+    border: 1px solid rgb(226 232 240 / 0.95);
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgb(15 23 42 / 0.05);
+    padding: 1.15rem 1.25rem 1.25rem;
+}
+
+.admin-account-settings__info {
+    margin-bottom: 1rem;
+    padding-bottom: 0.95rem;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.admin-account-settings__badge-wrap {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.admin-account-settings__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    border: 1px solid transparent;
+}
+
+.admin-account-settings__badge--role {
+    color: #5b21b6;
+    background: rgb(139 92 246 / 0.12);
+    border-color: rgb(139 92 246 / 0.25);
+}
+
+.admin-account-settings__badge--status {
+    color: #166534;
+    background: rgb(22 163 74 / 0.12);
+    border-color: rgb(22 163 74 / 0.22);
+}
+
+.admin-account-settings__form {
+    width: 100%;
+}
+
+.admin-account-settings__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+}
+
+@media (max-width: 767px) {
+    .admin-account-settings__grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.admin-account-settings__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.admin-account-settings__field--full {
+    grid-column: 1 / -1;
+}
+
+.admin-account-settings__label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.admin-account-settings__input {
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.875rem;
+    min-height: 2.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-family: inherit;
+}
+
+.admin-account-settings__input:focus {
+    outline: 2px solid #5eead4;
+    outline-offset: 1px;
+    border-color: #99f6e4;
+    background: #fff;
+}
+
+.admin-account-settings__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid #eef2f7;
+}
+
+.admin-account-settings__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.admin-account-settings__btn--primary {
+    color: #fff;
+    background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+    border: 1px solid rgb(15 118 110 / 0.24);
+    box-shadow: 0 2px 10px rgb(15 118 110 / 0.2);
+}
+
+.admin-account-settings__btn--primary:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+}
+
+.admin-account-settings__btn--reset {
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+}
+
+.admin-account-settings__btn--reset:hover {
+    color: #0f766e;
+    border-color: #99f6e4;
+    background: #f0fdfa;
+    transform: translateY(-1px);
+}

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\TogetherAiService;
+use App\Services\AiAdvisory\AiAdvisoryService;
+use App\Services\CropTimelineService;
 use App\Services\WeatherAdvisoryService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,46 +16,253 @@ use Illuminate\View\View;
 
 class CropProgressController extends Controller
 {
-    private const TIMELINE_STAGES = [
-        'planting' => 'Planting',
-        'early_growth' => 'Early Growth',
-        'growing' => 'Vegetative',
-        'flowering_fruiting' => 'Flowering',
-        'harvesting' => 'Harvesting',
-    ];
+    /** @deprecated Use CropTimelineService::STAGE_LABELS */
+    private const TIMELINE_STAGES = CropTimelineService::STAGE_LABELS;
 
-    private const STAGE_LABELS = [
-        'land_preparation' => 'Land Preparation',
-        'planting' => 'Planting',
-        'early_growth' => 'Early Growth',
-        'growing' => 'Vegetative',
-        'flowering_fruiting' => 'Flowering',
-        'harvesting' => 'Harvesting',
-    ];
-
-    public function index(WeatherAdvisoryService $weatherAdvisoryService, TogetherAiService $togetherAiService): View
-    {
+    public function index(
+        WeatherAdvisoryService $weatherAdvisoryService,
+        AiAdvisoryService $aiAdvisoryService,
+        CropTimelineService $timelineService,
+    ): View {
         /** @var User $user */
         $user = Auth::user();
         $weatherContext = $this->buildWeatherContext($user, $weatherAdvisoryService);
-        $stageInsights = $this->generateStageAdvice($user, $weatherContext, $togetherAiService);
+        $stageInsights = $this->generateStageAdvice($user, $weatherContext, $aiAdvisoryService);
+
+        $rec = $stageInsights['recommendation'];
+        $offsetDays = (int) ($user->crop_timeline_offset_days ?? 0);
+
+        $durations = $timelineService->stageDurationsForCrop((string) ($user->crop_type ?? ''));
+        $expected = $timelineService->inferExpectedStageFromPlanting($user, $durations);
+
+        if (! empty($rec['timeline']) && is_array($rec['timeline'])) {
+            $rec['timeline'] = $timelineService->applyOffsetToTimeline($rec['timeline'], $offsetDays);
+            foreach ($rec['timeline'] as &$row) {
+                if (is_array($row)) {
+                    $row['date_range_line'] = $timelineService->formatStageTypicalWindow(
+                        (string) ($row['stage'] ?? ''),
+                        (string) ($row['target_date'] ?? ''),
+                        (string) ($user->crop_type ?? '')
+                    );
+                }
+            }
+            unset($row);
+            $rec['timeline'] = $timelineService->applyCalendarStatusToTimeline($rec['timeline'], $expected['key']);
+        }
+
+        $nextItem = $this->resolveNextStage($rec['timeline'] ?? []);
+        if ($nextItem !== null) {
+            $rec['next_stage'] = $nextItem['stage'] ?? ($rec['next_stage'] ?? null);
+            $rec['next_stage_target_date'] = $nextItem['target_date'] ?? ($rec['next_stage_target_date'] ?? null);
+        }
+
+        $rec['days_remaining'] = $timelineService->nextStageDaysRemaining($rec['next_stage_target_date'] ?? null)
+            ?? (is_numeric($rec['days_remaining'] ?? null) ? (int) $rec['days_remaining'] : null);
+        $actualKey = $timelineService->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
+        $comparison = $timelineService->compareActualToExpected($actualKey, $expected['key']);
+
+        $humanAdjustment = $timelineService->humanAdjustmentLabel(
+            (string) ($rec['timeline_adjustment_reason'] ?? ''),
+            (string) ($rec['timeline_adjustment_label'] ?? 'On schedule')
+        );
+
+        if ($comparison === 'behind') {
+            $humanAdjustment = 'Growth is slower than expected';
+        } elseif ($comparison === 'ahead' && $humanAdjustment === 'On track with the current estimate') {
+            $humanAdjustment = 'Growing faster than typical for this season';
+        }
+
+        $growthSpeed = $timelineService->growthSpeed(
+            $comparison,
+            $user->crop_stage_reality_check,
+            $offsetDays
+        );
+
+        $confidence = $timelineService->confidenceDisplay($weatherContext);
+        $confidenceIsLow = ($confidence['level'] ?? 'medium') === 'low';
+
+        $realityQuestionStage = $this->resolveRealityQuestionStageLabel($user, $rec);
+        $questionStageKey = $this->normalizeStageLabelToKey($realityQuestionStage);
+
+        $nextStageDateRange = ! empty($rec['next_stage_target_date'])
+            ? $timelineService->formatStageTypicalWindow(
+                (string) ($rec['next_stage'] ?? ''),
+                (string) $rec['next_stage_target_date'],
+                (string) ($user->crop_type ?? '')
+            )
+            : null;
+
+        $realityReopened = (bool) session()->pull('reality_check_reopened', false);
+
+        $realityUi = $this->resolveRealityCheckUiState(
+            $user,
+            $comparison,
+            $growthSpeed,
+            $confidenceIsLow,
+            $questionStageKey,
+            $actualKey,
+            $realityReopened
+        );
+
+        $plantingDateFormatted = $user->planting_date
+            ? $user->planting_date->timezone(config('app.timezone'))->format('M j, Y')
+            : null;
+        $plantingDayLine = ! $expected['has_planting_date']
+            ? 'No planting date set — add one in Farm Settings.'
+            : (($expected['days_until_planting'] ?? null) !== null && (int) $expected['days_until_planting'] > 0
+                ? 'Planting in '.(int) $expected['days_until_planting'].' day'.(((int) $expected['days_until_planting'] === 1) ? '' : 's').' ('.$plantingDateFormatted.').'
+                : (($expected['days_since_planting'] ?? null) !== null
+                    ? (int) $expected['days_since_planting'].' day'.(((int) $expected['days_since_planting'] === 1) ? '' : 's').' since planting ('.$plantingDateFormatted.').'
+                    : 'Planted '.$plantingDateFormatted.'.'));
 
         return view('user.crop-progress.index', [
             'user' => $user,
             'stages' => self::TIMELINE_STAGES,
-            'farm_name' => trim((string) $user->name) . ' Farm',
-            'current_stage' => $user->farming_stage,
-            'current_stage_label' => $this->stageLabel($user->farming_stage),
+            'farm_name' => trim((string) $user->name).' Farm',
+            'current_stage' => $expected['key'],
+            'current_stage_label' => $expected['label'],
+            'manual_stage_label' => $this->stageLabel($user->farming_stage),
             'weather_context' => $weatherContext,
-            'recommendation' => $stageInsights['recommendation'],
+            'recommendation' => $rec,
             'recommendation_failed' => $stageInsights['failed'],
-            'timeline' => $stageInsights['recommendation']['timeline'] ?? [],
-            'next_stage' => $stageInsights['recommendation']['next_stage'] ?? null,
-            'next_stage_target_date' => $stageInsights['recommendation']['next_stage_target_date'] ?? null,
-            'days_remaining' => $stageInsights['recommendation']['days_remaining'] ?? null,
-            'timeline_adjustment_reason' => $stageInsights['recommendation']['timeline_adjustment_reason'] ?? 'Timeline is based on recent farm weather context.',
-            'timeline_adjustment_label' => $stageInsights['recommendation']['timeline_adjustment_label'] ?? 'On schedule',
+            'timeline' => $rec['timeline'] ?? [],
+            'next_stage' => $rec['next_stage'] ?? null,
+            'next_stage_target_date' => $rec['next_stage_target_date'] ?? null,
+            'days_remaining' => $rec['days_remaining'] ?? null,
+            'timeline_adjustment_reason' => $rec['timeline_adjustment_reason'] ?? 'Timeline is based on recent farm weather context.',
+            'timeline_adjustment_label' => $humanAdjustment,
+            'planting_date_formatted' => $plantingDateFormatted,
+            'planting_day_line' => $plantingDayLine,
+            'days_since_planting' => $expected['days_since_planting'],
+            'days_until_planting' => $expected['days_until_planting'],
+            'has_planting_date' => $expected['has_planting_date'],
+            'growth_speed' => $growthSpeed,
+            'stage_confidence' => $confidence,
+            'reality_question_stage' => $realityQuestionStage,
+            'crop_timeline_offset_days' => $offsetDays,
+            'next_stage_date_range' => $nextStageDateRange,
+            'confidence_is_low' => $confidenceIsLow,
+            'show_reality_check_form' => $realityUi['show_form'],
+            'show_reality_check_card' => $realityUi['show_form'],
         ]);
+    }
+
+    public function realityCheck(
+        Request $request,
+        CropTimelineService $timelineService,
+        WeatherAdvisoryService $weatherAdvisoryService,
+        AiAdvisoryService $aiAdvisoryService,
+    ): RedirectResponse|JsonResponse {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'response' => ['required', 'string', 'in:yes,not_yet'],
+        ]);
+
+        $offset = (int) ($user->crop_timeline_offset_days ?? 0);
+
+        if ($validated['response'] === 'yes') {
+            $user->crop_stage_reality_check = 'confirmed';
+            $user->crop_timeline_offset_days = max(0, $offset - 2);
+            $user->reality_check_answered = true;
+            $user->reality_check_status = 'confirmed';
+            $user->stage_confirmed_at = now();
+        } else {
+            $user->crop_stage_reality_check = 'behind';
+            $user->crop_timeline_offset_days = min(60, $offset + 5);
+            $user->reality_check_answered = true;
+            $user->reality_check_status = 'delayed';
+            $user->stage_confirmed_at = null;
+        }
+
+        $user->save();
+        $user->refresh();
+
+        $weatherContext = $this->buildWeatherContext($user, $weatherAdvisoryService);
+        $stageInsights = $this->generateStageAdvice($user, $weatherContext, $aiAdvisoryService);
+        $rec = $stageInsights['recommendation'];
+        $offsetDays = (int) ($user->crop_timeline_offset_days ?? 0);
+        $durations = $timelineService->stageDurationsForCrop((string) ($user->crop_type ?? ''));
+        $expected = $timelineService->inferExpectedStageFromPlanting($user, $durations);
+        if (! empty($rec['timeline']) && is_array($rec['timeline'])) {
+            $rec['timeline'] = $timelineService->applyOffsetToTimeline($rec['timeline'], $offsetDays);
+            $rec['timeline'] = $timelineService->applyCalendarStatusToTimeline($rec['timeline'], $expected['key']);
+        }
+
+        $confidence = $timelineService->confidenceDisplay($weatherContext);
+        $confidenceIsLow = ($confidence['level'] ?? 'medium') === 'low';
+        $actualKey = $timelineService->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
+        $comparison = $timelineService->compareActualToExpected($actualKey, $expected['key']);
+        $growthSpeed = $timelineService->growthSpeed($comparison, $user->crop_stage_reality_check, $offsetDays);
+        $realityQuestionStage = $this->resolveRealityQuestionStageLabel($user, $rec);
+        $questionStageKey = $this->normalizeStageLabelToKey($realityQuestionStage);
+        $ui = $this->resolveRealityCheckUiState(
+            $user,
+            $comparison,
+            $growthSpeed,
+            $confidenceIsLow,
+            $questionStageKey,
+            $actualKey,
+            false
+        );
+
+        if ($this->wantsJsonRealityResponse($request)) {
+            return response()->json([
+                'ok' => true,
+                'show_form' => $ui['show_form'],
+            ]);
+        }
+
+        $message = $validated['response'] === 'yes'
+            ? 'Stage confirmation saved.'
+            : 'Timeline adjusted for slower progress.';
+
+        return redirect()
+            ->route('crop-progress.index')
+            ->with('success', $message);
+    }
+
+    public function reopenRealityCheck(Request $request): RedirectResponse|JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $user->reality_check_answered = false;
+        $user->reality_check_status = null;
+        $user->stage_confirmed_at = null;
+        $user->crop_stage_reality_check = null;
+        $user->save();
+
+        if ($this->wantsJsonRealityResponse($request)) {
+            return response()->json([
+                'ok' => true,
+                'show_form' => true,
+            ]);
+        }
+
+        return redirect()
+            ->route('crop-progress.index')
+            ->with('success', 'You can update your field status again.')
+            ->with('reality_check_reopened', true);
+    }
+
+    public function updateCurrentStage(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'farming_stage' => ['required', 'string', 'in:'.implode(',', CropTimelineService::STAGE_ORDER)],
+        ]);
+
+        $user->farming_stage = $validated['farming_stage'];
+        $this->applyManualStageConfirmation($user);
+        $user->save();
+
+        return redirect()
+            ->route('crop-progress.index')
+            ->with('success', 'Current stage updated. Timeline and advice were refreshed.');
     }
 
     public function updateStage(Request $request): RedirectResponse
@@ -62,86 +271,53 @@ class CropProgressController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'farming_stage' => ['required', 'string', 'in:' . implode(',', array_keys(self::TIMELINE_STAGES))],
-            'planting_date' => ['required', 'date'],
+            'farming_stage' => ['required', 'string', 'in:'.implode(',', CropTimelineService::STAGE_ORDER)],
+            'planting_date' => ['nullable', 'date'],
         ], [
             'farming_stage.required' => 'Please select your current growth stage.',
             'farming_stage.in' => 'Selected growth stage is invalid.',
-            'planting_date.required' => 'Please enter the planting date.',
             'planting_date.date' => 'Please provide a valid planting date.',
         ]);
 
-        $user->update([
-            'farming_stage' => $validated['farming_stage'],
-            'planting_date' => $validated['planting_date'],
-        ]);
+        $data = ['farming_stage' => $validated['farming_stage']];
+        if (! empty($validated['planting_date'])) {
+            $data['planting_date'] = $validated['planting_date'];
+        }
+
+        $user->update(array_merge($data, $this->manualStageConfirmationAttributes()));
 
         return redirect()
             ->route('crop-progress.index')
             ->with('success', 'Crop progress updated successfully.');
     }
 
-    public function generateStageAdvice(User $user, array $weatherContext, TogetherAiService $togetherAiService): array
+    public function generateStageAdvice(User $user, array $weatherContext, AiAdvisoryService $aiAdvisoryService): array
     {
-        $payload = [
-            'crop_type' => $user->crop_type,
-            'current_growth_stage' => $user->farming_stage,
-            'planting_date' => $user->planting_date?->format('Y-m-d'),
-            'farm_location' => $user->farm_location_display,
-            'current_weather' => [
-                'condition' => $weatherContext['condition'],
-                'temperature' => $weatherContext['temperature'],
-                'humidity' => $weatherContext['humidity'],
-                'rain_chance' => $weatherContext['rain_chance'],
-                'wind_speed' => $weatherContext['wind_speed'],
-            ],
-            'recent_weather' => $weatherContext['recent_weather'],
-            'forecast' => $weatherContext['forecast'],
-            'rainfall_trend' => $weatherContext['rainfall_trend'],
-        ];
+        $modelName = (string) (config('togetherai.model') ?? config('services.togetherai.model', ''));
+        $pack = $aiAdvisoryService->runCropProgress($user, $weatherContext);
+
+        if ($pack['failed'] === false) {
+            return $pack;
+        }
+
+        $reco = $pack['recommendation'] ?? [];
+        if (($reco['ai_status'] ?? '') === 'missing_context') {
+            return $pack;
+        }
 
         $fallback = $this->stageAdviceFallback($user, $weatherContext);
-        $modelName = (string) (config('togetherai.model') ?? config('services.togetherai.model', ''));
-
-        try {
-            $response = $togetherAiService->generateRecommendation($payload, $this->stageAdvicePrompt());
-            $decoded = $this->decodeRecommendationJson((string) ($response['raw_content'] ?? ''));
-
-            if (! is_array($decoded)) {
-                throw new \RuntimeException('Together AI returned malformed crop progress JSON payload.');
-            }
-
-            return [
-                'recommendation' => array_merge(
-                    $this->normalizeStageAdvice($decoded, $fallback),
-                    [
-                        'ai_status' => 'success',
-                        'ai_model' => (string) ($response['model_used'] ?? $modelName),
-                        'ai_error' => '',
-                    ]
-                ),
-                'failed' => false,
-            ];
-        } catch (\Throwable $e) {
-            Log::error('Crop progress AI advice failed', [
-                'user_id' => $user->id,
-                'message' => $e->getMessage(),
-                'exception' => $e::class,
-                'payload' => $payload,
-            ]);
-
-            return [
-                'recommendation' => array_merge(
-                    $fallback,
-                    [
-                        'ai_status' => 'failed',
-                        'ai_model' => $modelName,
-                        'ai_error' => 'Stage recommendation AI unavailable.',
-                    ]
-                ),
-                'failed' => true,
-            ];
+        foreach (['main_advice', 'what_to_do', 'what_to_watch', 'what_to_avoid', 'timeline_adjustment_reason', 'timeline_adjustment_label'] as $k) {
+            $fallback[$k] = '';
         }
+        $fallback['risk_level'] = '';
+        $fallback['ai_status'] = 'failed';
+        $fallback['ai_model'] = $modelName;
+        $fallback['ai_error'] = 'AI advisory temporarily unavailable.';
+
+        return [
+            'recommendation' => $fallback,
+            'failed' => true,
+        ];
     }
 
     private function buildWeatherContext(User $user, WeatherAdvisoryService $weatherAdvisoryService): array
@@ -224,106 +400,14 @@ class CropProgressController extends Controller
         return 'stable';
     }
 
-    private function stageAdvicePrompt(): string
-    {
-        return <<<'PROMPT'
-You are an agricultural advisor for smallholder farmers.
-Use only the provided JSON input and return stage-based advice.
-
-Return valid JSON only with exactly these keys:
-{
-  "current_stage": "Planting|Early Growth|Vegetative|Flowering|Harvesting",
-  "next_stage": "Early Growth|Vegetative|Flowering|Harvesting|Harvesting",
-  "next_stage_target_date": "YYYY-MM-DD",
-  "days_remaining": 0,
-  "timeline": [
-    {
-      "stage": "Planting|Early Growth|Vegetative|Flowering|Harvesting",
-      "target_date": "YYYY-MM-DD",
-      "estimated_day_count": 0,
-      "status": "completed|current|upcoming"
-    }
-  ],
-  "timeline_adjustment_reason": "string",
-  "main_advice": "string",
-  "what_to_do": "string",
-  "what_to_watch": "string",
-  "what_to_avoid": "string",
-  "risk_level": "Low|Moderate|High"
-}
-
-Rules:
-- Keep language simple and farmer-friendly.
-- Respect crop_type, planting_date, and current_growth_stage.
-- Adjust timeline dates based on weather and rainfall context.
-- If weather is favorable, timeline may be on schedule or faster.
-- If heavy rain/high humidity/temperature stress exists, show slight delays.
-- Keep each field concise and actionable.
-- Do not add markdown, code fences, or extra keys.
-PROMPT;
-    }
-
-    private function decodeRecommendationJson(string $rawContent): ?array
-    {
-        $trimmed = trim($rawContent);
-        if ($trimmed === '') {
-            return null;
-        }
-
-        $decoded = json_decode($trimmed, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            return $decoded;
-        }
-
-        if (preg_match('/\{.*\}/s', $trimmed, $matches) === 1) {
-            $decoded = json_decode((string) $matches[0], true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                return $decoded;
-            }
-        }
-
-        return null;
-    }
-
-    private function normalizeStageAdvice(array $raw, array $fallback): array
-    {
-        $risk = strtolower(trim((string) ($raw['risk_level'] ?? '')));
-        $risk = match ($risk) {
-            'low' => 'Low',
-            'high' => 'High',
-            'moderate', 'medium' => 'Moderate',
-            default => $fallback['risk_level'],
-        };
-
-        $timelineRaw = is_array($raw['timeline'] ?? null) ? $raw['timeline'] : [];
-        $timeline = $this->normalizeTimeline($timelineRaw, $fallback['timeline']);
-        $nextTargetDate = $this->normalizeDate($raw['next_stage_target_date'] ?? null, $fallback['next_stage_target_date']);
-        $daysRemaining = is_numeric($raw['days_remaining'] ?? null) ? max(0, (int) $raw['days_remaining']) : $fallback['days_remaining'];
-        $adjustmentReason = $this->textOrFallback($raw['timeline_adjustment_reason'] ?? null, $fallback['timeline_adjustment_reason']);
-
-        return [
-            'current_stage' => $this->textOrFallback($raw['current_stage'] ?? null, $fallback['current_stage']),
-            'next_stage' => $this->textOrFallback($raw['next_stage'] ?? null, $fallback['next_stage']),
-            'next_stage_target_date' => $nextTargetDate,
-            'days_remaining' => $daysRemaining,
-            'timeline' => $timeline,
-            'timeline_adjustment_reason' => $adjustmentReason,
-            'timeline_adjustment_label' => $this->timelineAdjustmentLabel($adjustmentReason),
-            'main_advice' => $this->textOrFallback($raw['main_advice'] ?? null, $fallback['main_advice']),
-            'what_to_do' => $this->textOrFallback($raw['what_to_do'] ?? null, $fallback['what_to_do']),
-            'what_to_watch' => $this->textOrFallback($raw['what_to_watch'] ?? null, $fallback['what_to_watch']),
-            'what_to_avoid' => $this->textOrFallback($raw['what_to_avoid'] ?? null, $fallback['what_to_avoid']),
-            'risk_level' => $risk,
-        ];
-    }
-
     private function stageAdviceFallback(User $user, array $weatherContext): array
     {
-        $currentStage = $this->normalizeStageKey((string) ($user->farming_stage ?: 'planting'));
-        $plantingDate = $user->planting_date instanceof Carbon ? $user->planting_date->copy() : now()->startOfDay();
+        $durations = $this->cropStageDurations((string) $user->crop_type);
+        $currentStage = app(CropTimelineService::class)->inferExpectedStageFromPlanting($user, $durations)['key'];
+        $plantingDate = $user->planting_date instanceof Carbon ? $user->planting_date->copy()->startOfDay() : now()->startOfDay();
         $timeline = $this->buildFallbackTimeline((string) $user->crop_type, $plantingDate, $currentStage, $weatherContext);
 
-        $currentStageLabel = $this->stageLabel($currentStage);
+        $currentStageLabel = app(CropTimelineService::class)->displayLabel($currentStage);
         $next = $this->resolveNextStage($timeline);
         $riskLevel = $this->fallbackRiskLevel($weatherContext);
 
@@ -379,23 +463,7 @@ PROMPT;
 
     private function cropStageDurations(string $cropType): array
     {
-        $isCorn = strcasecmp(trim($cropType), 'Corn') === 0;
-
-        return $isCorn
-            ? [
-                'planting' => 8,
-                'early_growth' => 16,
-                'growing' => 20,
-                'flowering_fruiting' => 18,
-                'harvesting' => 30,
-            ]
-            : [
-                'planting' => 7,
-                'early_growth' => 14,
-                'growing' => 21,
-                'flowering_fruiting' => 24,
-                'harvesting' => 28,
-            ];
+        return app(CropTimelineService::class)->stageDurationsForCrop($cropType);
     }
 
     private function weatherDayAdjustment(array $weatherContext): int
@@ -476,48 +544,6 @@ PROMPT;
         return null;
     }
 
-    private function normalizeTimeline(array $rawTimeline, array $fallbackTimeline): array
-    {
-        if (empty($rawTimeline)) {
-            return $fallbackTimeline;
-        }
-
-        $normalized = [];
-        foreach ($rawTimeline as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
-            $status = strtolower((string) ($row['status'] ?? 'upcoming'));
-            if (! in_array($status, ['completed', 'current', 'upcoming'], true)) {
-                $status = 'upcoming';
-            }
-
-            $normalized[] = [
-                'stage' => trim((string) ($row['stage'] ?? '')) ?: 'Unknown Stage',
-                'target_date' => $this->normalizeDate($row['target_date'] ?? null, now()->format('Y-m-d')),
-                'estimated_day_count' => is_numeric($row['estimated_day_count'] ?? null) ? max(0, (int) $row['estimated_day_count']) : 0,
-                'status' => $status,
-            ];
-        }
-
-        return empty($normalized) ? $fallbackTimeline : $normalized;
-    }
-
-    private function normalizeDate(mixed $dateValue, string $fallback): string
-    {
-        $date = trim((string) $dateValue);
-        if ($date === '') {
-            return $fallback;
-        }
-
-        try {
-            return Carbon::parse($date)->format('Y-m-d');
-        } catch (\Throwable) {
-            return $fallback;
-        }
-    }
-
     private function timelineAdjustmentLabel(string $reason): string
     {
         $text = strtolower($reason);
@@ -531,23 +557,125 @@ PROMPT;
         return 'On schedule';
     }
 
-    private function textOrFallback(mixed $value, string $fallback): string
-    {
-        $text = trim((string) $value);
-        return $text !== '' ? $text : $fallback;
-    }
-
     private function stageLabel(?string $stage): string
     {
-        return self::STAGE_LABELS[$stage ?? ''] ?? 'Not set';
+        return app(CropTimelineService::class)->displayLabel($stage);
     }
 
     private function normalizeStageKey(string $stage): string
     {
-        if ($stage === 'land_preparation') {
-            return 'planting';
+        return app(CropTimelineService::class)->normalizeStageKey($stage);
+    }
+
+    /**
+     * Timeline "current" row stage label (AI), or the user's profile stage label as fallback.
+     *
+     * @param  array<string, mixed>  $rec
+     */
+    private function resolveRealityQuestionStageLabel(User $user, array $rec): string
+    {
+        foreach ($rec['timeline'] ?? [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            if (($row['status'] ?? '') === 'current' && ! empty($row['stage'])) {
+                return (string) $row['stage'];
+            }
         }
 
-        return array_key_exists($stage, self::TIMELINE_STAGES) ? $stage : 'planting';
+        return $this->stageLabel($user->farming_stage);
+    }
+
+    /**
+     * Map AI or display labels ("Early Growth", "Harvest") to internal stage keys.
+     */
+    private function normalizeStageLabelToKey(string $label): string
+    {
+        return app(CropTimelineService::class)->timelineStageRowToKey($label);
+    }
+
+    private function applyManualStageConfirmation(User $user): void
+    {
+        $user->reality_check_answered = true;
+        $user->reality_check_status = 'confirmed';
+        $user->stage_confirmed_at = now();
+        $user->crop_stage_reality_check = 'confirmed';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function manualStageConfirmationAttributes(): array
+    {
+        return [
+            'reality_check_answered' => true,
+            'reality_check_status' => 'confirmed',
+            'stage_confirmed_at' => now(),
+            'crop_stage_reality_check' => 'confirmed',
+        ];
+    }
+
+    /**
+     * @return array{show_form: bool, show_success_banner: bool, show_delay_banner: bool}
+     */
+    private function resolveRealityCheckUiState(
+        User $user,
+        string $comparison,
+        string $growthSpeed,
+        bool $confidenceIsLow,
+        string $questionStageKey,
+        string $actualKey,
+        bool $realityReopened,
+    ): array {
+        $answered = (bool) $user->reality_check_answered;
+        $status = (string) ($user->reality_check_status ?? '');
+
+        $promptMatchesActual = $questionStageKey === $actualKey;
+
+        $showDelayBanner = $answered && $status === 'delayed';
+        $showSuccessBanner = $answered && $status === 'confirmed'
+            && $comparison === 'match'
+            && $growthSpeed !== 'slow'
+            && ! $confidenceIsLow;
+
+        $showForm = false;
+        if (! $answered) {
+            if ($realityReopened) {
+                $showForm = true;
+            } else {
+                $showForm = ! $promptMatchesActual;
+            }
+        } elseif ($status === 'confirmed') {
+            $showForm = $confidenceIsLow;
+        }
+
+        $showForm = $showForm && ! $showDelayBanner && ! $showSuccessBanner;
+
+        return [
+            'show_form' => $showForm,
+            'show_success_banner' => $showSuccessBanner,
+            'show_delay_banner' => $showDelayBanner,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function realityCheckResetAttributes(): array
+    {
+        return [
+            'reality_check_answered' => false,
+            'reality_check_status' => null,
+            'stage_confirmed_at' => null,
+            'crop_stage_reality_check' => null,
+        ];
+    }
+
+    private function wantsJsonRealityResponse(Request $request): bool
+    {
+        return $request->wantsJson()
+            || $request->expectsJson()
+            || $request->ajax()
+            || $request->boolean('json');
     }
 }

@@ -15,5 +15,13 @@
     </main>
 
     @stack('scripts')
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        });
+    </script>
 </body>
 </html>

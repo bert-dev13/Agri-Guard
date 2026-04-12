@@ -21,3 +21,11 @@
 @import './user/rainfall-trends.css';
 @import './user/crop-progress.css';
 @import './user/settings.css';
+@import './user/farm-map.css';
+@import './user/assistant.css';
+@import './admin/admin-navbar.css';
+@import './admin/dashboard.css';
+@import './admin/user-management.css';
+@import './admin/farm-monitoring.css';
+@import './admin/analytics.css';
+@import './admin/account-settings.css';

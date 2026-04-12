@@ -75,6 +75,7 @@ class SmartAdvisoryEngine
     private function buildHeadline(string $riskLevel, ?string $crop): string
     {
         $cropName = $crop ? " for Your {$crop} Farm" : ' for Your Farm';
+
         return match ($riskLevel) {
             'HIGH' => "High Rainfall Alert{$cropName}",
             'MODERATE' => "Rain Advisory{$cropName}",
@@ -117,7 +118,7 @@ class SmartAdvisoryEngine
             $base = array_merge([$stageAction], $base);
         }
 
-        if ($stage === 'harvesting' && in_array($riskLevel, ['MODERATE', 'HIGH'], true)) {
+        if (in_array($stage, ['harvest', 'harvesting'], true) && in_array($riskLevel, ['MODERATE', 'HIGH'], true)) {
             $base[] = 'Harvest mature crops early if heavy rain continues';
         }
 
@@ -140,6 +141,7 @@ class SmartAdvisoryEngine
             if (in_array($riskLevel, ['MODERATE', 'HIGH'], true)) {
                 $actions[] = 'Prepare for possible flooding';
             }
+
             return $actions;
         }
         if (str_contains($lower, 'corn')) {
@@ -152,6 +154,7 @@ class SmartAdvisoryEngine
             if (in_array($riskLevel, ['MODERATE', 'HIGH'], true)) {
                 $actions[] = 'Avoid excess standing water around roots';
             }
+
             return $actions;
         }
         if (str_contains($lower, 'vegetable')) {
@@ -161,8 +164,10 @@ class SmartAdvisoryEngine
                 'Improve field drainage',
                 'Harvest mature vegetables early if heavy rain continues',
             ];
+
             return $actions;
         }
+
         return [];
     }
 
@@ -182,10 +187,14 @@ class SmartAdvisoryEngine
             'early_growth' => str_contains($cropLower, 'corn')
                 ? 'Monitor root stability and avoid waterlogging'
                 : 'Monitor water accumulation around young plants',
+            'harvest' => str_contains($cropLower, 'vegetable')
+                ? 'Harvest mature crops before heavy rain'
+                : 'Prepare early harvest if rainfall is high',
             'harvesting' => str_contains($cropLower, 'vegetable')
                 ? 'Harvest mature crops before heavy rain'
                 : 'Prepare early harvest if rainfall is high',
         ];
+
         return $stageActions[$stage] ?? null;
     }
 
@@ -210,6 +219,7 @@ class SmartAdvisoryEngine
         if ($forecastSummary) {
             return $forecastSummary;
         }
+
         return 'No significant rainfall expected. Conditions are suitable for normal farm activities.';
     }
 
@@ -238,6 +248,7 @@ class SmartAdvisoryEngine
         if (empty($impact)) {
             return 'Monitor your field. Prepare drainage if rain develops.';
         }
+
         return implode(' ', array_slice($impact, 0, 2));
     }
 
@@ -252,7 +263,7 @@ class SmartAdvisoryEngine
 
     private function buildFarmInsight(?string $crop, ?string $stage, string $riskLevel, ?int $rainProb): string
     {
-        if (!$crop && !$stage) {
+        if (! $crop && ! $stage) {
             return $rainProb && $rainProb > 50
                 ? 'Rain is possible in your area. Prepare drainage and protect crops.'
                 : 'Monitor weather and drainage regularly.';
@@ -263,21 +274,21 @@ class SmartAdvisoryEngine
         if ($crop && $stage) {
             $stageLabel = $this->ruleEngine->farmingStageLabel($stage);
             $cropLower = strtolower($crop);
-            if (str_contains($cropLower, 'vegetable') && $stage === 'harvesting') {
-                $insights[] = "Vegetables in harvesting stage may be damaged by continuous rain. Consider early harvest if crops are ready.";
+            if (str_contains($cropLower, 'vegetable') && in_array($stage, ['harvest', 'harvesting'], true)) {
+                $insights[] = 'Vegetables in harvesting stage may be damaged by continuous rain. Consider early harvest if crops are ready.';
             } elseif (str_contains($cropLower, 'rice') && in_array($stage, ['planting', 'early_growth'], true)) {
                 $insights[] = "Rice in {$stageLabel} stage is sensitive to heavy rain. Watch water levels and drainage.";
-            } elseif (str_contains($cropLower, 'corn') && in_array($stage, ['flowering_fruiting', 'harvesting'], true)) {
+            } elseif (str_contains($cropLower, 'corn') && in_array($stage, ['flowering', 'flowering_fruiting', 'harvest', 'harvesting'], true)) {
                 $insights[] = "Corn in {$stageLabel} stage may lose yield from strong rain. Prepare for early harvest if needed.";
             } else {
-                $insights[] = ucfirst($crop) . " in {$stageLabel} stage may need extra care during rainy weather.";
+                $insights[] = ucfirst($crop)." in {$stageLabel} stage may need extra care during rainy weather.";
             }
         }
 
         if ($rainProb && $rainProb > 50 && empty($insights)) {
-            $insights[] = "Rain is likely in the next 24 hours. Check drainage and protect sensitive crops.";
+            $insights[] = 'Rain is likely in the next 24 hours. Check drainage and protect sensitive crops.';
         }
 
-        return !empty($insights) ? implode(' ', $insights) : 'Monitor weather and field conditions regularly.';
+        return ! empty($insights) ? implode(' ', $insights) : 'Monitor weather and field conditions regularly.';
     }
 }

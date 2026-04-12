@@ -33,13 +33,13 @@
         if (!chartEl) return;
 
         var trends = {
-            daily: { label: 'Average Daily Rainfall (mm)', type: 'bar', color: 'rgba(46, 125, 50, 0.28)', border: '#2E7D32' },
-            weekly: { label: 'Average Weekly Rainfall (mm)', type: 'line', color: 'rgba(33, 150, 243, 0.22)', border: '#1d4ed8' },
-            monthly: { label: 'Average Monthly Rainfall (mm)', type: 'bar', color: 'rgba(46, 125, 50, 0.28)', border: '#2E7D32' },
-            yearly: { label: 'Total Yearly Rainfall (mm)', type: 'line', color: 'rgba(102, 187, 106, 0.26)', border: '#2E7D32' },
+            daily: { label: 'Rain per day (mm)', type: 'bar', color: 'rgba(52, 211, 153, 0.35)', border: '#059669' },
+            weekly: { label: 'Rain per week (mm)', type: 'line', color: 'rgba(167, 139, 250, 0.28)', border: '#7c3aed' },
+            monthly: { label: 'Average monthly rain (mm)', type: 'bar', color: 'rgba(52, 211, 153, 0.35)', border: '#059669' },
+            yearly: { label: 'Yearly rain total (mm)', type: 'line', color: 'rgba(167, 139, 250, 0.3)', border: '#6d28d9' },
         };
 
-        var buttons = Array.prototype.slice.call(document.querySelectorAll('.rainfall-filter-tab'));
+        var buttons = Array.prototype.slice.call(document.querySelectorAll('.rainfall-page__tab'));
         var activeKey = 'daily';
         var chartInstance = null;
 

@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Mail\EmailVerificationCodeMail;
+use App\Models\Barangay;
 use App\Models\User;
 use App\Services\AiRecommendationService;
+use App\Services\CropTimelineService;
 use App\Services\WeatherAdvisoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
@@ -18,17 +22,34 @@ class AuthController extends Controller
     /** Code validity in minutes. */
     private const VERIFICATION_CODE_EXPIRY_MINUTES = 5;
 
+    /** Target municipality for farmer registration (single-municipality deployment). */
+    private const DEFAULT_FARM_MUNICIPALITY = 'Amulung';
+
     /**
      * Generate a 6-digit numeric OTP and send verification email; store hashed code and expiry on user.
      */
     private function sendVerificationCode(User $user): void
     {
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $user->email_verification_code = Hash::make($code);
-        $user->email_verification_expires_at = now()->addMinutes(self::VERIFICATION_CODE_EXPIRY_MINUTES);
-        $user->verification_attempts = 0;
-        $user->verification_locked_until = null;
-        $user->save();
+        $hashed = Hash::make($code);
+        $expiresAt = now()->addMinutes(self::VERIFICATION_CODE_EXPIRY_MINUTES);
+
+        // Persist via query builder so OTP state is always written regardless of fillable / model state.
+        $updated = User::query()->whereKey($user->getKey())->update([
+            'email_verification_code' => $hashed,
+            'email_verification_expires_at' => $expiresAt,
+            'verification_attempts' => 0,
+            'verification_locked_until' => null,
+        ]);
+
+        if ($updated === 0) {
+            Log::error('sendVerificationCode: user row not updated', [
+                'user_id' => $user->getKey(),
+            ]);
+            throw new \RuntimeException('Could not store email verification data.');
+        }
+
+        $user->refresh();
 
         Mail::to($user->email)->send(new EmailVerificationCodeMail(
             $code,
@@ -39,6 +60,7 @@ class AuthController extends Controller
             session()->flash('dev_verification_code', $code);
         }
     }
+
     /**
      * Show the login form.
      */
@@ -65,17 +87,28 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials, $remember)) {
             $user = Auth::user();
+            if (! $user instanceof User) {
+                Auth::logout();
+
+                return back()->withErrors([
+                    'email' => 'The provided credentials do not match our records.',
+                ])->onlyInput('email');
+            }
+
             if ($user->email_verified_at === null) {
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
                 $request->session()->put('pending_email_verification_user_id', $user->id);
                 $this->sendVerificationCode($user->fresh());
+
                 return redirect()->route('verification.verify')
                     ->with('message', 'Please verify your email. A new code has been sent to your email address.');
             }
             $request->session()->regenerate();
-            return redirect()->intended(route('dashboard'));
+            $home = $user->isAdmin() ? route('admin.dashboard') : route('dashboard');
+
+            return redirect()->intended($home);
         }
 
         return back()->withErrors([
@@ -96,16 +129,35 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        $request->merge([
+            'farm_municipality' => self::DEFAULT_FARM_MUNICIPALITY,
+            'farm_barangay_code' => is_string($request->input('farm_barangay_code'))
+                ? trim($request->input('farm_barangay_code'))
+                : $request->input('farm_barangay_code'),
+        ]);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'farm_municipality' => ['required', 'string', 'in:Amulung'],
-            'farm_barangay' => ['required', 'string', 'max:20'],
-            'crop_type' => ['nullable', 'string', 'in:Rice,Corn'],
-            'farming_stage' => ['nullable', 'string', 'in:land_preparation,planting,early_growth,growing,flowering_fruiting,harvesting'],
-            'planting_date' => ['nullable', 'date'],
-            'farm_area' => ['nullable', 'numeric', 'min:0.01'],
+            ...(Barangay::query()->exists() ? [
+                'farm_barangay_code' => [
+                    'required',
+                    'string',
+                    'max:20',
+                    Rule::exists('barangays', 'id')->where('municipality', self::DEFAULT_FARM_MUNICIPALITY),
+                ],
+            ] : [
+                'farm_barangay_code' => ['required', 'string', 'max:20'],
+            ]),
+            'crop_type' => ['required', 'string', 'in:Rice,Corn'],
+            'planting_date' => [
+                'required',
+                'date',
+                'before_or_equal:today',
+                'after_or_equal:'.now()->subYears(5)->toDateString(),
+            ],
+            'farm_area' => ['required', 'numeric', 'min:0.01'],
         ], [
             'name.required' => 'Please enter your name.',
             'email.required' => 'Please enter your email address.',
@@ -113,25 +165,43 @@ class AuthController extends Controller
             'email.unique' => 'This email is already registered.',
             'password.required' => 'Please enter a password.',
             'password.confirmed' => 'The password confirmation does not match.',
-            'farm_municipality.required' => 'Farm municipality is required.',
-            'farm_municipality.in' => 'Farm municipality must be Amulung.',
-            'farm_barangay.required' => 'Please select your farm barangay.',
+            'farm_barangay_code.required' => 'Please select your farm barangay.',
+            'farm_barangay_code.exists' => 'Please select a valid barangay for the chosen municipality.',
+            'crop_type.required' => 'Please select your crop type.',
+            'crop_type.in' => 'Crop type must be Rice or Corn.',
+            'planting_date.required' => 'Please enter your planting date.',
             'planting_date.date' => 'Please enter a valid planting date.',
+            'planting_date.before_or_equal' => 'Planting date cannot be in the future.',
+            'planting_date.after_or_equal' => 'Planting date is too far in the past.',
+            'farm_area.required' => 'Please enter your farm area (square meters).',
             'farm_area.numeric' => 'Farm area must be a number (square meters).',
             'farm_area.min' => 'Farm area must be greater than 0.',
-            'crop_type.in' => 'Crop type must be Rice or Corn.',
         ]);
+
+        $barangayName = Barangay::nameForId($validated['farm_barangay_code']);
+
+        $timelineService = app(CropTimelineService::class);
+        $preUser = new User;
+        $preUser->forceFill([
+            'crop_type' => $validated['crop_type'],
+            'planting_date' => $validated['planting_date'],
+        ]);
+        $derivedStageKey = $timelineService->inferExpectedStageFromPlanting($preUser)['key'];
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => $validated['password'],
-            'farm_municipality' => $validated['farm_municipality'],
-            'farm_barangay' => $validated['farm_barangay'],
-            'crop_type' => $validated['crop_type'] ?? null,
-            'farming_stage' => $validated['farming_stage'] ?? null,
-            'planting_date' => isset($validated['planting_date']) ? $validated['planting_date'] : null,
-            'farm_area' => isset($validated['farm_area']) ? (float) $validated['farm_area'] : null,
+            'role' => 'farmer',
+            'farm_municipality' => self::DEFAULT_FARM_MUNICIPALITY,
+            'farm_barangay' => $barangayName ?? '',
+            'farm_barangay_code' => $validated['farm_barangay_code'],
+            'crop_type' => $validated['crop_type'],
+            'farming_stage' => $derivedStageKey,
+            'planting_date' => $validated['planting_date'],
+            'farm_area' => (float) $validated['farm_area'],
+            'crop_timeline_offset_days' => 0,
+            'reality_check_answered' => false,
         ]);
 
         $this->sendVerificationCode($user);
@@ -149,6 +219,7 @@ class AuthController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return redirect('/');
     }
 
@@ -159,6 +230,13 @@ class AuthController extends Controller
     public function dashboard(WeatherAdvisoryService $weatherAdvisory, AiRecommendationService $aiRecommendationService)
     {
         $user = Auth::user();
+        if (! $user instanceof User) {
+            abort(403);
+        }
+
+        if ($user->isAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
 
         try {
             $advisoryData = $weatherAdvisory->getAdvisoryData($user);
@@ -191,17 +269,66 @@ class AuthController extends Controller
         $weekRainfallMm = is_numeric($todayRainfallMm) ? ((float) $todayRainfallMm * 7) : null;
         $monthRainfallMm = is_numeric($todayRainfallMm) ? ((float) $todayRainfallMm * 30) : null;
 
-        $morningRain = isset($forecast[0]['pop']) ? (float) $forecast[0]['pop'] : null;
-        $afternoonRain = isset($forecast[1]['pop']) ? (float) $forecast[1]['pop'] : $morningRain;
-        $eveningRain = isset($forecast[2]['pop']) ? (float) $forecast[2]['pop'] : $afternoonRain;
+        $hourlyRows = array_slice(array_values($advisoryData['hourly_forecast'] ?? []), 0, 8);
+        $hourlyForAi = array_map(static function (array $h): array {
+            return [
+                'time_local' => (string) ($h['time'] ?? ''),
+                'rain_chance_pct' => isset($h['pop']) && is_numeric($h['pop']) ? (int) round((float) $h['pop']) : null,
+                'temp_c' => isset($h['temp']) && is_numeric($h['temp']) ? (int) round((float) $h['temp']) : null,
+            ];
+        }, $hourlyRows);
+
+        $bucketAvg = static function (array $rows, int $start, int $len): ?float {
+            $slice = array_slice($rows, $start, $len);
+            $pops = [];
+            foreach ($slice as $row) {
+                if (isset($row['pop']) && is_numeric($row['pop'])) {
+                    $pops[] = (float) $row['pop'];
+                }
+            }
+            if ($pops === []) {
+                return null;
+            }
+
+            return round(array_sum($pops) / count($pops), 1);
+        };
+        $morningRain = $bucketAvg($hourlyRows, 0, 3);
+        $afternoonRain = $bucketAvg($hourlyRows, 3, 3);
+        $eveningRain = $bucketAvg($hourlyRows, 6, 2);
+
+        $forecastNextDays = array_map(static function (array $day): array {
+            return [
+                'day_name' => (string) ($day['day_name'] ?? ''),
+                'date' => (string) ($day['date'] ?? ''),
+                'condition' => (string) ($day['condition']['main'] ?? ($day['condition']['description'] ?? '')),
+                'temp_min_c' => is_numeric($day['temp_min'] ?? null) ? round((float) $day['temp_min'], 1) : null,
+                'temp_max_c' => is_numeric($day['temp_max'] ?? null) ? round((float) $day['temp_max'], 1) : null,
+                'rain_chance_pct' => is_numeric($day['pop'] ?? null) ? (int) round((float) $day['pop']) : null,
+                'expected_rain_mm' => is_numeric($day['rain_mm'] ?? null) ? round((float) $day['rain_mm'], 1) : null,
+            ];
+        }, array_slice($forecast, 0, 5));
+
+        $popsFive = array_filter(array_column(array_slice($forecast, 0, 5), 'pop'), static fn ($v) => is_numeric($v));
+        $maxPopFive = $popsFive !== [] ? (int) round((float) max($popsFive)) : null;
+
+        $cropTimeline = app(CropTimelineService::class);
+        $calendarStageLabel = $cropTimeline->inferExpectedStageFromPlanting(
+            $user,
+            $cropTimeline->stageDurationsForCrop((string) ($user->crop_type ?? ''))
+        )['label'];
 
         $smartRecommendation = $aiRecommendationService->generateSmartRecommendation($user, [
+            'barangay' => trim((string) ($user->farm_barangay_name ?? '')),
+            'farming_stage_label' => $calendarStageLabel,
+            'forecast_next_days' => $forecastNextDays,
+            'hourly_next_slots' => $hourlyForAi,
             'weather' => [
                 'temperature' => $weather['temp'] ?? null,
                 'humidity' => $weather['humidity'] ?? null,
                 'wind_speed' => $weather['wind_speed'] ?? null,
                 'condition' => $weather['condition']['main'] ?? ($weather['condition']['description'] ?? 'Unknown'),
                 'rain_chance' => $todayRainProbability,
+                'today_expected_rainfall_mm' => $todayRainfallMm,
             ],
             'hourly_summary' => [
                 'morning_rain_chance' => $morningRain,
@@ -222,13 +349,7 @@ class AuthController extends Controller
                 'today_mm' => $todayRainfallMm,
                 'week_mm' => $weekRainfallMm,
                 'month_mm' => $monthRainfallMm,
-                'trend' => is_numeric($todayRainProbability) && (float) $todayRainProbability >= 60 ? 'increasing' : 'stable',
-            ],
-            'system_flags' => [
-                'flood_risk' => is_numeric($todayRainProbability) && (float) $todayRainProbability >= 75,
-                'soil_saturation' => is_numeric($monthRainfallMm) && (float) $monthRainfallMm >= 220,
-                'irrigation_needed' => is_numeric($todayRainProbability) && (float) $todayRainProbability < 40,
-                'good_for_spraying' => is_numeric($todayRainProbability) && (float) $todayRainProbability < 35 && (float) ($weather['wind_speed'] ?? 0) < 20,
+                'max_rain_chance_next_5_days_pct' => $maxPopFive,
             ],
         ], 'dashboard');
 
@@ -252,9 +373,11 @@ class AuthController extends Controller
         $user = User::find($userId);
         if (! $user || ! $user->hasPendingEmailVerification()) {
             $request->session()->forget('pending_email_verification_user_id');
+
             return redirect()->route('register')
                 ->with('message', 'Your session expired. Please register again.');
         }
+
         return view('auth.verify-email', [
             'email' => $user->email,
             'lockedUntil' => $user->verification_locked_until,
@@ -284,12 +407,13 @@ class AuthController extends Controller
         $user = User::find($userId);
         if (! $user || ! $user->hasPendingEmailVerification()) {
             $request->session()->forget('pending_email_verification_user_id');
+
             return redirect()->route('register')
                 ->withErrors(['code' => 'Invalid session. Please register again.']);
         }
         if ($user->isVerificationLocked()) {
             return back()->withErrors([
-                'code' => 'Too many failed attempts. You can try again after ' . $user->verification_locked_until->diffForHumans() . '.',
+                'code' => 'Too many failed attempts. You can try again after '.$user->verification_locked_until->diffForHumans().'.',
             ]);
         }
         if ($user->email_verification_expires_at && $user->email_verification_expires_at->isPast()) {
@@ -305,19 +429,35 @@ class AuthController extends Controller
             $remaining = $maxAttempts - $user->verification_attempts;
             $message = 'The verification code is incorrect.';
             if ($remaining > 0 && $user->verification_locked_until === null) {
-                $message .= ' ' . $remaining . ' attempt(s) remaining.';
+                $message .= ' '.$remaining.' attempt(s) remaining.';
             }
+
             return back()->withErrors(['code' => $message]);
         }
-        $user->email_verified_at = now();
-        $user->email_verification_code = null;
-        $user->email_verification_expires_at = null;
-        $user->verification_attempts = 0;
-        $user->verification_locked_until = null;
-        $user->save();
+
+        // Clear OTP columns and set email_verified_at in one SQL update (source of truth for "verified").
+        // OTP fields are *supposed* to be NULL after success—only email_verified_at proves verification.
+        $verifiedAt = now();
+        $updated = User::query()->whereKey($user->getKey())->update([
+            'email_verified_at' => $verifiedAt,
+            'email_verification_code' => null,
+            'email_verification_expires_at' => null,
+            'verification_attempts' => 0,
+            'verification_locked_until' => null,
+        ]);
+
+        if ($updated === 0) {
+            Log::error('verifyEmail: could not persist verified state', ['user_id' => $user->getKey()]);
+
+            return back()->withErrors([
+                'code' => 'We could not save your verification. Please try again.',
+            ]);
+        }
+
         $request->session()->forget('pending_email_verification_user_id');
         // Do not auto-login after verification; keep the user as a guest.
         $request->session()->regenerateToken();
+
         return redirect()->route('login')->with('success', 'Your email has been verified. Please log in.');
     }
 
@@ -334,14 +474,15 @@ class AuthController extends Controller
         $user = User::find($userId);
         if (! $user || ! $user->hasPendingEmailVerification()) {
             $request->session()->forget('pending_email_verification_user_id');
+
             return redirect()->route('register')->withErrors(['resend' => 'Invalid session. Please register again.']);
         }
         if ($user->isVerificationLocked()) {
             return back()->withErrors([
-                'resend' => 'You cannot request a new code until ' . $user->verification_locked_until->diffForHumans() . '.',
+                'resend' => 'You cannot request a new code until '.$user->verification_locked_until->diffForHumans().'.',
             ]);
         }
-        $key = 'resend_verification_' . $user->id;
+        $key = 'resend_verification_'.$user->id;
         if (RateLimiter::tooManyAttempts($key, 1)) {
             return back()->withErrors([
                 'resend' => 'Please wait a minute before requesting another code.',
@@ -349,6 +490,7 @@ class AuthController extends Controller
         }
         RateLimiter::hit($key, 60);
         $this->sendVerificationCode($user->fresh());
+
         return back()->with('message', 'A new verification code has been sent to your email.');
     }
 }

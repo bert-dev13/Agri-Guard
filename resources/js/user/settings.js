@@ -1,3 +1,5 @@
+import { initBarangaySelect } from '../shared/barangaySelect';
+
 /**
  * AGRIGUARD settings — barangay load, toggles, units, geolocation
  */
@@ -21,31 +23,7 @@
     ready(function () {
         initLucide();
 
-        var select = document.getElementById('farm_barangay');
-        if (select) {
-            var apiUrl = select.getAttribute('data-api-url') || '/api/amulung-barangays';
-            var selected = select.getAttribute('data-old') || '';
-            fetch(apiUrl, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(function (res) {
-                    return res.json();
-                })
-                .then(function (data) {
-                    var barangays = data.barangays || [];
-                    select.innerHTML = '<option value="">Select barangay</option>';
-                    barangays.forEach(function (b) {
-                        var opt = document.createElement('option');
-                        opt.value = b.code;
-                        opt.textContent = b.name;
-                        if (b.code === selected) {
-                            opt.selected = true;
-                        }
-                        select.appendChild(opt);
-                    });
-                })
-                .catch(function () {
-                    select.innerHTML = '<option value="">Could not load</option>';
-                });
-        }
+        initBarangaySelect(document.getElementById('farm_barangay_code'));
 
         document.querySelectorAll('.settings-page .ag-toggle').forEach(function (btn) {
             var key = 'ag_pref_' + (btn.getAttribute('data-pref') || '');
@@ -103,6 +81,12 @@
         var farmLng = document.getElementById('farm_lng');
         var coordsDisplay = document.getElementById('farm-coords-display');
         var coordsText = document.getElementById('farm-coords-text');
+        var coordsPlaceholder = document.getElementById('farm-coords-placeholder');
+        function restoreUseLocationButton() {
+            btnUseLocation.innerHTML =
+                '<i data-lucide="map-pin" class="w-4 h-4"></i> Use location';
+            initLucide();
+        }
         if (btnUseLocation && farmLat && farmLng) {
             btnUseLocation.addEventListener('click', function () {
                 if (!navigator.geolocation) {
@@ -110,7 +94,7 @@
                     return;
                 }
                 btnUseLocation.disabled = true;
-                btnUseLocation.textContent = 'Getting location...';
+                btnUseLocation.innerHTML = 'Locating…';
                 navigator.geolocation.getCurrentPosition(
                     function (pos) {
                         var lat = pos.coords.latitude;
@@ -123,17 +107,16 @@
                         if (coordsDisplay) {
                             coordsDisplay.classList.remove('hidden');
                         }
+                        if (coordsPlaceholder) {
+                            coordsPlaceholder.classList.add('hidden');
+                        }
                         btnUseLocation.disabled = false;
-                        btnUseLocation.innerHTML =
-                            '<i data-lucide="map-pin" class="w-4 h-4"></i> Use current location';
-                        initLucide();
+                        restoreUseLocationButton();
                     },
                     function () {
                         alert('Could not get your location. Please allow location access or enter coordinates manually.');
                         btnUseLocation.disabled = false;
-                        btnUseLocation.innerHTML =
-                            '<i data-lucide="map-pin" class="w-4 h-4"></i> Use current location';
-                        initLucide();
+                        restoreUseLocationButton();
                     },
                     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );

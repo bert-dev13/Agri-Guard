@@ -1,0 +1,75 @@
+.admin-farms-table {
+    min-width: 62rem;
+}
+
+.admin-farms-crop-tag {
+    color: #0f766e;
+    background: rgb(45 212 191 / 0.14);
+    border-color: rgb(13 148 136 / 0.28);
+}
+
+/* Farm monitoring — success toast (page-specific; not shared with User Management) */
+.admin-farms-toast {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 100;
+    max-width: min(26rem, calc(100vw - 2rem));
+    background: #0f766e;
+    color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+    padding: 0.7rem 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.35;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition:
+        opacity 200ms ease,
+        transform 200ms ease;
+}
+
+.admin-farms-toast[data-visible='true'] {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-farms-toast {
+        transition: none;
+    }
+
+    .admin-farms-toast[data-visible='true'] {
+        transform: none;
+    }
+}
+
+@media print {
+    body.admin-panel-body * {
+        visibility: hidden;
+    }
+
+    #admin-farms-root,
+    #admin-farms-root * {
+        visibility: visible;
+    }
+
+    #admin-farms-root {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+    }
+
+    #admin-farms-root .admin-users__header-actions,
+    #admin-farms-root .admin-users-filters,
+    #admin-farms-root .admin-users-cards,
+    #admin-farms-root .admin-users-pagination,
+    #admin-farms-root .admin-users-flash,
+    #admin-farms-root .admin-farms-toast,
+    #admin-farms-root .admin-users-modal,
+    #admin-farms-root .admin-users-modal-backdrop {
+        display: none !important;
+    }
+}
+

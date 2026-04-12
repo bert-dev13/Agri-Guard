@@ -2,254 +2,328 @@
     $rainProbDisplay = $rain_probability_display ?? $forecast_rain_probability ?? ($weatherData['today_rain_probability'] ?? null);
     $rainfallMm = $weather['today_expected_rainfall'] ?? ($weatherData['today_expected_rainfall'] ?? null);
     $rainStatIsChance = is_numeric($rainProbDisplay);
-    $rainStatLabel = $rainStatIsChance ? 'Rain Chance' : 'Rainfall';
+    $rainStatLabel = $rainStatIsChance ? 'Rain' : 'Rainfall';
     $rainStatValue = $rainStatIsChance
         ? ((int) round((float) $rainProbDisplay)) . '%'
-        : (is_numeric($rainfallMm) ? round((float) $rainfallMm, 1) . ' mm' : '0%');
+        : (is_numeric($rainfallMm) ? round((float) $rainfallMm, 1) . ' mm' : '—');
 
-    $stageLabels = [
-        'land_preparation' => 'Land Preparation',
-        'planting' => 'Planting',
-        'early_growth' => 'Early Growth',
-        'growing' => 'Growing',
-        'flowering_fruiting' => 'Flowering',
-        'harvesting' => 'Harvesting',
-    ];
-    $stageLabel = Auth::user()->farming_stage ? ($stageLabels[Auth::user()->farming_stage] ?? Auth::user()->farming_stage) : null;
+    $stageLabel = filled(Auth::user()->farming_stage)
+        ? app(\App\Services\CropTimelineService::class)->displayLabel(Auth::user()->farming_stage)
+        : null;
     $farmName = $crop_type ? ($crop_type . ' Farm') : 'Rice Farm';
     $farmStage = $stageLabel ?: 'Planting';
     $headerLocation = $farm_location_display ?: 'Barangay Calamagui, Amulung, Cagayan';
     $insights = $agri_insights ?? [];
+    $recoForRisk = is_array($recommendation ?? null) ? $recommendation : [];
+    $riskForBadge = strtolower((string) ($recoForRisk['risk'] ?? $recoForRisk['risk_level'] ?? ''));
+    $weatherRiskTone = $riskForBadge !== '' ? $riskForBadge : 'moderate';
+    $weatherRiskBadgeClass = $weatherRiskTone === 'low'
+        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+        : ($weatherRiskTone === 'high'
+            ? 'bg-rose-100 text-rose-800 border border-rose-200'
+            : 'bg-amber-100 text-amber-800 border border-amber-200');
+
+    $clayDataUri = static function (string $svg): string {
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    };
+
+    $clay = [
+        'sun' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="cs" cx="32%" cy="28%" r="70%"><stop offset="0%" stop-color="#FFFBEB"/><stop offset="45%" stop-color="#FDE047"/><stop offset="100%" stop-color="#EAB308"/></radialGradient><filter id="ds"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".18"/></filter></defs><circle cx="24" cy="26" r="13" fill="url(#cs)" filter="url(#ds)"/><ellipse cx="19" cy="21" rx="5" ry="3" fill="#fff" opacity=".45"/></svg>',
+        'partly_cloudy' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="cs2" cx="30%" cy="25%" r="65%"><stop offset="0%" stop-color="#FEF9C3"/><stop offset="100%" stop-color="#FACC15"/></radialGradient><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#CBD5E1"/></linearGradient><filter id="ds2"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".16"/></filter></defs><circle cx="14" cy="16" r="8" fill="url(#cs2)" filter="url(#ds2)"/><ellipse cx="18" cy="14" rx="3" ry="2" fill="#fff" opacity=".5"/><ellipse cx="26" cy="30" rx="14" ry="10" fill="url(#cg)" filter="url(#ds2)"/><ellipse cx="20" cy="28" rx="9" ry="7" fill="#E2E8F0"/><ellipse cx="32" cy="29" rx="8" ry="6" fill="#F1F5F9"/></svg>',
+        'cloud' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="clg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#CBD5E1"/></linearGradient><filter id="dsc"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".15"/></filter></defs><ellipse cx="24" cy="28" rx="16" ry="11" fill="url(#clg)" filter="url(#dsc)"/><ellipse cx="16" cy="26" rx="10" ry="8" fill="#E2E8F0"/><ellipse cx="32" cy="26" rx="9" ry="7" fill="#F1F5F9"/></svg>',
+        'overcast' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="ov" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E2E8F0"/><stop offset="100%" stop-color="#94A3B8"/></linearGradient><filter id="dso"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0f172a" flood-opacity=".2"/></filter></defs><ellipse cx="24" cy="28" rx="17" ry="12" fill="url(#ov)" filter="url(#dso)"/><ellipse cx="15" cy="26" rx="11" ry="9" fill="#CBD5E1"/><ellipse cx="34" cy="27" rx="10" ry="8" fill="#94A3B8"/></svg>',
+        'rain' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="rc" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F1F5F9"/><stop offset="100%" stop-color="#94A3B8"/></linearGradient><linearGradient id="rd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7DD3FC"/><stop offset="100%" stop-color="#38BDF8"/></linearGradient><filter id="dsr"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".16"/></filter></defs><ellipse cx="24" cy="22" rx="15" ry="10" fill="url(#rc)" filter="url(#dsr)"/><ellipse cx="17" cy="21" rx="9" ry="7" fill="#E2E8F0"/><path d="M16 34v8M24 32v9M32 34v7" stroke="url(#rd)" stroke-width="3.5" stroke-linecap="round" filter="url(#dsr)"/></svg>',
+        'storm' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="stc" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E2E8F0"/><stop offset="100%" stop-color="#64748B"/></linearGradient><filter id="dst"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".18"/></filter></defs><ellipse cx="24" cy="22" rx="15" ry="10" fill="url(#stc)" filter="url(#dst)"/><path d="M22 28 L18 36h6l-3 8 10-12h-7l4-4z" fill="#FDE047" stroke="#EAB308" stroke-width="0.5" filter="url(#dst)"/></svg>',
+        'snow' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="sn" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#CBD5E1"/></linearGradient><filter id="dss"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".14"/></filter></defs><ellipse cx="24" cy="22" rx="15" ry="10" fill="url(#sn)" filter="url(#dss)"/><circle cx="18" cy="34" r="2.2" fill="#E0F2FE"/><circle cx="24" cy="36" r="2" fill="#BAE6FD"/><circle cx="30" cy="33" r="2.2" fill="#E0F2FE"/></svg>',
+        'wind' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="wg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#DDD6FE"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient><filter id="dsw"><feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#0f172a" flood-opacity=".15"/></filter></defs><path d="M8 20 Q22 14 38 20 Q22 26 8 20" fill="none" stroke="url(#wg)" stroke-width="5" stroke-linecap="round" filter="url(#dsw)"/><path d="M10 30 Q24 24 40 30 Q24 36 10 30" fill="none" stroke="url(#wg)" stroke-width="4" stroke-linecap="round" opacity=".85" filter="url(#dsw)"/></svg>',
+        'droplet' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="dg" cx="35%" cy="25%" r="65%"><stop offset="0%" stop-color="#A7F3D0"/><stop offset="100%" stop-color="#34D399"/></radialGradient><filter id="dsd"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".16"/></filter></defs><path d="M24 10 C16 22 12 28 12 32a12 12 0 0 0 24 0c0-4-4-10-12-22z" fill="url(#dg)" filter="url(#dsd)"/><ellipse cx="20" cy="30" rx="4" ry="5" fill="#fff" opacity=".35"/></svg>',
+        'pin' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="pg" cx="35%" cy="20%" r="70%"><stop offset="0%" stop-color="#FDE68A"/><stop offset="100%" stop-color="#D97706"/></radialGradient><filter id="dsp"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".18"/></filter></defs><path d="M24 8c-6 0-10 4.5-10 10 0 8 10 22 10 22s10-14 10-22c0-5.5-4-10-10-10z" fill="url(#pg)" filter="url(#dsp)"/><circle cx="24" cy="18" r="4" fill="#fff" opacity=".5"/></svg>',
+        'sprout' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="sg" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#86EFAC"/><stop offset="100%" stop-color="#22C55E"/></linearGradient><filter id="dss2"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".14"/></filter></defs><path d="M24 38v-8" stroke="#A3E635" stroke-width="4" stroke-linecap="round" filter="url(#dss2)"/><path d="M24 30 Q14 22 18 12 Q24 18 24 30" fill="url(#sg)" filter="url(#dss2)"/><path d="M24 30 Q34 22 30 12 Q24 18 24 30" fill="url(#sg)" opacity=".9" filter="url(#dss2)"/></svg>',
+        'gauge' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="gg" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#FEF3C7"/><stop offset="100%" stop-color="#F59E0B"/></linearGradient><filter id="dsg"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".14"/></filter></defs><path d="M10 32 A16 16 0 0 1 38 32" fill="none" stroke="#E2E8F0" stroke-width="5" stroke-linecap="round"/><path d="M10 32 A16 16 0 0 1 28 18" fill="none" stroke="url(#gg)" stroke-width="5" stroke-linecap="round" filter="url(#dsg)"/><circle cx="24" cy="32" r="3" fill="#F59E0B" filter="url(#dsg)"/></svg>',
+        'brain' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="bg" cx="30%" cy="30%" r="65%"><stop offset="0%" stop-color="#EDE9FE"/><stop offset="100%" stop-color="#A78BFA"/></radialGradient><filter id="dsb"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".15"/></filter></defs><path d="M18 14c-4 0-7 3-7 7 0 2 1 4 2 5-1 1-2 3-2 5 0 5 4 9 9 9h10c5 0 9-4 9-9 0-2-1-4-2-5 1-1 2-3 2-5 0-4-3-7-7-7-1-3-4-5-8-5s-7 2-8 5z" fill="url(#bg)" filter="url(#dsb)"/></svg>',
+        'alert' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FDE68A"/><stop offset="100%" stop-color="#F59E0B"/></linearGradient><filter id="dsa"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".16"/></filter></defs><path d="M24 8 L40 38H8L24 8z" fill="url(#ag)" filter="url(#dsa)"/><path d="M24 16v12M24 32v2" stroke="#92400E" stroke-width="2.5" stroke-linecap="round"/></svg>',
+        'clock' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="ck" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F1F5F9"/><stop offset="100%" stop-color="#CBD5E1"/></linearGradient><filter id="dscl"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".14"/></filter></defs><circle cx="24" cy="24" r="14" fill="url(#ck)" filter="url(#dscl)"/><path d="M24 14v10l6 4" stroke="#475569" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>',
+        'calendar' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="cal" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#FDE68A"/><stop offset="100%" stop-color="#FBBF24"/></linearGradient><filter id="dscal"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".14"/></filter></defs><rect x="10" y="14" width="28" height="26" rx="4" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="2" filter="url(#dscal)"/><rect x="10" y="14" width="28" height="9" rx="4" fill="url(#cal)"/><path d="M16 10v8M32 10v8" stroke="#D97706" stroke-width="3" stroke-linecap="round"/></svg>',
+        'grid' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><filter id="dsgr"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".12"/></filter></defs><rect x="8" y="8" width="14" height="14" rx="4" fill="#E0E7FF" filter="url(#dsgr)"/><rect x="26" y="8" width="14" height="14" rx="4" fill="#FEF3C7" filter="url(#dsgr)"/><rect x="8" y="26" width="14" height="14" rx="4" fill="#D1FAE5" filter="url(#dsgr)"/><rect x="26" y="26" width="14" height="14" rx="4" fill="#EDE9FE" filter="url(#dsgr)"/></svg>',
+        'chart' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><filter id="dsch"><feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#0f172a" flood-opacity=".12"/></filter></defs><rect x="8" y="28" width="8" height="12" rx="2" fill="#86EFAC" filter="url(#dsch)"/><rect x="20" y="18" width="8" height="22" rx="2" fill="#A78BFA" filter="url(#dsch)"/><rect x="32" y="22" width="8" height="18" rx="2" fill="#FCD34D" filter="url(#dsch)"/></svg>',
+        'dashboard' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><filter id="dsdb"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".12"/></filter></defs><rect x="8" y="8" width="30" height="14" rx="4" fill="#C4B5FD" filter="url(#dsdb)"/><rect x="8" y="26" width="13" height="14" rx="4" fill="#FDE68A" filter="url(#dsdb)"/><rect x="25" y="26" width="13" height="14" rx="4" fill="#A7F3D0" filter="url(#dsdb)"/></svg>',
+        'thermo' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="tg" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#FCA5A5"/><stop offset="100%" stop-color="#FEF08A"/></linearGradient><filter id="dsth"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".14"/></filter></defs><rect x="20" y="10" width="8" height="22" rx="4" fill="#F1F5F9" filter="url(#dsth)"/><circle cx="24" cy="34" r="8" fill="url(#tg)" filter="url(#dsth)"/></svg>',
+        'eye' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="eg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E0E7FF"/><stop offset="100%" stop-color="#A5B4FC"/></linearGradient><filter id="dse"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".14"/></filter></defs><ellipse cx="24" cy="24" rx="18" ry="11" fill="url(#eg)" filter="url(#dse)"/><circle cx="24" cy="24" r="7" fill="#F8FAFC"/><circle cx="24" cy="24" r="4" fill="#6366F1"/></svg>',
+        'moon' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="mg" cx="28%" cy="22%" r="75%"><stop offset="0%" stop-color="#EDE9FE"/><stop offset="55%" stop-color="#A78BFA"/><stop offset="100%" stop-color="#6D28D9"/></radialGradient><filter id="dsm"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0f172a" flood-opacity=".22"/></filter></defs><circle cx="22" cy="24" r="14" fill="url(#mg)" filter="url(#dsm)"/><circle cx="33" cy="20" r="11" fill="#ffffff"/></svg>',
+        'wifi_off' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><filter id="dswf"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".12"/></filter></defs><path d="M8 38 L40 10" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/><path d="M12 28 Q24 18 36 28" stroke="#E2E8F0" stroke-width="3" fill="none" stroke-linecap="round" filter="url(#dswf)"/></svg>',
+    ];
+
+    $wImg = static function (string $key) use ($clay, $clayDataUri): string {
+        $svg = $clay[$key] ?? $clay['cloud'];
+
+        return $clayDataUri($svg);
+    };
+
+    $wWeatherKey = static function (int $conditionId): string {
+        return match (true) {
+            $conditionId >= 200 && $conditionId < 300 => 'storm',
+            $conditionId >= 300 && $conditionId < 600 => 'rain',
+            $conditionId >= 600 && $conditionId < 700 => 'snow',
+            $conditionId === 800 => 'sun',
+            $conditionId === 801 => 'partly_cloudy',
+            $conditionId === 802 || $conditionId === 803 => 'cloud',
+            $conditionId === 804 => 'overcast',
+            default => 'cloud',
+        };
+    };
 @endphp
 @extends('layouts.user')
 
 @section('title', 'Weather Details – AGRIGUARD')
 
-@section('body-class', 'weather-page min-h-screen bg-[#F5F7FA]')
+@push('head')
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+@endpush
+
+@section('body-class', 'dashboard-page weather-page min-h-screen bg-[#f3f8fc]')
 
 @section('main-class', 'pt-20')
 
 @section('content')
     <section class="dashboard-shell py-4 sm:py-6 pb-24">
         <div class="dashboard-container max-w-3xl mx-auto px-4 sm:px-5 space-y-4 sm:space-y-5">
-            <header class="ag-card ag-welcome-gradient overflow-hidden" aria-label="Weather header">
-                <div class="relative px-5 py-5 sm:px-6 sm:py-6 flex items-start justify-between gap-4">
-                    <div class="min-w-0 flex-1">
-                        <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight">Weather Details</h1>
-                        <p class="mt-1.5 text-white/90 text-sm">Detailed weather insights for your farm.</p>
-                        <p class="mt-2 text-white/95 text-sm flex items-center gap-1.5">
-                            <i data-lucide="map-pin" class="w-4 h-4 shrink-0 opacity-90"></i>
-                            {{ $headerLocation }}
-                        </p>
-                        <p class="mt-1.5 text-white/85 text-sm">{{ $farmName }} • {{ $farmStage }}</p>
-                        <p class="mt-1 text-white/70 text-xs">{{ now()->format('l, F j, Y') }}</p>
+            @php
+                $weatherReco = is_array($recommendation ?? null) ? $recommendation : [];
+                $whCondId = is_array($weather ?? null)
+                    ? (int) ($weather['condition']['id'] ?? 800)
+                    : 800;
+                $weatherHeroEmoji = \App\Http\Controllers\WeatherDetailsController::simpleWeatherEmoji($whCondId);
+                $weatherHeroLabel = is_array($weather ?? null) && isset($weather['simple_label']) && $weather['simple_label'] !== ''
+                    ? (string) $weather['simple_label']
+                    : \App\Http\Controllers\WeatherDetailsController::simpleWeatherLabel($whCondId);
+            @endphp
+            <header class="dashboard-hero weather-page-hero ag-card" aria-labelledby="weather-page-hero-heading">
+                <div class="dashboard-hero__accent" aria-hidden="true">
+                    <span class="dashboard-hero__accent-shimmer"></span>
+                </div>
+                <div class="dashboard-hero__canvas" aria-hidden="true">
+                    <span class="dashboard-hero__blob dashboard-hero__blob--a"></span>
+                    <span class="dashboard-hero__blob dashboard-hero__blob--b"></span>
+                    <span class="dashboard-hero__blob dashboard-hero__blob--c"></span>
+                    <span class="dashboard-hero__grain"></span>
+                </div>
+                <div class="dashboard-hero__layout">
+                    <div class="dashboard-hero__main">
+                        <div class="dashboard-hero__title-row">
+                            <span class="dashboard-hero__greet-badge weather-page-hero__badge" aria-hidden="true">
+                                <span class="dashboard-hero__greet-badge-glow"></span>
+                                <i data-lucide="cloud-sun" class="dashboard-hero__lucide dashboard-hero__lucide--greet"></i>
+                            </span>
+                            <div class="dashboard-hero__title-stack">
+                                <h1 id="weather-page-hero-heading" class="dashboard-hero__title">
+                                    <span class="dashboard-hero__title-line">Weather</span>
+                                    <span class="dashboard-hero__title-emoji" aria-hidden="true">{{ $weatherHeroEmoji }}</span>
+                                </h1>
+                                <p class="dashboard-hero__subtitle">
+                                    <span class="dashboard-hero__subtitle-ic" aria-hidden="true">
+                                        <i data-lucide="bar-chart-3" class="dashboard-hero__lucide dashboard-hero__lucide--xs"></i>
+                                    </span>
+                                    <span>Rainfall trends</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="dashboard-hero__meta">
+                            <span class="dashboard-hero__pill weather-page-hero__pill">
+                                <span class="dashboard-hero__pill-ic" aria-hidden="true">
+                                    <i data-lucide="map-pin" class="dashboard-hero__lucide"></i>
+                                </span>
+                                <span class="dashboard-hero__pill-text">{{ $headerLocation }}</span>
+                            </span>
+                            <span class="dashboard-hero__pill weather-page-hero__pill">
+                                <span class="dashboard-hero__pill-ic" aria-hidden="true">
+                                    <i data-lucide="calendar-days" class="dashboard-hero__lucide"></i>
+                                </span>
+                                <time class="dashboard-hero__pill-text" datetime="{{ now()->toDateString() }}">{{ now()->format('l, F j, Y') }}</time>
+                            </span>
+                        </div>
                     </div>
-                    <div class="flex flex-col items-end gap-2 shrink-0">
-                        <span class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/20" aria-hidden="true">
-                            <i data-lucide="cloud-sun" class="w-7 h-7 sm:w-8 sm:h-8 text-white"></i>
+                    <div class="dashboard-hero__aside">
+                        <span class="dashboard-hero__weather-card weather-page-hero__status-card" aria-hidden="true">
+                            <span class="dashboard-hero__weather-glow" aria-hidden="true"></span>
+                            <span class="dashboard-hero__weather-ring" aria-hidden="true">
+                                <i data-lucide="cloud-sun" class="dashboard-hero__lucide dashboard-hero__lucide--greet"></i>
+                            </span>
+                            <span class="dashboard-hero__weather-body">
+                                <span class="dashboard-hero__weather-label">
+                                    <i data-lucide="cloud-sun" class="dashboard-hero__lucide dashboard-hero__lucide--sm" aria-hidden="true"></i>
+                                    Live weather
+                                </span>
+                                <span class="dashboard-hero__weather-temp weather-page-hero__status-value">{{ $weatherHeroLabel ?: 'Clear' }}</span>
+                                <span class="dashboard-hero__weather-desc">Live conditions</span>
+                            </span>
                         </span>
-                        <a
-                            href="{{ route('rainfall-trends') }}"
-                            class="inline-flex items-center gap-1.5 rounded-full bg-white/95 hover:bg-white text-[#0F172A] text-xs sm:text-sm font-semibold px-3 py-1.5 border border-white/70 shadow-sm transition-colors"
-                            aria-label="View Rainfall Trends"
-                        >
-                            <i data-lucide="cloud-rain" class="w-3.5 h-3.5 text-blue-600"></i>
-                            View Rainfall Trends
-                        </a>
                     </div>
                 </div>
             </header>
 
+            @php
+                $todayPlan = is_array($weatherReco['today_plan'] ?? null) ? $weatherReco['today_plan'] : [];
+                $wAiStatus = strtolower((string) ($weatherReco['ai_status'] ?? 'failed'));
+                $wAiError = trim((string) ($weatherReco['ai_error'] ?? ''));
+                $wAiAdvisoryReady = $wAiStatus === 'success';
+                $wAiUnavailableMsg = 'AI advisory temporarily unavailable.';
+                $wBlockedMsg = $wAiStatus === 'missing_context' && $wAiError !== ''
+                    ? $wAiError
+                    : ($wAiStatus === 'missing_context' ? 'Please update your crop type and farming stage in Farm Settings to receive AI advisory from Together AI.' : $wAiUnavailableMsg);
+            @endphp
+
             @if ($weather && isset($weather['temp']))
-                <article class="ag-card weather-dashboard-card p-4 sm:p-5">
-                    <div class="weather-featured-card">
-                        <div class="weather-featured-head">
-                            <h2 class="weather-section-title">
-                                <i data-lucide="cloud-sun" class="w-4 h-4" aria-hidden="true"></i>
-                                Current Weather
-                            </h2>
+                @php
+                    $condId = (int) ($weather['condition']['id'] ?? 800);
+                    $condLabel = $weather['simple_label'] ?? \App\Http\Controllers\WeatherDetailsController::simpleWeatherLabel($condId);
+                    $snapshotSummary = $summary_message ?? 'Weather looks stable. Low chance of rain.';
+                @endphp
+                <article class="ag-card overflow-hidden rounded-3xl border border-sky-200 bg-sky-50/85 p-4 shadow-sm sm:p-5" aria-label="Current weather snapshot">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="inline-flex rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-sky-900">Current weather snapshot</p>
+                            <p class="mt-2 text-5xl font-extrabold leading-none tracking-tight text-slate-900 sm:text-6xl">{{ round((float) $weather['temp']) }}°C</p>
+                            <p class="mt-2 text-sm font-semibold text-slate-700 sm:text-base">{{ $condLabel }}</p>
+                            <p class="mt-1 text-xs text-slate-500 sm:text-sm">{{ $snapshotSummary }}</p>
                         </div>
-                        <div class="weather-featured-main">
-                            <span class="weather-featured-icon" aria-hidden="true">
-                                <i data-lucide="{{ $weather['simple_icon'] ?? 'sun' }}"></i>
-                            </span>
-                            <div class="min-w-0">
-                                <p class="weather-featured-temp">{{ round((float) $weather['temp']) }}<span class="weather-featured-unit">°C</span></p>
-                                <p class="weather-featured-condition">{{ $weather['simple_label'] ?? 'Clear' }}</p>
-                                <p class="weather-featured-summary">{{ $summary_message ?? 'Weather looks stable for normal field activity.' }}</p>
-                            </div>
-                        </div>
-                        <div class="weather-mini-stats">
-                            <article class="weather-mini-stat">
-                                <span class="weather-mini-stat-icon"><i data-lucide="cloud-rain"></i></span>
-                                <span>
-                                    <span class="weather-mini-stat-label">{{ $rainStatLabel }}</span>
-                                    <span class="weather-mini-stat-value">{{ $rainStatValue }}</span>
-                                </span>
-                            </article>
-                            <article class="weather-mini-stat">
-                                <span class="weather-mini-stat-icon"><i data-lucide="droplets"></i></span>
-                                <span>
-                                    <span class="weather-mini-stat-label">Humidity</span>
-                                    <span class="weather-mini-stat-value">{{ is_numeric($weather['humidity'] ?? null) ? ((int) round((float) $weather['humidity'])) . '%' : '0%' }}</span>
-                                </span>
-                            </article>
-                            <article class="weather-mini-stat">
-                                <span class="weather-mini-stat-icon"><i data-lucide="wind"></i></span>
-                                <span>
-                                    <span class="weather-mini-stat-label">Wind</span>
-                                    <span class="weather-mini-stat-value">{{ is_numeric($weather['wind_speed'] ?? null) ? round((float) $weather['wind_speed'], 1) . ' km/h' : '0 km/h' }}</span>
-                                </span>
-                            </article>
-                        </div>
+                        <span class="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-sky-50 sm:h-20 sm:w-20" aria-hidden="true">
+                            <img src="{{ $wImg($wWeatherKey((int) ($weather['condition']['id'] ?? 800))) }}" alt="" class="weather-clay-ic weather-clay-ic--hero" width="40" height="40" decoding="async">
+                        </span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+                        <article class="rounded-2xl border border-sky-100 bg-sky-50 px-3 py-2.5 sm:px-4">
+                            <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Rain %</p>
+                            <p class="mt-1 text-sm font-bold text-slate-900 sm:text-base">{{ $rainStatValue }}</p>
+                        </article>
+                        <article class="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 sm:px-4">
+                            <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Humidity</p>
+                            <p class="mt-1 text-sm font-bold text-slate-900 sm:text-base">{{ is_numeric($weather['humidity'] ?? null) ? ((int) round((float) $weather['humidity'])) . '%' : '—' }}</p>
+                        </article>
+                        <article class="rounded-2xl border border-violet-100 bg-violet-50 px-3 py-2.5 sm:px-4">
+                            <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Wind speed</p>
+                            <p class="mt-1 text-sm font-bold text-slate-900 sm:text-base">{{ is_numeric($weather['wind_speed'] ?? null) ? round((float) $weather['wind_speed'], 1) . ' km/h' : '—' }}</p>
+                        </article>
                     </div>
                 </article>
             @else
-                <article class="ag-card p-5 sm:p-6 text-center">
-                    <i data-lucide="cloud-off" class="w-12 h-12 text-slate-300 mx-auto"></i>
-                    <p class="mt-3 text-sm font-medium text-slate-500 text-center">Weather data unavailable</p>
+                <article class="ag-card p-4 text-center weather-page__empty">
+                    <img src="{{ $wImg('wifi_off') }}" alt="" class="weather-clay-ic weather-clay-ic--lg mx-auto opacity-90" width="48" height="48" decoding="async">
+                    <p class="mt-3 text-sm font-semibold text-slate-600">Weather data unavailable</p>
                 </article>
             @endif
 
-            @php
-                $weatherReco = is_array($recommendation ?? null) ? $recommendation : [];
-                $todayPlan = is_array($weatherReco['today_plan'] ?? null) ? $weatherReco['today_plan'] : [];
-                $aiStatus = strtolower((string) ($weatherReco['ai_status'] ?? 'failed'));
-                $aiModel = trim((string) ($weatherReco['ai_model'] ?? ''));
-                $aiError = trim((string) ($weatherReco['ai_error'] ?? ''));
-                $showAiDebug = app()->environment('local') || (bool) config('app.debug');
-                $riskLevel = strtolower((string) ($weatherReco['risk_level'] ?? 'moderate'));
-                $riskLabel = $riskLevel === 'high' ? 'High' : ($riskLevel === 'low' ? 'Low' : 'Moderate');
-
-                $riskMap = [
-                    'low' => [
-                        'badge' => 'bg-emerald-100 text-emerald-700 border border-emerald-200',
-                    ],
-                    'moderate' => [
-                        'badge' => 'bg-amber-100 text-amber-700 border border-amber-200',
-                    ],
-                    'high' => [
-                        'badge' => 'bg-rose-100 text-rose-700 border border-rose-200',
-                    ],
-                ];
-                $riskStyle = $riskMap[$riskLevel] ?? $riskMap['moderate'];
-            @endphp
-
-            <article class="ag-card border border-slate-200 bg-white p-4 sm:p-5 rounded-2xl shadow-sm" aria-label="Today's smart weather action">
-                <div class="mx-auto w-full max-w-4xl space-y-4">
-                    @if ($showAiDebug)
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            <p class="text-xs text-slate-700 font-semibold">
-                                AI API Status:
-                                <span class="{{ $aiStatus === 'success' ? 'text-emerald-700' : 'text-rose-700' }}">{{ $aiStatus === 'success' ? 'Success' : 'Failed' }}</span>
-                            </p>
-                            @if ($aiModel !== '')
-                                <p class="text-xs text-slate-600 mt-1">Model: {{ $aiModel }}</p>
-                            @endif
-                            @if ($aiStatus !== 'success' && $aiError !== '')
-                                <p class="text-xs text-slate-600 mt-1">Error: {{ $aiError }}</p>
-                            @endif
-                        </div>
-                    @endif
-
-                    @if (!empty($recommendation_failed))
-                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                            <p class="text-sm text-amber-900 font-semibold">Live AI weather advice is temporarily unavailable. Showing a safe fallback recommendation.</p>
-                        </div>
-                    @endif
-
-                    <header class="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
-                            <i data-lucide="sprout" class="w-4 h-4 text-[#2E7D32]"></i>
-                            TODAY’S SMART WEATHER ACTION
-                        </p>
-                        <p class="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">{{ $weatherReco['main_recommendation'] ?? 'Check weather conditions before starting field work today.' }}</p>
-                        <div class="flex flex-wrap items-center gap-2.5 text-xs">
-                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 px-3 py-1.5 border border-slate-200">
-                                <i data-lucide="gauge" class="w-3.5 h-3.5"></i>
-                                Farm Score: {{ $weatherReco['farm_score'] ?? 6 }}/10
-                            </span>
-                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 px-3 py-1.5 border border-emerald-200">
-                                <i data-lucide="brain" class="w-3.5 h-3.5"></i>
-                                AI Confidence: {{ $weatherReco['ai_confidence'] ?? 'Medium' }}
-                            </span>
-                            <span class="inline-flex items-center gap-1 rounded-full px-3 py-1.5 font-semibold {{ $riskStyle['badge'] }}">
-                                ⚠️ Risk Level: {{ $riskLabel }}
-                            </span>
-                        </div>
-                    </header>
-
-                    <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <p class="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                            <i data-lucide="clock-3" class="w-4 h-4 text-[#2E7D32]"></i>
-                            Today&rsquo;s Plan
-                        </p>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <p class="text-sm font-semibold text-slate-900 mb-1">🌅 Morning</p>
-                                <p class="text-sm text-slate-700 leading-relaxed">{{ $todayPlan['morning'] ?? 'No action needed.' }}</p>
-                            </div>
-                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <p class="text-sm font-semibold text-slate-900 mb-1">☀️ Afternoon</p>
-                                <p class="text-sm text-slate-700 leading-relaxed">{{ $todayPlan['afternoon'] ?? 'No action needed.' }}</p>
-                            </div>
-                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <p class="text-sm font-semibold text-slate-900 mb-1">🌙 Evening</p>
-                                <p class="text-sm text-slate-700 leading-relaxed">{{ $todayPlan['evening'] ?? 'No action needed.' }}</p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        <div class="rounded-xl border border-amber-200 bg-amber-50 p-3.5 shadow-sm">
-                            <p class="text-sm font-semibold text-amber-800 mb-1.5 flex items-center gap-1.5">
-                                <i data-lucide="triangle-alert" class="w-4 h-4"></i>
-                                Avoid
-                            </p>
-                            <p class="text-sm text-amber-900 leading-relaxed">{{ $weatherReco['avoid'] ?? 'Avoid risky operations when rain or wind increases.' }}</p>
-                        </div>
-
-                        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 shadow-sm">
-                            <p class="text-sm font-semibold text-emerald-800 mb-1.5 flex items-center gap-1.5">
-                                <i data-lucide="droplets" class="w-4 h-4"></i>
-                                Water Strategy
-                            </p>
-                            <p class="text-sm text-emerald-900 leading-relaxed">{{ $weatherReco['water_strategy'] ?? 'Maintain normal irrigation and monitor rain updates.' }}</p>
-                        </div>
-                    </section>
-
-                    <section class="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
-                        <details>
-                            <summary class="cursor-pointer text-xs sm:text-sm font-semibold text-slate-700">Why this recommendation?</summary>
-                            <p class="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">{{ $weatherReco['why'] ?? 'Weather data is limited right now. Follow caution and monitor updates.' }}</p>
-                        </details>
-                    </section>
+            <article class="ag-card dash-smart weather-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5" aria-label="AI smart advisory">
+                <div class="dash-smart__debug">
+                    <p class="text-xs font-semibold text-slate-700">
+                        @if ($wAiAdvisoryReady)
+                            <span class="text-emerald-700">AI Smart Advisory: Active</span>
+                        @elseif ($wAiStatus === 'missing_context')
+                            <span class="text-amber-800">AI Smart Advisory: Profile incomplete</span>
+                        @else
+                            <span class="text-rose-700">AI Smart Advisory: Unavailable</span>
+                        @endif
+                    </p>
                 </div>
+
+                <div class="dash-smart__head rounded-2xl bg-emerald-100/80 px-3 py-2.5">
+                    <span class="dash-smart__chip" aria-hidden="true">
+                        <img src="{{ $wImg('sprout') }}" alt="" class="weather-clay-ic weather-clay-ic--chip" width="18" height="18" decoding="async">
+                        Smart action
+                    </span>
+                    <div class="dash-smart__badges">
+                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $wAiAdvisoryReady ? $weatherRiskBadgeClass : 'bg-slate-100 text-slate-600 border border-slate-200' }}">
+                            Risk: {{ $wAiAdvisoryReady ? ucfirst(strtolower((string) ($weatherReco['risk'] ?? $weatherReco['risk_level'] ?? 'moderate'))) : '—' }}
+                        </span>
+                        @if ($wAiAdvisoryReady && trim((string) ($weatherReco['ai_confidence'] ?? '')) !== '')
+                            <span class="dash-smart__badge dash-smart__badge--conf-high">
+                                <img src="{{ $wImg('brain') }}" class="dash-smart__badge-ic-img" width="12" height="12" alt="">
+                                {{ $weatherReco['ai_confidence'] }}
+                            </span>
+                        @endif
+                    </div>
+                </div>
+
+                <p class="dash-smart__action">{{ $wAiAdvisoryReady ? trim((string) ($weatherReco['main_recommendation'] ?? '')) : $wBlockedMsg }}</p>
             </article>
 
+            <section class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5 shadow-sm" aria-label="Today's plan">
+                <h2 class="inline-flex rounded-xl bg-sky-100 px-3 py-1.5 text-sm font-extrabold uppercase tracking-[0.1em] text-sky-900">Today&rsquo;s Plan</h2>
+                <div class="mt-3 space-y-3">
+                    <article class="flex gap-3 rounded-2xl border border-amber-100/80 bg-amber-50 px-3 py-3">
+                        <img src="{{ $wImg('sun') }}" alt="" class="weather-clay-ic weather-clay-ic--plan mt-0.5" width="22" height="22" decoding="async">
+                        <div><p class="text-sm font-semibold text-slate-800">Morning</p><p class="text-sm text-slate-600">{{ $wAiAdvisoryReady ? trim((string) ($todayPlan['morning'] ?? '')) : $wBlockedMsg }}</p></div>
+                    </article>
+                    <article class="flex gap-3 rounded-2xl border border-sky-100/80 bg-sky-50 px-3 py-3">
+                        <img src="{{ $wImg('partly_cloudy') }}" alt="" class="weather-clay-ic weather-clay-ic--plan mt-0.5" width="22" height="22" decoding="async">
+                        <div><p class="text-sm font-semibold text-slate-800">Afternoon</p><p class="text-sm text-slate-600">{{ $wAiAdvisoryReady ? trim((string) ($todayPlan['afternoon'] ?? '')) : $wBlockedMsg }}</p></div>
+                    </article>
+                    <article class="flex gap-3 rounded-2xl border border-violet-100/80 bg-violet-50 px-3 py-3">
+                        <img src="{{ $wImg('moon') }}" alt="" class="weather-clay-ic weather-clay-ic--plan mt-0.5" width="22" height="22" decoding="async">
+                        <div><p class="text-sm font-semibold text-slate-800">Evening</p><p class="text-sm text-slate-600">{{ $wAiAdvisoryReady ? trim((string) ($todayPlan['evening'] ?? '')) : $wBlockedMsg }}</p></div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="grid gap-3 sm:grid-cols-2" aria-label="Avoid and water strategy">
+                <div class="ag-card rounded-3xl border border-rose-100 bg-rose-50/70 p-4">
+                    <div class="dash-split__card dash-split__card--avoid">
+                        <div class="dash-split__head">
+                            <img src="{{ $wImg('alert') }}" class="dash-split__ic-img" width="15" height="15" alt="">
+                            Avoid
+                        </div>
+                        <p class="dash-split__body">{{ $wAiAdvisoryReady ? trim((string) ($weatherReco['avoid'] ?? '')) : $wBlockedMsg }}</p>
+                    </div>
+                </div>
+                <div class="ag-card rounded-3xl border border-cyan-100 bg-cyan-50/70 p-4">
+                    <div class="dash-split__card dash-split__card--water">
+                        <div class="dash-split__head">
+                            <img src="{{ $wImg('droplet') }}" class="dash-split__ic-img" width="15" height="15" alt="">
+                            Water
+                        </div>
+                        <p class="dash-split__body">{{ $wAiAdvisoryReady ? trim((string) ($weatherReco['water_strategy'] ?? '')) : $wBlockedMsg }}</p>
+                    </div>
+                </div>
+            </section>
+
             @if (!empty($forecast))
-                <section class="ag-card weather-forecast-panel p-5 sm:p-6">
-                    <h2 class="weather-section-title weather-section-title--sub">
-                        <i data-lucide="calendar-days" class="w-4 h-4" aria-hidden="true"></i>
-                        5-Day Forecast
-                    </h2>
-                    <div class="forecast-vertical-list">
-                        @foreach ($forecast as $day)
+                <section class="ag-card weather-page__fc-card weather-page__fc-card--emph bg-slate-50/90" aria-label="Five day forecast">
+                    <div class="weather-page__fc-head rounded-2xl bg-sky-100/80 px-3 py-2">
+                        <img src="{{ $wImg('calendar') }}" alt="" class="weather-clay-ic weather-clay-ic--fc-head" width="28" height="28" decoding="async">
+                        <div>
+                            <h2 class="weather-page__fc-title">5-Day Forecast</h2>
+                            <p class="weather-page__fc-sub">Daily conditions and temperature range</p>
+                        </div>
+                    </div>
+                    <div class="weather-page__fc-list" role="list">
+                        @foreach (array_slice($forecast, 0, 5) as $day)
                             @php
                                 $conditionId = (int) ($day['condition']['id'] ?? 800);
-                                $dayIcon = \App\Http\Controllers\WeatherDetailsController::simpleWeatherIcon($conditionId);
+                                $wk = $wWeatherKey($conditionId);
                                 $dayCondition = \App\Http\Controllers\WeatherDetailsController::simpleWeatherLabel($conditionId);
                                 $dayLabel = $day['day_name'] ?? \Carbon\Carbon::parse($day['date'] ?? now())->format('D');
                                 $dayRainChance = isset($day['pop']) && is_numeric($day['pop']) ? (int) round((float) $day['pop']) . '%' : '0%';
+                                $toneClass = ['weather-page__fc-row--slate', 'weather-page__fc-row--amber', 'weather-page__fc-row--mint', 'weather-page__fc-row--violet'][$loop->index % 4];
                             @endphp
-                            <article class="forecast-vertical-item">
-                                <p class="forecast-vertical-day">{{ $dayLabel }}</p>
-                                <span class="forecast-vertical-icon"><i data-lucide="{{ $dayIcon }}"></i></span>
-                                <div class="forecast-vertical-meta">
-                                    <p class="forecast-vertical-condition">{{ $dayCondition }}</p>
-                                    <p class="forecast-vertical-temp">{{ $day['temp_max'] }}° / {{ $day['temp_min'] }}°</p>
+                            <article class="weather-page__fc-row {{ $toneClass }}" role="listitem">
+                                <p class="weather-page__fc-day">{{ $dayLabel }}</p>
+                                <span class="weather-page__fc-icon" aria-hidden="true">
+                                    <img src="{{ $wImg($wk) }}" alt="" class="weather-clay-ic weather-clay-ic--fc-row" width="26" height="26" decoding="async">
+                                </span>
+                                <div class="weather-page__fc-meta">
+                                    <p class="weather-page__fc-condition">{{ $dayCondition }}</p>
+                                    <p class="weather-page__fc-temp-line">
+                                        @if (isset($day['temp_max']) && isset($day['temp_min']))
+                                            <span class="weather-page__fc-hi">{{ round((float) $day['temp_max']) }}°</span>
+                                            <span class="weather-page__fc-sep">/</span>
+                                            <span class="weather-page__fc-lo">{{ round((float) $day['temp_min']) }}°</span>
+                                        @else
+                                            —
+                                        @endif
+                                    </p>
                                 </div>
-                                <p class="forecast-vertical-rain">Rain {{ $dayRainChance }}</p>
+                                <p class="weather-page__fc-rain">Rain {{ $dayRainChance }}</p>
                             </article>
                         @endforeach
                     </div>
@@ -257,25 +331,23 @@
             @endif
 
             @if (!empty($hourly_forecast))
-                <section class="ag-card p-5 sm:p-6">
-                    <h2 class="weather-section-title weather-section-title--sub">
-                        <i data-lucide="clock-3" class="w-4 h-4" aria-hidden="true"></i>
-                        Hourly Forecast
+                <section class="ag-card border border-slate-200 bg-slate-100/80 p-4 weather-page__hourly-card">
+                    <h2 class="farm-dash__title weather-page__section-kicker inline-flex rounded-xl bg-sky-100 px-3 py-1.5 text-sky-900">
+                        <img src="{{ $wImg('clock') }}" alt="" class="weather-clay-ic weather-clay-ic--title" width="18" height="18" decoding="async">
+                        Hourly
                     </h2>
-                    <div class="hourly-scroll">
+                    <div class="weather-page__hourly-scroll">
                         @foreach ($hourly_forecast as $hourly)
                             @php
                                 $hourlyCondition = (int) ($hourly['condition_id'] ?? 800);
-                                $hourlyIcon = \App\Http\Controllers\WeatherDetailsController::simpleWeatherIcon($hourlyCondition);
-                                $hourlyLabel = \App\Http\Controllers\WeatherDetailsController::simpleWeatherLabel($hourlyCondition);
+                                $hk = $wWeatherKey($hourlyCondition);
                                 $hourlyRain = is_numeric($hourly['pop'] ?? null) ? ((int) round((float) $hourly['pop'])) . '%' : '0%';
                             @endphp
-                            <article class="hourly-card">
-                                <p class="hourly-time">{{ $hourly['time'] ?? '--' }}</p>
-                                <span class="hourly-icon"><i data-lucide="{{ $hourlyIcon }}"></i></span>
-                                <p class="hourly-temp">{{ isset($hourly['temp']) ? round((float) $hourly['temp']) . '°C' : '--' }}</p>
-                                <p class="hourly-rain">Rain {{ $hourlyRain }}</p>
-                                <p class="hourly-label">{{ $hourlyLabel }}</p>
+                            <article class="weather-page__hourly-cell">
+                                <p class="weather-page__hourly-time">{{ $hourly['time'] ?? '—' }}</p>
+                                <img src="{{ $wImg($hk) }}" alt="" class="weather-clay-ic weather-clay-ic--fc mx-auto" width="22" height="22" decoding="async">
+                                <p class="weather-page__hourly-temp">{{ isset($hourly['temp']) ? round((float) $hourly['temp']) . '°' : '—' }}</p>
+                                <p class="weather-page__hourly-rain">Rain {{ $hourlyRain }}</p>
                             </article>
                         @endforeach
                     </div>
@@ -283,91 +355,95 @@
             @endif
 
             @if ($weather)
-                <section class="ag-card p-5 sm:p-6">
-                    <h2 class="weather-section-title weather-section-title--sub">
-                        <i data-lucide="layout-grid" class="w-4 h-4" aria-hidden="true"></i>
-                        Additional Weather Details
+                <section class="ag-card border border-slate-200 bg-slate-50/90 p-4 weather-page__details-card">
+                    <h2 class="farm-dash__title weather-page__section-kicker inline-flex rounded-xl bg-sky-100 px-3 py-1.5 text-sky-900">
+                        <img src="{{ $wImg('grid') }}" alt="" class="weather-clay-ic weather-clay-ic--title" width="18" height="18" decoding="async">
+                        Details
                     </h2>
-                    <div class="details-enhanced-grid">
+                    <div class="weather-page__details-grid">
                         @php
-                            $hideMissingDetailCards = $hide_missing_weather_cards ?? false;
-
-                            $detailItems = [
-                                [
-                                    'label' => 'Actual Feel',
-                                    'raw' => is_numeric($weather['feels_like'] ?? null)
-                                        ? round((float) $weather['feels_like']) . '°C'
-                                        : (is_numeric($weather['temp'] ?? null) ? round((float) $weather['temp']) . '°C' : null),
-                                    'icon' => 'thermometer',
-                                    'tone' => 'green',
-                                    'helpText' => 'How hot it really feels',
-                                ],
-                                [
-                                    'label' => 'Rain Chance Today',
-                                    'raw' => is_numeric($rainProbDisplay ?? null) ? ((int) round((float) $rainProbDisplay)) . '%' : null,
-                                    'icon' => 'cloud-rain',
-                                    'tone' => 'blue',
-                                    'helpText' => 'Chance of rain that may affect farm work',
-                                ],
-                                [
-                                    'label' => 'Air Moisture Level',
-                                    'raw' => is_numeric($dew_point ?? null) ? round((float) $dew_point, 1) . '°C' : null,
-                                    'icon' => 'droplets',
-                                    'tone' => 'green',
-                                    'helpText' => 'Helps show if the air feels dry or sticky',
-                                ],
-                                [
-                                    'label' => 'Cloud Level',
-                                    'raw' => is_numeric($cloud_cover ?? null) ? ((int) $cloud_cover) . '%' : null,
-                                    'icon' => 'cloud',
-                                    'tone' => 'blue',
-                                    'helpText' => 'How cloudy the sky is',
-                                ],
-                            ];
-
-                            if ($hideMissingDetailCards) {
-                                $detailItems = array_values(array_filter($detailItems, fn($item) => !is_null($item['raw'])));
+                            $rainChanceDisplay = is_numeric($rainProbDisplay ?? null)
+                                ? (int) round((float) $rainProbDisplay) . '%'
+                                : '—';
+                            $feels = is_numeric($weather['feels_like'] ?? null)
+                                ? round((float) $weather['feels_like']) . '°C'
+                                : (is_numeric($weather['temp'] ?? null) ? round((float) $weather['temp']) . '°C' : '—');
+                            $cloudPercent = is_numeric($cloud_cover ?? null) ? (int) $cloud_cover : null;
+                            if ($cloudPercent !== null) {
+                                $cloudPercent = max(0, min(100, $cloudPercent));
                             }
+                            if ($cloudPercent === null) {
+                                $conditionId = (int) ($weather['condition']['id'] ?? 800);
+                                $cloudPercent = match (true) {
+                                    $conditionId === 800 => 10,
+                                    $conditionId === 801 => 35,
+                                    $conditionId === 802 || $conditionId === 803 => 65,
+                                    $conditionId === 804 => 90,
+                                    default => 50,
+                                };
+                            }
+                            [$sunlightValue, $sunlightHint, $sunlightIcon] = match (true) {
+                                $cloudPercent <= 20 => ['Strong sunlight', 'Good for drying and spraying', '☀️'],
+                                $cloudPercent <= 50 => ['Moderate sunlight', 'Normal field activity', '🌤'],
+                                $cloudPercent <= 80 => ['Low sunlight', 'Limited sunlight, monitor crops', '☁️'],
+                                default => ['No sunlight', 'Cloudy or rainy conditions', '🌧'],
+                            };
+                            $moist = is_numeric($dew_point ?? null) ? round((float) $dew_point, 1) . '°C' : '—';
                         @endphp
-                        @foreach ($detailItems as $item)
-                            <article class="metric-card metric-card--{{ $item['tone'] }}">
-                                <span class="metric-card-icon"><i data-lucide="{{ $item['icon'] }}"></i></span>
-                                <p class="metric-card-label">{{ $item['label'] }}</p>
-                                <p class="metric-card-value">{{ $item['raw'] ?? 'No data' }}</p>
-                                <p class="metric-card-help">{{ $item['helpText'] }}</p>
-                            </article>
-                        @endforeach
+                        <article class="weather-page__detail-cell weather-page__detail-cell--slate">
+                            <span class="weather-page__detail-ic"><img src="{{ $wImg('thermo') }}" alt="" width="22" height="22" decoding="async"></span>
+                            <p class="weather-page__detail-lbl">Feels like</p>
+                            <p class="weather-page__detail-val">{{ $feels }}</p>
+                            <p class="weather-page__detail-hint">Apparent temperature</p>
+                        </article>
+                        <article class="weather-page__detail-cell weather-page__detail-cell--violet">
+                            <span class="weather-page__detail-ic"><img src="{{ $wImg('rain') }}" alt="" width="22" height="22" decoding="async"></span>
+                            <p class="weather-page__detail-lbl">Rain Chance</p>
+                            <p class="weather-page__detail-val">{{ $rainChanceDisplay }}</p>
+                            <p class="weather-page__detail-hint">Likelihood of rain today</p>
+                        </article>
+                        <article class="weather-page__detail-cell weather-page__detail-cell--amber">
+                            <span class="weather-page__detail-ic weather-page__detail-ic--emoji" aria-hidden="true">{{ $sunlightIcon }}</span>
+                            <p class="weather-page__detail-lbl">Sunlight Level</p>
+                            <p class="weather-page__detail-val weather-page__detail-val--sunlight">{{ $sunlightValue }}</p>
+                            <p class="weather-page__detail-hint">{{ $sunlightHint }}</p>
+                        </article>
+                        <article class="weather-page__detail-cell weather-page__detail-cell--mint">
+                            <span class="weather-page__detail-ic"><img src="{{ $wImg('droplet') }}" alt="" width="22" height="22" decoding="async"></span>
+                            <p class="weather-page__detail-lbl">Air moisture</p>
+                            <p class="weather-page__detail-val">{{ $moist }}</p>
+                            <p class="weather-page__detail-hint">Dew point</p>
+                        </article>
                     </div>
                 </section>
-
             @endif
 
             @if (!empty($forecast))
-                <section class="ag-card p-5 sm:p-6">
-                    <h2 class="weather-section-title weather-section-title--sub">
-                        <i data-lucide="chart-no-axes-combined" class="w-4 h-4" aria-hidden="true"></i>
-                        Weather Trends
+                <section class="ag-card border border-slate-200 bg-slate-50/90 p-4 weather-page__trends-card">
+                    <h2 class="farm-dash__title weather-page__section-kicker inline-flex rounded-xl bg-sky-100 px-3 py-1.5 text-sky-900">
+                        <img src="{{ $wImg('chart') }}" alt="" class="weather-clay-ic weather-clay-ic--title" width="18" height="18" decoding="async">
+                        Trends
                     </h2>
-                    <div class="trend-list">
+                    <div class="weather-page__trend-list">
                         @foreach ($forecast as $day)
                             @php
                                 $tempRange = max(1, (int) ($day['temp_max'] ?? 0));
                                 $tempPercent = max(0, min(100, (int) round(($tempRange / 45) * 100)));
                                 $rainPercent = max(0, min(100, (int) ($day['pop'] ?? 0)));
                             @endphp
-                            <article class="trend-item">
-                                <p class="trend-day">{{ $day['day_name'] ?? 'Day' }}</p>
-                                <div class="trend-track-group">
-                                    <div class="trend-label-row">
-                                        <span>Temperature</span>
-                                        <span>{{ $day['temp_max'] ?? '--' }}°C</span>
+                            <article class="weather-page__trend-row">
+                                <p class="weather-page__trend-day">{{ $day['day_name'] ?? 'Day' }}</p>
+                                <div>
+                                    <div class="weather-page__trend-labels">
+                                        <span>Temp high</span>
+                                        <span>{{ $day['temp_max'] ?? '—' }}°C</span>
                                     </div>
-                                    <div class="trend-track"><span style="width: {{ $tempPercent }}%"></span></div>
-                                    <div class="trend-label-row mt-2">
-                                        <span>Rain Probability</span>
+                                    <div class="weather-page__trend-bar"><span @style(['width: '.$tempPercent.'%'])></span></div>
+                                    <div class="weather-page__trend-labels weather-page__trend-labels--mt">
+                                        <span>Rain chance</span>
                                         <span>{{ $rainPercent }}%</span>
                                     </div>
-                                    <div class="trend-track trend-track--rain"><span style="width: {{ $rainPercent }}%"></span></div>
+                                    <div class="weather-page__trend-bar weather-page__trend-bar--rain"><span @style(['width: '.$rainPercent.'%'])></span></div>
                                 </div>
                             </article>
                         @endforeach
@@ -375,20 +451,7 @@
                 </section>
             @endif
 
-            <div class="grid grid-cols-2 gap-3">
-                <a href="{{ route('dashboard') }}" class="weather-action-link">
-                    <span class="weather-action-icon"><i data-lucide="layout-dashboard"></i></span>
-                    <p class="weather-action-label">Dashboard</p>
-                </a>
-                <a href="{{ route('rainfall-trends') }}" class="weather-action-link">
-                    <span class="weather-action-icon"><i data-lucide="cloud-rain"></i></span>
-                    <p class="weather-action-label">Rainfall Trends</p>
-                </a>
-            </div>
         </div>
     </section>
 @endsection
 
-@push('scripts')
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-@endpush

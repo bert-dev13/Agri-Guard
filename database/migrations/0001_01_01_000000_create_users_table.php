@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Final users schema (farm profile, email OTP verification, crop timeline, GPS).
      */
     public function up(): void
     {
@@ -16,34 +16,41 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
+            $table->string('email_verification_code', 255)->nullable();
+            $table->timestamp('email_verification_expires_at')->nullable();
+            $table->unsignedTinyInteger('verification_attempts')->default(0);
+            $table->timestamp('verification_locked_until')->nullable();
+
             $table->string('password');
+            $table->string('role', 32)->default('farmer');
+
+            $table->string('farm_municipality')->nullable();
+            $table->string('farm_barangay')->nullable();
+            $table->string('farm_barangay_code', 20)->nullable();
+            $table->string('crop_type')->nullable();
+            $table->string('farming_stage')->nullable();
+            $table->date('planting_date')->nullable();
+            $table->unsignedSmallInteger('crop_timeline_offset_days')->default(0);
+            $table->string('crop_stage_reality_check', 24)->nullable();
+            $table->boolean('reality_check_answered')->default(false);
+            $table->string('reality_check_status', 16)->nullable();
+            $table->timestamp('stage_confirmed_at')->nullable();
+            $table->decimal('farm_area', 12, 2)->nullable();
+            $table->decimal('farm_lat', 10, 7)->nullable();
+            $table->decimal('farm_lng', 10, 7)->nullable();
+            $table->timestamp('gps_captured_at')->nullable();
+            $table->string('location_source', 32)->nullable();
+            $table->string('field_condition')->nullable();
+
             $table->rememberToken();
             $table->timestamps();
-        });
 
-        Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary();
-            $table->string('token');
-            $table->timestamp('created_at')->nullable();
-        });
-
-        Schema::create('sessions', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->foreignId('user_id')->nullable()->index();
-            $table->string('ip_address', 45)->nullable();
-            $table->text('user_agent')->nullable();
-            $table->longText('payload');
-            $table->integer('last_activity')->index();
+            $table->index('role');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
-        Schema::dropIfExists('sessions');
     }
 };

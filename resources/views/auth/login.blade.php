@@ -47,7 +47,10 @@
                         </div>
 
                         <div class="form-group {{ $errors->has('password') ? 'has-error' : '' }} mt-5">
-                            <label for="password">Password</label>
+                            <div class="auth-password-label-row">
+                                <label for="password">Password</label>
+                                <a href="{{ route('password.request') }}" class="auth-small-link">Forgot password?</a>
+                            </div>
                             <div class="input-wrap with-password-toggle">
                                 <input
                                     type="password"
@@ -59,19 +62,7 @@
                                     data-password-input
                                 />
 
-                                <button
-                                    type="button"
-                                    class="password-toggle-btn"
-                                    aria-label="Show password"
-                                    data-password-toggle
-                                >
-                                    <span data-eye-icon>
-                                        <i data-lucide="eye" class="w-5 h-5"></i>
-                                    </span>
-                                    <span data-eye-off-icon class="hidden">
-                                        <i data-lucide="eye-off" class="w-5 h-5"></i>
-                                    </span>
-                                </button>
+                                <x-auth.password-toggle-button />
                             </div>
                             @error('password')
                                 <p class="error-message" role="alert">{{ $message }}</p>
@@ -84,10 +75,6 @@
                     </form>
 
                     <p class="auth-footer-link">
-                        <a href="{{ route('password.request') }}">Forgot password?</a>
-                    </p>
-
-                    <p class="auth-footer-link">
                         Don't have an account?
                         <a href="{{ route('register') }}">Register</a>
                     </p>
@@ -96,12 +83,3 @@
         </div>
     </section>
 @endsection
-
-@push('scripts')
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-        });
-    </script>
-@endpush

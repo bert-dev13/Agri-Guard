@@ -1,0 +1,707 @@
+/**
+ * AGRIGUARD admin — lg+: fixed w-64 sidebar + padded main shell; mobile: drawer + hamburger.
+ */
+
+.admin-panel-body {
+    margin: 0;
+}
+
+.admin-app {
+    --ag-admin-teal: #0d9488;
+    --ag-admin-teal-dark: #0f766e;
+    --ag-admin-teal-light: #14b8a6;
+    --ag-admin-teal-muted: rgb(13 148 136 / 0.12);
+    --ag-admin-teal-muted-hover: rgb(13 148 136 / 0.2);
+    --ag-admin-surface: #ffffff;
+    --ag-admin-surface-2: #f8fafc;
+    --ag-admin-border: rgb(226 232 240 / 0.95);
+    --ag-admin-text: #0f172a;
+    --ag-admin-text-muted: #64748b;
+    --ag-admin-sidebar-bg: linear-gradient(180deg, #0f766e 0%, #0d9488 42%, #115e59 100%);
+    /* w-64 expanded, narrow rail collapsed — flex layout (no margin-left offset) */
+    --ag-admin-sidebar-w: 16rem;
+    --ag-admin-sidebar-w-collapsed: 4rem;
+    /* Inset for main column when sidebar is position:fixed (lg+) */
+    --ag-admin-sidebar-offset: var(--ag-admin-sidebar-w);
+    --ag-admin-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --ag-admin-radius: 14px;
+    --ag-admin-radius-sm: 10px;
+
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 100dvh;
+}
+
+.admin-app.admin-sidebar-collapsed {
+    --ag-admin-sidebar-offset: var(--ag-admin-sidebar-w-collapsed);
+}
+
+/* ---- Backdrop (mobile drawer) ---- */
+.admin-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgb(15 23 42 / 0.45);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        opacity var(--ag-admin-transition),
+        visibility var(--ag-admin-transition);
+    backdrop-filter: blur(2px);
+}
+
+.admin-app.admin-drawer-open .admin-sidebar-backdrop {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+@media (min-width: 1024px) {
+    .admin-sidebar-backdrop {
+        display: none;
+    }
+}
+
+/* ---- Sidebar ---- */
+.admin-sidebar {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: var(--ag-admin-sidebar-w);
+    max-width: min(16rem, 88vw);
+    background: var(--ag-admin-sidebar-bg);
+    color: #ecfdf5;
+    box-shadow:
+        4px 0 24px rgb(15 23 42 / 0.12),
+        inset -1px 0 0 rgb(255 255 255 / 0.08);
+    transition:
+        width var(--ag-admin-transition),
+        transform var(--ag-admin-transition),
+        box-shadow var(--ag-admin-transition);
+    overflow: hidden;
+}
+
+/* Mobile / tablet: overlay drawer (fixed) */
+@media (max-width: 1023px) {
+    .admin-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 50;
+        height: 100vh;
+        height: 100dvh;
+        width: min(16rem, 88vw);
+        max-width: min(16rem, 88vw);
+        transform: translateX(-100%);
+    }
+
+    .admin-app.admin-drawer-open .admin-sidebar {
+        transform: translateX(0);
+    }
+}
+
+/* Large screens: fixed rail (viewport) + shell padding — avoids sticky bugs & sidebar scrolling with body */
+@media (min-width: 1024px) {
+    .admin-app {
+        padding-left: var(--ag-admin-sidebar-offset);
+        transition: padding-left var(--ag-admin-transition);
+    }
+
+    .admin-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 40;
+        width: var(--ag-admin-sidebar-w);
+        max-width: none;
+        height: 100vh;
+        height: 100dvh;
+        max-height: 100dvh;
+        min-height: 0;
+        transform: none;
+        box-shadow:
+            2px 0 20px rgb(15 23 42 / 0.08),
+            inset -1px 0 0 rgb(255 255 255 / 0.08);
+    }
+
+    .admin-app.admin-drawer-open .admin-sidebar {
+        transform: none;
+    }
+
+    .admin-app.admin-sidebar-collapsed .admin-sidebar {
+        width: var(--ag-admin-sidebar-w-collapsed);
+    }
+}
+
+.admin-sidebar__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 0.85rem 0.85rem;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgb(255 255 255 / 0.12);
+}
+
+.admin-sidebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+    flex: 1;
+    text-decoration: none;
+    color: inherit;
+    border-radius: var(--ag-admin-radius-sm);
+    padding: 0.25rem 0.35rem;
+    transition:
+        background var(--ag-admin-transition),
+        opacity var(--ag-admin-transition);
+}
+
+.admin-sidebar__brand:hover {
+    background: rgb(255 255 255 / 0.08);
+}
+
+.admin-sidebar__brand:focus-visible {
+    outline: 2px solid #fef08a;
+    outline-offset: 2px;
+}
+
+.admin-sidebar__logo {
+    width: 2.5rem;
+    height: 2.5rem;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.15));
+}
+
+.admin-sidebar__brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    transition:
+        opacity var(--ag-admin-transition),
+        width var(--ag-admin-transition);
+}
+
+.admin-app.admin-sidebar-collapsed .admin-sidebar__brand-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+}
+
+@media (max-width: 1023px) {
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__brand-text {
+        opacity: 1;
+        width: auto;
+        overflow: visible;
+        pointer-events: auto;
+        position: static;
+    }
+}
+
+.admin-sidebar__brand-name {
+    font-weight: 800;
+    font-size: 1.0625rem;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.admin-sidebar__brand-badge {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(204 251 241 / 0.95);
+    background: rgb(0 0 0 / 0.15);
+    padding: 0.2rem 0.45rem;
+    border-radius: 6px;
+    width: fit-content;
+    border: 1px solid rgb(255 255 255 / 0.12);
+}
+
+.admin-sidebar__collapse-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--ag-admin-radius-sm);
+    border: 1px solid rgb(255 255 255 / 0.2);
+    background: rgb(0 0 0 / 0.12);
+    color: #ecfdf5;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+        background var(--ag-admin-transition),
+        border-color var(--ag-admin-transition),
+        transform var(--ag-admin-transition);
+}
+
+.admin-sidebar__collapse-btn:hover {
+    background: rgb(255 255 255 / 0.12);
+    border-color: rgb(255 255 255 / 0.28);
+}
+
+.admin-sidebar__collapse-btn:focus-visible {
+    outline: 2px solid #fef08a;
+    outline-offset: 2px;
+}
+
+@media (min-width: 1024px) {
+    .admin-sidebar__collapse-btn {
+        display: flex;
+    }
+}
+
+.admin-sidebar__collapse-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.admin-sidebar__collapse-icon--collapse {
+    display: none;
+}
+
+.admin-app.admin-sidebar-collapsed .admin-sidebar__collapse-icon--expand {
+    display: none;
+}
+
+.admin-app.admin-sidebar-collapsed .admin-sidebar__collapse-icon--collapse {
+    display: block;
+}
+
+/* ---- Nav links ---- */
+.admin-sidebar__nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.admin-sidebar__link {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--ag-admin-radius-sm);
+    color: rgb(236 253 245 / 0.92);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    text-decoration: none;
+    transition:
+        background var(--ag-admin-transition),
+        color var(--ag-admin-transition),
+        box-shadow var(--ag-admin-transition),
+        transform var(--ag-admin-transition);
+    position: relative;
+}
+
+.admin-sidebar__link:hover {
+    background: rgb(255 255 255 / 0.1);
+    color: #fff;
+    transform: translateX(2px);
+}
+
+.admin-sidebar__link:focus-visible {
+    outline: 2px solid #fef08a;
+    outline-offset: 2px;
+}
+
+.admin-sidebar__link.is-active {
+    background: rgb(255 255 255 / 0.18);
+    color: #fff;
+    box-shadow:
+        0 1px 0 rgb(255 255 255 / 0.12) inset,
+        0 4px 14px rgb(0 0 0 / 0.12);
+}
+
+.admin-sidebar__link.is-active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    border-radius: 0 4px 4px 0;
+    background: #fef08a;
+}
+
+.admin-sidebar__link-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.admin-sidebar__link-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.admin-sidebar__link-label {
+    white-space: nowrap;
+    transition: opacity var(--ag-admin-transition);
+}
+
+@media (min-width: 1024px) {
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__link {
+        justify-content: center;
+        padding: 0.65rem 0.5rem;
+    }
+
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__link-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    /* Tooltip (collapsed desktop) */
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__link[data-tooltip]::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: calc(100% + 10px);
+        top: 50%;
+        transform: translateY(-50%) translateX(-4px);
+        padding: 0.35rem 0.6rem;
+        background: #0f172a;
+        color: #f8fafc;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 8px;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        box-shadow: 0 8px 24px rgb(15 23 42 / 0.25);
+        z-index: 60;
+        transition:
+            opacity 0.18s ease,
+            transform 0.18s ease,
+            visibility 0.18s ease;
+    }
+
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__link[data-tooltip]:hover::after,
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__link[data-tooltip]:focus-visible::after {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(-50%) translateX(0);
+    }
+
+    /* Narrow rail: no inner scroll container or sideways nudge (avoids scrollbar flash / “scrolling” feel). */
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__nav {
+        overflow-x: hidden;
+        overflow-y: visible;
+    }
+
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__link:hover,
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__link:focus-visible {
+        transform: none;
+    }
+}
+
+/* ---- Footer / log out ---- */
+.admin-sidebar__footer {
+    margin-top: auto;
+    padding: 0.85rem 0.75rem 1rem;
+    border-top: 1px solid rgb(255 255 255 / 0.12);
+    flex-shrink: 0;
+}
+
+.admin-sidebar__logout-form {
+    margin: 0;
+}
+
+.admin-sidebar__logout-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border-radius: var(--ag-admin-radius-sm);
+    border: 1px solid rgb(255 255 255 / 0.22);
+    background: rgb(0 0 0 / 0.14);
+    color: #fef2f2;
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition:
+        background var(--ag-admin-transition),
+        border-color var(--ag-admin-transition),
+        color var(--ag-admin-transition);
+}
+
+.admin-sidebar__logout-btn:hover {
+    background: rgb(127 29 29 / 0.35);
+    border-color: rgb(254 202 202 / 0.45);
+    color: #fff;
+}
+
+.admin-sidebar__logout-btn:focus-visible {
+    outline: 2px solid #fef08a;
+    outline-offset: 2px;
+}
+
+.admin-sidebar__logout-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.admin-sidebar__logout-icon svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.admin-sidebar__logout-label {
+    flex: 1;
+    text-align: left;
+}
+
+@media (min-width: 1024px) {
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__logout-btn {
+        justify-content: center;
+        padding: 0.65rem 0.5rem;
+    }
+
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__logout-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__logout-btn[data-tooltip]::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: calc(100% + 10px);
+        top: 50%;
+        transform: translateY(-50%) translateX(-4px);
+        padding: 0.35rem 0.6rem;
+        background: #0f172a;
+        color: #f8fafc;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 8px;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        box-shadow: 0 8px 24px rgb(15 23 42 / 0.25);
+        z-index: 60;
+        transition:
+            opacity 0.18s ease,
+            transform 0.18s ease,
+            visibility 0.18s ease;
+    }
+
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__logout-btn[data-tooltip]:hover::after,
+    .admin-app.admin-sidebar-collapsed .admin-sidebar__logout-btn[data-tooltip]:focus-visible::after {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(-50%) translateX(0);
+    }
+}
+
+/* ---- Main column (flex-1 beside sidebar on lg+; full width when drawer is overlay) ---- */
+.admin-main-wrap {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Main column: flex growth; avoid stacking min-height:100vh (causes extra scroll + white gap) */
+.admin-main {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 1023.98px) {
+    .admin-main {
+        /* Mobile: one full-viewport column behind the overlay drawer */
+        min-height: 100vh;
+        min-height: 100dvh;
+    }
+}
+
+@media (min-width: 640px) {
+    .admin-main {
+        padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+    }
+}
+
+@media (min-width: 1024px) {
+    .admin-main {
+        min-height: 0;
+        padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
+    }
+
+    /* Short pages: fill viewport beside fixed sidebar without forcing main to 100vh+content */
+    .admin-main-wrap {
+        min-height: 100dvh;
+    }
+}
+
+/* Global top breathing room for every admin page (set in layouts/admin.blade.php wrapper). */
+.admin-layout-content {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding-top: 2rem;
+    max-width: 100rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+/* Shared admin page container spacing/alignment.
+   Keep top spacing owned by .admin-layout-content to avoid per-page drift. */
+.admin-panel-body .admin-page {
+    min-width: 0;
+    width: min(1400px, 100%);
+    margin: 0 auto;
+    padding: 0 0 1.75rem;
+}
+
+@media (min-width: 640px) {
+    .admin-layout-content {
+        padding-top: 2.5rem;
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+    }
+
+    .admin-panel-body .admin-page {
+        padding-bottom: 1.5rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .admin-layout-content {
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .admin-layout-content {
+        padding-top: 2rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+}
+
+@media (min-width: 1280px) {
+    .admin-layout-content {
+        padding-left: 3rem;
+        padding-right: 3rem;
+    }
+}
+
+/* ---- Mobile top bar ---- */
+.admin-mobile-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-top: max(0.65rem, env(safe-area-inset-top, 0px));
+    padding-bottom: 0.65rem;
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+    background: var(--ag-admin-surface);
+    border-bottom: 1px solid var(--ag-admin-border);
+    box-shadow: 0 4px 18px rgb(15 23 42 / 0.06);
+    position: sticky;
+    top: 0;
+    z-index: 35;
+}
+
+@media (min-width: 1024px) {
+    .admin-mobile-bar {
+        display: none;
+    }
+}
+
+.admin-mobile-bar__menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--ag-admin-radius-sm);
+    border: 1px solid var(--ag-admin-border);
+    background: var(--ag-admin-surface-2);
+    color: var(--ag-admin-teal-dark);
+    cursor: pointer;
+    transition:
+        background var(--ag-admin-transition),
+        border-color var(--ag-admin-transition),
+        transform 0.15s ease;
+}
+
+.admin-mobile-bar__menu:hover {
+    background: var(--ag-admin-teal-muted);
+    border-color: rgb(13 148 136 / 0.35);
+}
+
+.admin-mobile-bar__menu:active {
+    transform: scale(0.96);
+}
+
+.admin-mobile-bar__menu:focus-visible {
+    outline: 2px solid var(--ag-admin-teal);
+    outline-offset: 2px;
+}
+
+.admin-mobile-bar__menu svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.admin-mobile-bar__title {
+    font-weight: 800;
+    font-size: 1.0625rem;
+    letter-spacing: -0.02em;
+    color: var(--ag-admin-teal-dark);
+    text-decoration: none;
+}
+
+.admin-mobile-bar__spacer {
+    width: 2.5rem;
+    flex-shrink: 0;
+}
+
+/* Drawer open: prevent body scroll */
+@media (max-width: 1023px) {
+    .admin-panel-body.admin-drawer-scroll-lock {
+        overflow: hidden;
+    }
+}

@@ -253,6 +253,12 @@ body.auth-layout .auth-page {
     box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
 }
 
+.auth-form input.auth-input-readonly[readonly] {
+    cursor: default;
+    color: #475569;
+    background-color: #f1f5f9;
+}
+
 .auth-footer-link {
     text-align: center;
     color: #64748b;
@@ -498,6 +504,19 @@ body.auth-layout .auth-page {
     height: 1rem;
 }
 
+.auth-form .auth-password-label-row {
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.auth-form .auth-password-label-row label {
+    margin-bottom: 0;
+}
+
 .auth-form .auth-remember-row {
     justify-content: space-between;
     align-items: center;
@@ -538,6 +557,23 @@ body.auth-layout .auth-page {
     padding-right: 3rem;
 }
 
+/* Hide browser-native password reveal so only our custom toggle shows (Edge/IE + WebKit). */
+.auth-form .input-wrap.with-password-toggle input::-ms-reveal {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.auth-form .input-wrap.with-password-toggle input::-webkit-credentials-auto-fill-button {
+    visibility: hidden;
+    display: none !important;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+    position: absolute;
+    right: 0;
+}
+
 .auth-form .password-toggle-btn {
     cursor: pointer;
     color: #64748b;
@@ -554,6 +590,20 @@ body.auth-layout .auth-page {
     top: 50%;
     right: 0.6rem;
     transform: translateY(-50%);
+}
+
+.auth-form .password-toggle-btn__icon-wrap {
+    position: absolute;
+    inset: 0;
+    justify-content: center;
+    align-items: center;
+    display: flex;
+}
+
+.auth-form .password-toggle-btn__svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    display: block;
 }
 
 .auth-form .password-toggle-btn:hover {

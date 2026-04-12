@@ -2,18 +2,20 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class TogetherAiService
 {
     /**
      * Send farm/weather context to Together AI chat completions endpoint.
+     *
+     * @param  string|null  $userInstructionOverride  When set, replaces the default crop/weather user preamble (e.g. map-page JSON tasks).
      */
-    public function generateRecommendation(array $inputPayload, string $systemPrompt): array
+    public function generateRecommendation(array $inputPayload, string $systemPrompt, ?string $userInstructionOverride = null): array
     {
         $apiKey = (string) (config('togetherai.api_key') ?? config('services.togetherai.api_key'));
         $primaryModel = trim((string) (config('togetherai.model') ?? config('services.togetherai.model', '')));
@@ -25,6 +27,16 @@ class TogetherAiService
         }
 
         $encodedInput = json_encode($inputPayload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+
+        $defaultUserPreamble = "Use only this input JSON and no outside assumptions.\n"
+            ."If the latest_user_message is a language-support/capability question (e.g., Tagalog/Taglish/English understanding), do not reject it; acknowledge politely in the requested language and ask what farm question they want to ask.\n"
+            ."Otherwise, generate recommendations strictly for the given crop_type and growth_stage using weather and rainfall fields.\n"
+            ."Do not mention other crops, keep responses short and actionable, and return valid JSON only.\n"
+            ."Input JSON:\n";
+
+        $userContent = $userInstructionOverride !== null && trim($userInstructionOverride) !== ''
+            ? rtrim($userInstructionOverride)."\n\nInput JSON:\n".$encodedInput
+            : $defaultUserPreamble.$encodedInput;
 
         $modelsToTry = [$primaryModel];
         if (is_array($fallbackModels)) {
@@ -52,10 +64,7 @@ class TogetherAiService
                     ],
                     [
                         'role' => 'user',
-                        'content' => "Use only this input JSON and no outside assumptions.\n"
-                            ."Generate recommendations strictly for the given crop_type and growth_stage using weather and rainfall fields.\n"
-                            ."Do not mention other crops, keep responses short and actionable, and return valid JSON only.\n"
-                            ."Input JSON:\n".$encodedInput,
+                        'content' => $userContent,
                     ],
                 ],
             ];
@@ -64,12 +73,12 @@ class TogetherAiService
                 $response = Http::timeout(25)
                     ->connectTimeout(10)
                     ->withHeaders([
-                        'Authorization' => 'Bearer ' . $apiKey,
+                        'Authorization' => 'Bearer '.$apiKey,
                         'Content-Type' => 'application/json',
                     ])
                     ->acceptJson()
                     ->asJson()
-                    ->post($baseUrl . '/chat/completions', $requestBody);
+                    ->post($baseUrl.'/chat/completions', $requestBody);
             } catch (ConnectionException $e) {
                 $lastError = 'Together AI request timed out or network is unavailable.';
                 Log::error('Together AI connection failed', [
@@ -140,6 +149,7 @@ class TogetherAiService
                     'response' => $json,
                 ]);
                 $lastError = 'Together AI response content is empty.';
+
                 continue;
             }
 

@@ -14,22 +14,26 @@ use Carbon\Carbon;
 class SmartAdvisoryService
 {
     public const RISK_HIGH = 'HIGH';
+
     public const RISK_MODERATE = 'MODERATE';
+
     public const RISK_LOW = 'LOW';
 
     /** Rain probability thresholds (%). */
     private const RAIN_PROB_HIGH = 70;
+
     private const RAIN_PROB_MODERATE_MIN = 40;
+
     private const RAIN_PROB_MODERATE_MAX = 69;
 
     /** Crop stages considered sensitive to heavy rain (seedling/vegetative). */
     private const SENSITIVE_STAGES = ['seedling', 'vegetative', 'planting', 'early_growth', 'land_preparation'];
 
     /** Reproductive-type stages. */
-    private const REPRODUCTIVE_STAGES = ['flowering_fruiting', 'reproductive'];
+    private const REPRODUCTIVE_STAGES = ['flowering', 'flowering_fruiting', 'reproductive'];
 
     /** Maturity-type stages. */
-    private const MATURITY_STAGES = ['harvesting', 'maturity', 'growing'];
+    private const MATURITY_STAGES = ['harvest', 'harvesting', 'maturity'];
 
     public function __construct(
         private readonly FarmWeatherService $farmWeather,
@@ -220,6 +224,7 @@ class SmartAdvisoryService
         if ($rainProb >= self::RAIN_PROB_MODERATE_MIN && $rainProb <= self::RAIN_PROB_MODERATE_MAX) {
             return 'moderate';
         }
+
         return 'low';
     }
 
@@ -360,11 +365,13 @@ class SmartAdvisoryService
     {
         if ($user->farming_stage) {
             $stage = $user->farming_stage;
+
             return $this->mapToAdvisoryStage($stage);
         }
         if ($daysAfterPlanting === null) {
             return 'unknown';
         }
+
         return $this->deriveStageFromDays($user->crop_type, $daysAfterPlanting);
     }
 
@@ -374,10 +381,14 @@ class SmartAdvisoryService
             'land_preparation' => 'land_preparation',
             'planting' => 'seedling',
             'early_growth' => 'vegetative',
+            'vegetative' => 'vegetative',
             'growing' => 'vegetative',
+            'flowering' => 'reproductive',
             'flowering_fruiting' => 'reproductive',
+            'harvest' => 'maturity',
             'harvesting' => 'maturity',
         ];
+
         return $map[$farmingStage] ?? $farmingStage;
     }
 
@@ -391,6 +402,7 @@ class SmartAdvisoryService
             if ($days <= 55) {
                 return 'reproductive';
             }
+
             return 'maturity';
         }
         if (str_contains($cropLower, 'corn')) {
@@ -400,6 +412,7 @@ class SmartAdvisoryService
             if ($days <= 70) {
                 return 'reproductive';
             }
+
             return 'maturity';
         }
         if ($days <= 14) {
@@ -411,6 +424,7 @@ class SmartAdvisoryService
         if ($days <= 70) {
             return 'reproductive';
         }
+
         return 'maturity';
     }
 
@@ -424,9 +438,11 @@ class SmartAdvisoryService
             'land_preparation' => 'Land Preparation',
             'planting' => 'Planting',
             'early_growth' => 'Early Growth',
-            'growing' => 'Growing',
-            'flowering_fruiting' => 'Flowering / Fruiting',
-            'harvesting' => 'Harvesting',
+            'growing' => 'Vegetative',
+            'flowering' => 'Flowering',
+            'flowering_fruiting' => 'Flowering',
+            'harvest' => 'Harvest',
+            'harvesting' => 'Harvest',
             default => ucfirst(str_replace('_', ' ', $stage)),
         };
     }

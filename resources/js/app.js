@@ -12,3 +12,23 @@ import './user/weather';
 import './user/rainfall-trends';
 import './user/crop-progress';
 import './user/settings';
+import './user/assistant';
+
+import './admin/admin-navbar';
+import './admin/dashboard';
+
+if (document.getElementById('farm-map-page')) {
+    import('./user/farm-map');
+}
+
+if (document.querySelector('.admin-users-page')) {
+    import('./admin/user-management');
+}
+
+if (document.querySelector('.admin-farms-page')) {
+    import('./admin/farm-monitoring');
+}
+
+if (document.querySelector('.admin-analytics-page')) {
+    import('./admin/analytics');
+}

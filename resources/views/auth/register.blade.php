@@ -1,6 +1,6 @@
 @extends('layouts.auth')
 
-@section('title', 'Register – AGRIGUARD')
+@section('title', 'Register')
 
 @section('body-class', 'auth-verify-page m-0 flex min-h-screen min-h-[100dvh] flex-col overflow-x-clip bg-[#F8FAFC] auth-layout')
 
@@ -21,11 +21,10 @@
                 <div class="auth-container auth-container-register">
                     <div class="auth-form-wrap">
                         <div class="auth-card">
-                            <a href="{{ url('/') }}" class="auth-brand">
+                            <a href="{{ url('/') }}" class="auth-brand" aria-label="AGRIGUARD — home">
                                 <span class="auth-brand-logo">
-                                    <img src="{{ asset('images/agriguard-logo.png') }}" alt="AGRIGUARD" />
+                                    <img src="{{ asset('images/agriguard-logo.png') }}" alt="" decoding="async" />
                                 </span>
-                                <span class="auth-brand-wordmark">AGRIGUARD</span>
                             </a>
 
                             <div class="text-center">
@@ -35,8 +34,7 @@
 
                             @if ($errors->any())
                                 <div class="auth-message error relative" role="alert">
-                                    <div class="font-semibold text-left">Please fix the highlighted fields:</div>
-                                    <ul class="mt-2 list-disc list-inside text-left">
+                                    <ul class="list-disc list-inside text-left">
                                         @foreach ($errors->all() as $error)
                                             <li>{{ $error }}</li>
                                         @endforeach
@@ -46,7 +44,6 @@
 
                             <form class="auth-form" method="POST" action="{{ route('register') }}" novalidate>
                                 @csrf
-                                <input type="hidden" name="farm_municipality" value="Amulung">
 
                                 <div class="space-y-6">
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
@@ -128,110 +125,97 @@
                                     </div>
 
                                     <div class="pt-4 border-t border-slate-100/80">
-                                        <div class="form-group {{ $errors->has('farm_barangay') ? 'has-error' : '' }}">
-                                            <label for="farm_barangay">
-                                                Barangay
-                                                <span class="ml-1 text-xs font-semibold text-slate-500">(required)</span>
-                                            </label>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                                            <div class="form-group {{ $errors->has('farm_barangay_code') ? 'has-error' : '' }}">
+                                                <label for="farm_barangay_code">
+                                                    Barangay
+                                                    <span class="ml-1 text-xs font-semibold text-slate-500">(required)</span>
+                                                </label>
 
-                                            <p class="mt-1 text-xs text-slate-500 leading-relaxed">
-                                                Used to generate local advisories.
-                                            </p>
+                                                <div class="input-wrap">
+                                                    <select
+                                                        id="farm_barangay_code"
+                                                        name="farm_barangay_code"
+                                                        required
+                                                        class="{{ $errors->has('farm_barangay_code') ? 'error' : '' }}"
+                                                        data-api-url="{{ url('/api/amulung-barangays') }}"
+                                                        data-old="{{ old('farm_barangay_code') }}"
+                                                    >
+                                                        <option value="">Select barangay</option>
+                                                    </select>
+                                                </div>
 
-                                            <div class="input-wrap mt-3">
-                                                <select
-                                                    id="farm_barangay"
-                                                    name="farm_barangay"
-                                                    required
-                                                    class="{{ $errors->has('farm_barangay') ? 'error' : '' }}"
-                                                    data-api-url="{{ url('/api/amulung-barangays') }}"
-                                                    data-old="{{ old('farm_barangay') }}"
-                                                >
-                                                    <option value="">Select barangay</option>
-                                                </select>
+                                                @error('farm_barangay_code')
+                                                    <p class="error-message" role="alert">{{ $message }}</p>
+                                                @enderror
                                             </div>
 
-                                            @error('farm_barangay')
-                                                <p class="error-message" role="alert">{{ $message }}</p>
-                                            @enderror
-                                        </div>
-                                    </div>
-
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 pt-2">
-                                        <div class="form-group {{ $errors->has('crop_type') ? 'has-error' : '' }}">
-                                            <label for="crop_type">Crop type</label>
-                                            <div class="input-wrap">
-                                                <select
-                                                    id="crop_type"
-                                                    name="crop_type"
-                                                    class="{{ $errors->has('crop_type') ? 'error' : '' }}"
-                                                >
-                                                    <option value="" @selected(old('crop_type', '') === '')>Select crop…</option>
-                                                    <option value="Rice" @selected(old('crop_type') === 'Rice')>Rice</option>
-                                                    <option value="Corn" @selected(old('crop_type') === 'Corn')>Corn</option>
-                                                </select>
+                                            <div class="form-group {{ $errors->has('crop_type') ? 'has-error' : '' }}">
+                                                <label for="crop_type">
+                                                    Crop type
+                                                    <span class="ml-1 text-xs font-semibold text-slate-500">(required)</span>
+                                                </label>
+                                                <div class="input-wrap">
+                                                    <select
+                                                        id="crop_type"
+                                                        name="crop_type"
+                                                        required
+                                                        class="{{ $errors->has('crop_type') ? 'error' : '' }}"
+                                                    >
+                                                        <option value="" @selected(old('crop_type', '') === '')>Select crop…</option>
+                                                        <option value="Rice" @selected(old('crop_type') === 'Rice')>Rice</option>
+                                                        <option value="Corn" @selected(old('crop_type') === 'Corn')>Corn</option>
+                                                    </select>
+                                                </div>
+                                                @error('crop_type')
+                                                    <p class="error-message" role="alert">{{ $message }}</p>
+                                                @enderror
                                             </div>
-                                            @error('crop_type')
-                                                <p class="error-message" role="alert">{{ $message }}</p>
-                                            @enderror
-                                        </div>
 
-                                        <div class="form-group {{ $errors->has('farming_stage') ? 'has-error' : '' }}">
-                                            <label for="farming_stage">Farming stage</label>
-                                            <div class="input-wrap">
-                                                <select
-                                                    id="farming_stage"
-                                                    name="farming_stage"
-                                                    class="{{ $errors->has('farming_stage') ? 'error' : '' }}"
-                                                >
-                                                    <option value="" @selected(old('farming_stage') === '')>Select stage</option>
-                                                    <option value="land_preparation" @selected(old('farming_stage') === 'land_preparation')>Land preparation</option>
-                                                    <option value="planting" @selected(old('farming_stage') === 'planting')>Planting</option>
-                                                    <option value="early_growth" @selected(old('farming_stage') === 'early_growth')>Early growth</option>
-                                                    <option value="growing" @selected(old('farming_stage') === 'growing')>Growing</option>
-                                                    <option value="flowering_fruiting" @selected(old('farming_stage') === 'flowering_fruiting')>Flowering &amp; fruiting</option>
-                                                    <option value="harvesting" @selected(old('farming_stage') === 'harvesting')>Harvesting</option>
-                                                </select>
+                                            <div class="form-group {{ $errors->has('planting_date') ? 'has-error' : '' }}">
+                                                <label for="planting_date">
+                                                    Planting date
+                                                    <span class="ml-1 text-xs font-semibold text-slate-500">(required)</span>
+                                                </label>
+                                                <div class="input-wrap">
+                                                    <input
+                                                        type="date"
+                                                        id="planting_date"
+                                                        name="planting_date"
+                                                        value="{{ old('planting_date') }}"
+                                                        max="{{ now()->format('Y-m-d') }}"
+                                                        required
+                                                        class="{{ $errors->has('planting_date') ? 'error' : '' }}"
+                                                    />
+                                                </div>
+                                                @error('planting_date')
+                                                    <p class="error-message" role="alert">{{ $message }}</p>
+                                                @enderror
                                             </div>
-                                            @error('farming_stage')
-                                                <p class="error-message" role="alert">{{ $message }}</p>
-                                            @enderror
-                                        </div>
 
-                                        <div class="form-group {{ $errors->has('planting_date') ? 'has-error' : '' }}">
-                                            <label for="planting_date">Planting date</label>
-                                            <div class="input-wrap">
-                                                <input
-                                                    type="date"
-                                                    id="planting_date"
-                                                    name="planting_date"
-                                                    value="{{ old('planting_date') }}"
-                                                    class="{{ $errors->has('planting_date') ? 'error' : '' }}"
-                                                />
+                                            <div class="form-group {{ $errors->has('farm_area') ? 'has-error' : '' }}">
+                                                <label for="farm_area">
+                                                    Farm area (m²)
+                                                    <span class="ml-1 text-xs font-semibold text-slate-500">(required)</span>
+                                                </label>
+                                                <div class="input-wrap">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        id="farm_area"
+                                                        name="farm_area"
+                                                        value="{{ old('farm_area') }}"
+                                                        required
+                                                        min="0.01"
+                                                        class="{{ $errors->has('farm_area') ? 'error' : '' }}"
+                                                        placeholder="e.g., 2500"
+                                                        inputmode="decimal"
+                                                    />
+                                                </div>
+                                                @error('farm_area')
+                                                    <p class="error-message" role="alert">{{ $message }}</p>
+                                                @enderror
                                             </div>
-                                            @error('planting_date')
-                                                <p class="error-message" role="alert">{{ $message }}</p>
-                                            @enderror
-                                        </div>
-
-                                        <div class="form-group {{ $errors->has('farm_area') ? 'has-error' : '' }}">
-                                            <label for="farm_area">Farm area (m²)</label>
-                                            <div class="input-wrap">
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    id="farm_area"
-                                                    name="farm_area"
-                                                    value="{{ old('farm_area') }}"
-                                                    min="0"
-                                                    class="{{ $errors->has('farm_area') ? 'error' : '' }}"
-                                                    placeholder="e.g., 2500"
-                                                    inputmode="decimal"
-                                                />
-                                            </div>
-                                            @error('farm_area')
-                                                <p class="error-message" role="alert">{{ $message }}</p>
-                                            @enderror
                                         </div>
                                     </div>
 
@@ -244,7 +228,6 @@
                             </form>
 
                             <p class="auth-footer-link">
-                                Already have an account?
                                 <a href="{{ route('login') }}">Log in</a>
                             </p>
                         </div>

@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Services\AiAdvisory\AiAdvisoryService;
 use Illuminate\Support\Facades\Log;
 
 class AiRecommendationService
 {
     public function __construct(
-        private readonly FarmRecommendationService $farmRecommendationService
+        private readonly FarmRecommendationService $farmRecommendationService,
+        private readonly AiAdvisoryService $aiAdvisoryService,
     ) {}
 
     /**
@@ -17,10 +19,10 @@ class AiRecommendationService
     public function generateSmartRecommendation(User $user, array $context, string $pageContext = 'dashboard'): array
     {
         $payload = $this->farmRecommendationService->buildPayload($user, $context);
-        $recommendations = $this->farmRecommendationService->getRecommendations($user, $payload, $pageContext);
-        $recommendation = $this->farmRecommendationService->toSmartRecommendation($recommendations);
+        $run = $this->aiAdvisoryService->run(AiAdvisoryService::PAGE_DASHBOARD, $user, $payload);
+        $recommendation = $this->aiAdvisoryService->formatDashboardCard($run);
 
-        $recommendationMeta = is_array($recommendations['_meta'] ?? null) ? $recommendations['_meta'] : [];
+        $recommendationMeta = is_array($run['_meta'] ?? null) ? $run['_meta'] : [];
         $recommendationFailed = (($recommendationMeta['ai_status'] ?? 'failed') !== 'success');
 
         $recommendation['ai_status'] = (string) ($recommendationMeta['ai_status'] ?? 'failed');
@@ -28,7 +30,7 @@ class AiRecommendationService
         $recommendation['ai_model'] = (string) ($recommendationMeta['model'] ?? config('togetherai.model', config('services.togetherai.model', '')));
 
         if ($recommendationFailed) {
-            Log::warning('AI smart recommendation fallback used', [
+            Log::warning('AI smart recommendation unavailable', [
                 'user_id' => $user->id,
                 'page_context' => $pageContext,
                 'ai_status' => $recommendation['ai_status'],
@@ -39,7 +41,7 @@ class AiRecommendationService
         return [
             'recommendation' => $recommendation,
             'failed' => $recommendationFailed,
-            'raw' => $recommendations,
+            'raw' => $run,
         ];
     }
 }
