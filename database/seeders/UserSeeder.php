@@ -20,7 +20,7 @@ class UserSeeder extends Seeder
     public const DEPLOY_TEST_FARMER_PASSWORD = 'FarmerTest123!';
 
     /**
-     * Seed realistic user accounts (2 admins, 2 deploy-test farmers, 28 random farmers).
+     * Seed realistic user accounts (2 admins, 2 deploy-test farmers, 28 demo farmers).
      *
      * - Does not overwrite existing users (skips if email exists)
      * - Uses real Amulung barangays (from DB if seeded; fallback to data file)
@@ -49,8 +49,6 @@ class UserSeeder extends Seeder
             }
         }
 
-        $faker = fake('en_PH');
-
         // 2 admins (real-looking, non-demo).
         $seed = [
             [
@@ -76,14 +74,8 @@ class UserSeeder extends Seeder
             ],
         ];
 
-        // 28 farmers (real-looking Filipino names + realistic farm data).
-        for ($i = 0; $i < 28; $i++) {
-            $seed[] = [
-                'role' => 'farmer',
-                'name' => $faker->name(),
-                'email' => $faker->unique()->safeEmail(),
-            ];
-        }
+        // 28 farmers — no Faker here so `composer install --no-dev` (Render Docker) can still seed.
+        $seed = array_merge($seed, self::demoFarmerSeedRows());
 
         foreach ($seed as $row) {
             $email = strtolower(trim((string) ($row['email'] ?? '')));
@@ -141,5 +133,33 @@ class UserSeeder extends Seeder
                 'updated_at' => now()->subDays(random_int(0, 30)),
             ]);
         }
+    }
+
+    /**
+     * @return list<array{role: string, name: string, email: string}>
+     */
+    private static function demoFarmerSeedRows(): array
+    {
+        $names = [
+            'Ana Lucia Reyes', 'Marco Antonio Flores', 'Teresa Villanueva', 'Ricardo Bautista',
+            'Lourdes Mendoza', 'Fernando Aquino', 'Carmela Santiago', 'Eduardo Navarro',
+            'Rosario Delgado', 'Antonio Ramos', 'Imelda Cortez', 'Roberto Salazar',
+            'Gloria Espinoza', 'Manuel Pascual', 'Corazon Ignacio', 'Alberto Morales',
+            'Fe Torres', 'Danilo Castillo', 'Marites Ocampo', 'Ramon Herrera',
+            'Divina Cruz', 'Nestor Villarin', 'Yolanda Fabian', 'Orlando Mercado',
+            'Soledad Ramos', 'Felipe Domingo', 'Esperanza Bautista', 'Cesar Agustin',
+        ];
+
+        $rows = [];
+        foreach ($names as $index => $name) {
+            $n = $index + 1;
+            $rows[] = [
+                'role' => 'farmer',
+                'name' => $name,
+                'email' => sprintf('farmer-demo-%02d@agriguard.seed', $n),
+            ];
+        }
+
+        return $rows;
     }
 }
