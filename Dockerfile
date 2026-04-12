@@ -1,9 +1,11 @@
 FROM php:8.2-cli
 
 RUN apt-get update && apt-get install -y \
-    git unzip curl libzip-dev libpng-dev libonig-dev libxml2-dev libpq-dev \
+    git unzip curl libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev libwebp-dev \
+    libonig-dev libxml2-dev libpq-dev \
     nodejs npm \
-    && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql mbstring zip exif pcntl
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql mbstring zip exif pcntl gd
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
