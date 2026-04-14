@@ -12,12 +12,12 @@ class UserSeeder extends Seeder
     private const MUNICIPALITY = 'Amulung';
 
     /** Fixed farmer accounts for staging / Render smoke tests (skipped if email already exists). */
-    public const DEPLOY_TEST_FARMER_1_EMAIL = 'farmer-test-1@agriguard.test';
+    public const DEPLOY_TEST_FARMER_1_EMAIL = 'juan.delacruz@agriguard.test';
 
-    public const DEPLOY_TEST_FARMER_2_EMAIL = 'farmer-test-2@agriguard.test';
+    public const DEPLOY_TEST_FARMER_2_EMAIL = 'maria.santos@agriguard.test';
 
     /** Password for both deploy test farmers (plain; stored via same hashing as other seeded users). */
-    public const DEPLOY_TEST_FARMER_PASSWORD = 'FarmerTest123!';
+    public const DEPLOY_TEST_FARMER_PASSWORD = 'Test1234!';
 
     /**
      * Seed realistic user accounts (2 admins, 2 deploy-test farmers, 28 demo farmers).
@@ -64,12 +64,12 @@ class UserSeeder extends Seeder
             // Deploy / QA: log in on production after migrate + db:seed (see Dockerfile CMD).
             [
                 'role' => 'farmer',
-                'name' => 'Deploy Test Farmer One',
+                'name' => 'Juan Dela Cruz',
                 'email' => self::DEPLOY_TEST_FARMER_1_EMAIL,
             ],
             [
                 'role' => 'farmer',
-                'name' => 'Deploy Test Farmer Two',
+                'name' => 'Maria Santos',
                 'email' => self::DEPLOY_TEST_FARMER_2_EMAIL,
             ],
         ];
