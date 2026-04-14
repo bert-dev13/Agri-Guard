@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -19,9 +20,12 @@ class PasswordResetCodeMail extends Mailable
 
     public function envelope(): Envelope
     {
+        $fromAddress = (string) config('mail.from.address');
+        $fromName = (string) config('mail.from.name', 'AGRIGUARD');
+
         return new Envelope(
             subject: 'AGRIGUARD Password Reset Code',
-            from: config('mail.from.address'),
+            from: new Address($fromAddress, $fromName),
             replyTo: [],
         );
     }

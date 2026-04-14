@@ -52,13 +52,6 @@
                                 </div>
                             @endif
 
-                            @if ($devCode && config('app.debug'))
-                                <div class="auth-message auth-message--dev mt-6" role="status">
-                                    <span class="block text-sm font-semibold mb-1">Dev code</span>
-                                    <span class="dev-code">{{ $devCode }}</span>
-                                </div>
-                            @endif
-
                             @if ($expiresAt)
                                 <p
                                     class="auth-countdown mt-6 text-center {{ $expiresAt->isPast() ? 'is-expired' : '' }}"

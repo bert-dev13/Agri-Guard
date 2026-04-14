@@ -69,13 +69,25 @@ class AuthController extends Controller
 
             return true;
         } catch (\Throwable $e) {
+            $mailContext = [
+                'mailer' => config('mail.default'),
+                'host' => config('mail.mailers.smtp.host'),
+                'port' => config('mail.mailers.smtp.port'),
+                'scheme' => config('mail.mailers.smtp.scheme'),
+                'username' => config('mail.mailers.smtp.username'),
+                'from_address' => config('mail.from.address'),
+            ];
+
             Log::error('Email verification mail delivery failed', [
                 'user_id' => $user->getKey(),
                 'email' => $user->email,
-                'mailer' => config('mail.default'),
+                'mail_config' => $mailContext,
                 'exception' => $e::class,
                 'message' => $e->getMessage(),
+                'previous_exception' => $e->getPrevious()?->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
+            report($e);
 
             return false;
         }
@@ -83,9 +95,7 @@ class AuthController extends Controller
 
     private function flashDevVerificationCodeIfApplicable(string $plainCode): void
     {
-        if (config('mail.default') === 'log' && config('app.debug')) {
-            session()->flash('dev_verification_code', $plainCode);
-        }
+        // Intentionally left blank: never expose OTP in UI.
     }
 
     /**
@@ -270,7 +280,7 @@ class AuthController extends Controller
                 'message',
                 $mailOk
                     ? 'We sent a verification code to your email. Enter it below to activate your account.'
-                    : 'Your account was created. We could not reach the mail server to send the code — use “Resend code” below, or contact support if this keeps happening.'
+                    : 'Your account was created, but we could not send the verification code email right now. Please click "Resend code" below. If this continues, contact support.'
             );
     }
 
@@ -444,7 +454,6 @@ class AuthController extends Controller
         return view('auth.verify-email', [
             'email' => $user->email,
             'lockedUntil' => $user->verification_locked_until,
-            'devCode' => session('dev_verification_code'),
             'expiresAt' => $user->email_verification_expires_at,
         ]);
     }
@@ -557,7 +566,7 @@ class AuthController extends Controller
         $plain = $this->generateAndStoreVerificationCode($user);
         if (! $this->deliverVerificationCodeMail($user, $plain)) {
             return back()->withErrors([
-                'resend' => 'We could not send the email right now. Please wait a moment and try again.',
+                'resend' => 'We could not send the verification email at the moment. Please wait a minute and try again.',
             ]);
         }
         $this->flashDevVerificationCodeIfApplicable($plain);

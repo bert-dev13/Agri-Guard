@@ -17,6 +17,8 @@ use App\Http\Controllers\RainfallTrendsController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\WeatherDetailsController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 
 // Landing page: show to guests; redirect authenticated users to dashboard
@@ -47,6 +49,26 @@ Route::middleware('guest')->group(function () {
     Route::get('/reset-password', [PasswordResetController::class, 'showResetForm'])->name('password.reset.form');
     Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.reset');
 });
+
+// Local/dev SMTP smoke test endpoint.
+if (app()->environment('local')) {
+    Route::get('/dev/test-mail', function (Request $request) {
+        abort_unless(config('app.debug'), 404);
+
+        $recipient = (string) $request->query('to', config('mail.from.address'));
+
+        Mail::raw('AGRIGUARD SMTP test email sent at '.now()->toDateTimeString(), function ($message) use ($recipient) {
+            $message->to($recipient)->subject('AGRIGUARD Mail Test');
+        });
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Test email dispatch completed.',
+            'to' => $recipient,
+            'mailer' => config('mail.default'),
+        ]);
+    })->name('dev.test-mail');
+}
 
 // Barangay JSON for forms (public: registration uses it while guest)
 Route::get('/api/barangays', [BarangayApiController::class, 'index'])->name('api.barangays');

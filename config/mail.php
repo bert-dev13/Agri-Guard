@@ -39,6 +39,7 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
+            // MAIL_SCHEME only supports smtp/smtps; TLS is handled via MAIL_ENCRYPTION on port 587.
             'scheme' => env('MAIL_SCHEME'),
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
