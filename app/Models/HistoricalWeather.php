@@ -30,8 +30,9 @@ class HistoricalWeather extends Model
     protected function casts(): array
     {
         return [
-            'rainfall' => 'decimal:2',
-            'wind_speed' => 'decimal:2',
+            'rainfall' => 'float',
+            'wind_speed' => 'float',
+            'wind_direction' => 'integer',
         ];
     }
 
