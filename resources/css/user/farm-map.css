@@ -1038,6 +1038,84 @@
     color: #0f172a;
 }
 
+/* Fixed map legend for flood risk colors */
+.farm-map-risk-legend {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 500;
+    min-width: 142px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.93);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 8px 20px rgb(15 23 42 / 0.12);
+    backdrop-filter: blur(6px);
+}
+
+.farm-map-risk-legend__title {
+    margin: 0 0 6px;
+    font-size: 0.625rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #334155;
+}
+
+.farm-map-risk-legend__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 4px;
+}
+
+.farm-map-risk-legend__list li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #475569;
+}
+
+.farm-map-risk-legend__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    flex-shrink: 0;
+    border: 1px solid rgb(15 23 42 / 0.1);
+}
+
+.farm-map-risk-legend__dot--low {
+    background: #22c55e;
+}
+
+.farm-map-risk-legend__dot--moderate {
+    background: #facc15;
+}
+
+.farm-map-risk-legend__dot--high {
+    background: #ef4444;
+}
+
+@media (max-width: 520px) {
+    .farm-map-risk-legend {
+        right: 8px;
+        bottom: 8px;
+        min-width: 132px;
+        padding: 7px 8px;
+    }
+
+    .farm-map-risk-legend__title {
+        font-size: 0.58rem;
+    }
+
+    .farm-map-risk-legend__list li {
+        font-size: 0.64rem;
+    }
+}
+
 /* Layers & legend — compact rows */
 .farm-map-legend-card {
     padding: 16px 16px 14px;

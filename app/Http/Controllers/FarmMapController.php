@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\FarmWeatherService;
+use App\Services\FarmRiskSnapshotService;
 use App\Services\FloodRiskAssessmentService;
 use App\Services\MapSmartAdvisoryService;
 use App\Services\RainfallHeatmapService;
@@ -69,7 +70,8 @@ class FarmMapController extends Controller
         RainfallHeatmapService $heatmap,
         RuleBasedAdvisoryService $ruleBasedAdvisory,
         SmartAdvisoryEngine $smartAdvisory,
-        MapSmartAdvisoryService $mapSmartAdvisory
+        MapSmartAdvisoryService $mapSmartAdvisory,
+        FarmRiskSnapshotService $riskSnapshotService
     ): JsonResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -91,6 +93,7 @@ class FarmMapController extends Controller
             $ruleBasedAdvisory,
             $smartAdvisory,
             $mapSmartAdvisory,
+            $riskSnapshotService,
             $mapLayer
         ));
     }
@@ -106,6 +109,7 @@ class FarmMapController extends Controller
         RuleBasedAdvisoryService $ruleBasedAdvisory,
         SmartAdvisoryEngine $smartAdvisory,
         MapSmartAdvisoryService $mapSmartAdvisory,
+        FarmRiskSnapshotService $riskSnapshotService,
         string $mapLayer = 'farm'
     ): array {
         $safeName = trim((string) ($user->name ?? ''));
@@ -148,6 +152,11 @@ class FarmMapController extends Controller
                     'After GPS is saved, you will see what today’s weather means for your decisions.',
                 ],
                 'map_smart_advisory' => null,
+                'risk_snapshot' => [
+                    'estimated_crop_loss' => 'N/A',
+                    'three_day_effect' => 'No forecast impact available',
+                    'flood_risk_level' => 'Unknown',
+                ],
             ]);
         }
 
@@ -155,6 +164,7 @@ class FarmMapController extends Controller
         $lng = (float) $user->farm_lng;
 
         $weather = $farmWeather->getNormalizedWeatherByCoordinates($lat, $lng);
+        $riskSnapshot = $riskSnapshotService->buildFromNormalizedWeather($user, $weather);
         $userContext = [];
         $floodResult = $floodRisk->assess($weather, $userContext);
         $rainfallAccumulationLabel = $floodRisk->rainfallAccumulationLabel(
@@ -273,6 +283,7 @@ class FarmMapController extends Controller
             'advisory' => $advisory,
             'smart_advisory' => $smart,
             'map_smart_advisory' => $mapSmartAdvisoryPayload,
+            'risk_snapshot' => $riskSnapshot,
             'popup_summary' => $popupSummary,
             'weekly_rainfall_summary' => $weeklySummary,
             'recommendation' => $smart['short_recommendation'] ?? ($advisory['recommended_action'] ?? null),
@@ -393,15 +404,17 @@ class FarmMapController extends Controller
     private function floodOverlayColor(string $level): string
     {
         return match ($level) {
+            'CRITICAL' => 'rgba(127, 29, 29, 0.3)',
             'HIGH' => 'rgba(220, 38, 38, 0.22)',
             'MODERATE' => 'rgba(245, 158, 11, 0.22)',
-            default => 'rgba(34, 197, 94, 0.12)',
+            default => 'rgba(34, 197, 94, 0.18)',
         };
     }
 
     private function floodRadiusM(string $level): int
     {
         return match ($level) {
+            'CRITICAL' => 560,
             'HIGH' => 480,
             'MODERATE' => 400,
             default => 320,

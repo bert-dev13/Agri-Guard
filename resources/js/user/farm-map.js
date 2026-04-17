@@ -296,13 +296,16 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
         }
 
         function ringStyleForFlood(level) {
+            if (level === 'CRITICAL') {
+                return { fillColor: '#7f1d1d', fillOpacity: 0.34, color: '#450a0a', weight: 2 };
+            }
             if (level === 'HIGH') {
                 return { fillColor: '#ef4444', fillOpacity: 0.32, color: '#991b1b', weight: 2 };
             }
             if (level === 'MODERATE') {
                 return { fillColor: '#f97316', fillOpacity: 0.34, color: '#c2410c', weight: 2 };
             }
-            return { fillColor: '#facc15', fillOpacity: 0.26, color: '#ca8a04', weight: 2 };
+            return { fillColor: '#22c55e', fillOpacity: 0.22, color: '#15803d', weight: 2 };
         }
 
         function updateLayerLegend() {
@@ -416,12 +419,13 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             var w = ctx.weather || {};
             var rf = (ctx.rainfall_context || {}).intensity_label || '—';
             var fl = (ctx.flood_risk || {}).label || '—';
+            var crop = ctx.crop_type ? String(ctx.crop_type) : 'Not set';
             var wxRaw =
                 (w.current_temperature != null ? String(w.current_temperature) + '°C' : '—') +
                 (w.condition ? ' · ' + String(w.condition) : '');
             return (
                 '<div class="farm-map-popup">' +
-                '<p class="farm-map-popup__eyebrow">Your farm</p>' +
+                '<p class="farm-map-popup__eyebrow">Farm location</p>' +
                 '<p class="farm-map-popup__title">' +
                 escapeHtml(ctx.farm_name || 'Your farm') +
                 '</p>' +
@@ -430,13 +434,17 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                 ', ' +
                 fmtCoordExact(ctx.longitude) +
                 '</p>' +
+                '<p class="farm-map-popup__meta"><span>Crop:</span> ' +
+                escapeHtml(crop) +
+                '</p>' +
+                '<p class="farm-map-popup__meta"><span>Flood risk:</span> ' +
+                escapeHtml(fl) +
+                '</p>' +
                 '<p class="farm-map-popup__wx">' +
                 escapeHtml(wxRaw) +
                 '</p>' +
                 '<p class="farm-map-popup__meta"><span>Rainfall:</span> ' +
                 escapeHtml(rf) +
-                ' · <span>Flood:</span> ' +
-                escapeHtml(fl) +
                 '</p>' +
                 '</div>'
             );
@@ -878,11 +886,14 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
         }
 
         function floodLevelShort(level) {
+            if (level === 'CRITICAL') {
+                return 'Critical';
+            }
             if (level === 'HIGH') {
                 return 'High';
             }
             if (level === 'MODERATE') {
-                return 'Medium';
+                return 'Moderate';
             }
             return 'Low';
         }
@@ -914,11 +925,16 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             var flvl = (ctx.flood_risk || {}).level || 'LOW';
             var floodAdj = floodLevelShort(flvl);
             var rain = rainPhraseFromCtx(ctx);
+            var snapshot = ctx.risk_snapshot || {};
+            var snapshotEffect = String(snapshot.three_day_effect || '').trim();
             var tail = 'Normal farm activity is okay.';
             if (flvl === 'HIGH') {
                 tail = 'Limit work in low spots and check drainage.';
             } else if (flvl === 'MODERATE') {
                 tail = 'Watch fields if rain increases.';
+            }
+            if (snapshotEffect !== '' && snapshotEffect.toLowerCase() !== 'no forecast impact available') {
+                tail = snapshotEffect + '. ' + tail;
             }
             todaySummaryEl.textContent =
                 'Today: ' + floodAdj + ' flood risk and ' + rain + '. ' + tail;
@@ -975,16 +991,15 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                 wxSub = 'Unavailable';
             }
 
-            var rf = ctx.rainfall_context || {};
-            var rainVal =
-                rf.intensity_label != null && String(rf.intensity_label).trim() !== ''
-                    ? escapeHtml(String(rf.intensity_label))
-                    : '—';
             var rainSub = 'Forecast trend near your farm';
 
             var fr = ctx.flood_risk || {};
             var flvl = fr.level || 'LOW';
-            var floodVal = escapeHtml(floodLevelShort(flvl));
+            var snapshot = ctx.risk_snapshot || {};
+            var snapshotFlood = String(snapshot.flood_risk_level || '').trim();
+            var snapshotCropLoss = String(snapshot.estimated_crop_loss || 'N/A').trim() || 'N/A';
+            var snapshotEffect = String(snapshot.three_day_effect || 'No forecast impact available').trim() || 'No forecast impact available';
+            var floodVal = escapeHtml(snapshotFlood !== '' ? snapshotFlood : floodLevelShort(flvl));
             var floodLbl = fr.label != null && String(fr.label).trim() !== '' ? String(fr.label) : '';
             var floodSub =
                 floodLbl !== ''
@@ -1011,21 +1026,30 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                 '</p>' +
                 '</div>' +
                 '<div class="farm-map-snap-card farm-map-snap-card--rain">' +
-                '<p class="farm-map-snap-card__label">Rainfall</p>' +
+                '<p class="farm-map-snap-card__label">Estimated Crop Loss</p>' +
                 '<p class="farm-map-snap-card__value">' +
-                rainVal +
+                escapeHtml(snapshotCropLoss) +
                 '</p>' +
                 '<p class="farm-map-snap-card__sub">' +
-                rainSub +
+                'Potential crop damage from current weather risk' +
                 '</p>' +
                 '</div>' +
                 '<div class="farm-map-snap-card farm-map-snap-card--flood">' +
-                '<p class="farm-map-snap-card__label">Flood risk</p>' +
+                '<p class="farm-map-snap-card__label">Flood Risk Level</p>' +
                 '<p class="farm-map-snap-card__value">' +
                 floodVal +
                 '</p>' +
                 '<p class="farm-map-snap-card__sub">' +
                 floodSub +
+                '</p>' +
+                '</div>' +
+                '<div class="farm-map-snap-card farm-map-snap-card--rain">' +
+                '<p class="farm-map-snap-card__label">3-Day Effect</p>' +
+                '<p class="farm-map-snap-card__value">' +
+                escapeHtml(snapshotEffect) +
+                '</p>' +
+                '<p class="farm-map-snap-card__sub">' +
+                rainSub +
                 '</p>' +
                 '</div>';
         }

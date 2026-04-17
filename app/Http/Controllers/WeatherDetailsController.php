@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\AiAdvisory\AiAdvisoryService;
+use App\Services\FarmRiskSnapshotService;
+use App\Services\ThreeDayImpactService;
 use App\Services\WeatherAdvisoryService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -12,7 +14,12 @@ class WeatherDetailsController extends Controller
     /**
      * Show the Weather Details page with full forecast, metrics, and charts.
      */
-    public function show(WeatherAdvisoryService $weatherService, AiAdvisoryService $aiAdvisory): View
+    public function show(
+        WeatherAdvisoryService $weatherService,
+        AiAdvisoryService $aiAdvisory,
+        ThreeDayImpactService $threeDayImpactService,
+        FarmRiskSnapshotService $riskSnapshotService
+    ): View
     {
         $user = Auth::user();
         $data = $weatherService->getAdvisoryData($user);
@@ -63,6 +70,16 @@ class WeatherDetailsController extends Controller
             $user->crop_type,
             $user->farming_stage
         );
+
+        $riskSnapshot = $riskSnapshotService->buildFromWeather($user, $weather ?? [], $forecast);
+        $snapshotFloodLevel = strtolower((string) ($riskSnapshot['flood_risk_tone'] ?? 'unknown'));
+
+        $impactAdvisory = $threeDayImpactService->buildImpact(
+            $user,
+            $forecast,
+            $snapshotFloodLevel
+        );
+        $impactAdvisory['effect_summary'] = (string) ($riskSnapshot['three_day_effect'] ?? ($impactAdvisory['effect_summary'] ?? 'No forecast impact available'));
 
         $dewPoint = self::estimateDewPoint(
             isset($weather['temp']) ? (float) $weather['temp'] : null,
@@ -123,8 +140,10 @@ class WeatherDetailsController extends Controller
             'dew_point' => $dewPoint,
             'cloud_cover' => $cloudCover,
             'agri_insights' => $agriInsights,
+            'impact_advisory' => $impactAdvisory,
             'recommendation' => $smartRecommendation['recommendation'],
             'recommendation_failed' => $smartRecommendation['failed'],
+            'risk_snapshot' => $riskSnapshot,
         ]);
     }
 

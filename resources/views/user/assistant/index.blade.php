@@ -90,8 +90,8 @@
                 Today&apos;s Snapshot: {{ is_numeric(data_get($ctx, 'rainfall_probability')) && (int) data_get($ctx, 'rainfall_probability') < 50 ? 'Good conditions for field work today.' : 'Stay alert for rain and choose lower-risk field tasks.' }}
             </section>
 
-            <section class="assistant-unified-shell ag-card">
-                <div class="assistant-cards" aria-label="Farm context summary cards">
+            <section class="assistant-summary-shell ag-card" aria-label="Farm context summary">
+                <div class="assistant-cards assistant-cards--single-row" aria-label="Farm context summary cards">
                     <article class="assistant-card assistant-card--crop">
                         <div class="assistant-card-head">
                             <span class="assistant-card-icon"><i data-lucide="wheat"></i></span>
@@ -116,26 +116,31 @@
                         <p class="assistant-card-value">{{ data_get($ctx, 'current_weather_text', '24°C · Clear sky') }}</p>
                     </article>
 
-                    <article class="assistant-card assistant-card--rain">
+                    <article class="assistant-card assistant-card--weather">
+                        <div class="assistant-card-head">
+                            <span class="assistant-card-icon"><i data-lucide="sprout"></i></span>
+                            <p class="assistant-card-label">Estimated Crop Loss</p>
+                        </div>
+                        <p class="assistant-card-value">{{ data_get($ctx, 'risk_snapshot.estimated_crop_loss', 'N/A') }}</p>
+                    </article>
+                    <article class="assistant-card assistant-card--weather">
                         <div class="assistant-card-head">
                             <span class="assistant-card-icon"><i data-lucide="cloud-rain"></i></span>
-                            <p class="assistant-card-label">Rain Chance</p>
+                            <p class="assistant-card-label">3-Day Effect</p>
                         </div>
-                        <p class="assistant-card-value">
-                            {{ is_numeric(data_get($ctx, 'rainfall_probability')) ? data_get($ctx, 'rainfall_probability') . '%' : '0%' }}
-                        </p>
+                        <p class="assistant-card-value">{{ data_get($ctx, 'risk_snapshot.three_day_effect', 'No forecast impact available') }}</p>
                     </article>
-
                     <article class="assistant-card assistant-card--flood">
                         <div class="assistant-card-head">
                             <span class="assistant-card-icon"><i data-lucide="waves"></i></span>
-                            <p class="assistant-card-label">Flood Risk</p>
+                            <p class="assistant-card-label">Flood Risk Level</p>
                         </div>
-                        <p class="assistant-card-value">{{ data_get($ctx, 'flood_risk.label', 'Low Risk') }}</p>
+                        <p class="assistant-card-value">{{ data_get($ctx, 'risk_snapshot.flood_risk_level', 'Unknown') }}</p>
                     </article>
                 </div>
+            </section>
 
-                <section class="assistant-chat-shell">
+            <section class="assistant-chat-shell">
                 <div class="assistant-chat-head assistant-top-info" role="region" aria-label="Assistant status">
                     <div class="assistant-top-info__left">
                         <span class="assistant-top-info__item assistant-top-info__item--weather">
@@ -172,6 +177,8 @@
                 <section class="assistant-bottom-bar assistant-bottom-bar--inline" aria-label="Assistant input actions">
                     <div class="assistant-bottom-inner">
                         <div class="assistant-quick-actions" aria-label="Suggested quick prompts">
+                            <button type="button" class="assistant-quick-chip" data-assistant-prompt="Estimate my crop loss based on current flood and weather risk.">Estimated Crop Loss</button>
+                            <button type="button" class="assistant-quick-chip" data-assistant-prompt="Give me a 3-day effect prediction for my farm conditions.">3-Day Effect Prediction</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="Give crop advice based on today's weather and growth stage.">🌱 Crop advice</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="What is the flood risk for my farm today?">🌧 Flood risk</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="How should I handle irrigation today?">💧 Irrigation</button>
@@ -196,7 +203,6 @@
                 @if (!data_get($ctx, 'has_gps'))
                     <p class="assistant-note">Save GPS in <a href="{{ route('map.index') }}">Map</a> for more accurate farm-aware responses.</p>
                 @endif
-                </section>
             </section>
         </div>
     </section>

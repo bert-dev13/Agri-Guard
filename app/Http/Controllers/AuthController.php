@@ -7,6 +7,7 @@ use App\Models\Barangay;
 use App\Models\User;
 use App\Services\AiRecommendationService;
 use App\Services\CropTimelineService;
+use App\Services\DashboardDisasterSummaryService;
 use App\Services\WeatherAdvisoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -300,7 +301,11 @@ class AuthController extends Controller
      * Show the dashboard (authenticated).
      * Weather API failures are caught so the dashboard always renders with a fallback state.
      */
-    public function dashboard(WeatherAdvisoryService $weatherAdvisory, AiRecommendationService $aiRecommendationService)
+    public function dashboard(
+        WeatherAdvisoryService $weatherAdvisory,
+        AiRecommendationService $aiRecommendationService,
+        DashboardDisasterSummaryService $dashboardSummaryService
+    )
     {
         $user = Auth::user();
         if (! $user instanceof User) {
@@ -426,10 +431,13 @@ class AuthController extends Controller
             ],
         ], 'dashboard');
 
+        $disasterSummary = $dashboardSummaryService->build($user, $advisoryData);
+
         return view('user.dashboard', [
             'advisoryData' => $advisoryData,
             'recommendation' => $smartRecommendation['recommendation'],
             'recommendation_failed' => $smartRecommendation['failed'],
+            'disasterSummary' => $disasterSummary,
         ]);
     }
 

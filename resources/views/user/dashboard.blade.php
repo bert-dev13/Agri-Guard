@@ -108,12 +108,6 @@
                                     <span class="dashboard-hero__title-line">{{ $greeting }}, {{ $safeUserName ?: 'Farmer' }}</span>
                                     <span class="dashboard-hero__title-emoji" aria-hidden="true">{{ $hour < 18 ? '👋' : '🌙' }}</span>
                                 </h1>
-                                <p class="dashboard-hero__subtitle">
-                                    <span class="dashboard-hero__subtitle-ic" aria-hidden="true">
-                                        <i data-lucide="sprout" class="dashboard-hero__lucide dashboard-hero__lucide--xs"></i>
-                                    </span>
-                                    <span>Today&rsquo;s farm snapshot</span>
-                                </p>
                             </div>
                         </div>
                         <div class="dashboard-hero__meta">
@@ -158,23 +152,38 @@
                 </div>
             </header>
 
-            <section class="ag-card overflow-hidden rounded-3xl border border-slate-200 bg-slate-50/95 p-4 shadow-sm sm:p-5" aria-label="Main farm hero">
+            <section class="ag-card weather-snapshot overflow-hidden rounded-3xl border border-sky-200 bg-sky-50/85 p-3.5 shadow-sm sm:p-4" aria-label="TODAYS WEATHER">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Today&rsquo;s farm snapshot</p>
-                        <p class="mt-2 text-4xl font-extrabold leading-none text-slate-900 sm:text-5xl">
-                            @if ($weather && isset($weather['temp']))
-                                {{ round($weather['temp']) }}°C
-                            @else
-                                —
-                            @endif
-                        </p>
-                        <p class="mt-2 text-sm font-semibold text-slate-700 sm:text-base">{{ $weatherLabel ?: 'No weather data' }}</p>
-                        <p class="mt-1 text-xs text-slate-500 sm:text-sm">{{ $dashboardSummary }}</p>
+                        <p class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-700 transition-all duration-300 hover:tracking-[0.14em] hover:text-slate-900">
+                            <i data-lucide="cloud-sun" class="h-3.5 w-3.5 text-sky-600"></i>
+                            TODAYS WEATHER                        </p>
+                        <div class="mt-1.5 flex items-end gap-2">
+                            <p class="text-2xl font-extrabold leading-none text-slate-900 sm:text-3xl">
+                                @if ($weather && isset($weather['temp']))
+                                    {{ round($weather['temp']) }}°C
+                                @else
+                                    —
+                                @endif
+                            </p>
+                            <p class="text-xs font-semibold text-slate-600 sm:text-sm">{{ $weatherLabel ?: 'No data' }}</p>
+                        </div>
                     </div>
-                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-3xl sm:h-16 sm:w-16 sm:text-4xl" aria-hidden="true">
-                        {{ $weatherEmoji }}
-                    </div>
+                    <div class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-xl shadow-sm sm:h-11 sm:w-11 sm:text-2xl" aria-hidden="true">{{ $weatherEmoji }}</div>
+                </div>
+                <div class="mt-2.5 grid grid-cols-3 gap-1.5 sm:gap-2">
+                    <article class="rounded-xl border border-sky-100 bg-sky-50 px-2 py-1.5 text-center">
+                        <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Rain</p>
+                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ $rainStatIsChance ? $rainStatValue : '—' }}</p>
+                    </article>
+                    <article class="rounded-xl border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-center">
+                        <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Humidity</p>
+                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ is_numeric($humidity) ? ((int) round((float) $humidity)) . '%' : '—' }}</p>
+                    </article>
+                    <article class="rounded-xl border border-violet-100 bg-violet-50 px-2 py-1.5 text-center">
+                        <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Wind</p>
+                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ is_numeric($windSpeed) ? round((float) $windSpeed, 1) . ' km/h' : '—' }}</p>
+                    </article>
                 </div>
             </section>
 
@@ -191,29 +200,25 @@
                     </p>
                 </div>
 
-                <div class="dash-smart__head rounded-2xl bg-emerald-100/80 px-3 py-2.5">
-                    <span class="dash-smart__chip" aria-hidden="true">
-                        <i data-lucide="sprout" class="h-4 w-4"></i>
-                        Smart action
-                    </span>
-                    <div class="dash-smart__badges">
-                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
-                            Risk: {{ $riskLabel }}
+                <div class="dash-smart__head">
+                    <div class="dash-smart__title-wrap">
+                        <span class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-extrabold uppercase tracking-[0.1em] text-slate-700 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900" aria-hidden="true">
+                            <i data-lucide="sparkles" class="h-3.5 w-3.5 text-emerald-600"></i>
+                            Smart action
                         </span>
-                        @if ($aiAdvisoryReady && trim((string) $confidenceLabel) !== '' && $confidenceLabel !== '—')
-                            <span class="dash-smart__badge dash-smart__badge--conf-high">
-                                <i data-lucide="brain" class="h-3 w-3"></i>
-                                {{ $confidenceLabel }}
-                            </span>
-                        @endif
                     </div>
                 </div>
 
-                <p class="dash-smart__action">{{ $dashboardSummary }}</p>
+                <div class="dash-smart__body">
+                    <p class="dash-smart__action">{{ $dashboardSummary }}</p>
+                </div>
             </article>
 
             <section class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5" aria-label="Today's plan">
-                <h2 class="inline-flex rounded-xl bg-teal-100 px-3 py-1.5 text-sm font-extrabold uppercase tracking-[0.1em] text-teal-900">Today&rsquo;s Plan</h2>
+                <h2 class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
+                    <i data-lucide="calendar-check-2" class="h-4 w-4 text-amber-600"></i>
+                    Today&rsquo;s Plan
+                </h2>
                 <div class="mt-3 space-y-3">
                     <article class="flex gap-3 rounded-2xl bg-amber-50 px-3 py-3">
                         <span class="text-lg" aria-hidden="true">🌤️</span>
@@ -232,39 +237,26 @@
 
             <section class="grid gap-3 sm:grid-cols-2" aria-label="Avoid and water strategy">
                 <article class="ag-card rounded-3xl border border-rose-100 bg-rose-50/70 p-4">
-                    <p class="inline-flex rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-rose-800">Avoid</p>
+                    <p class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
+                        <i data-lucide="shield-alert" class="h-3.5 w-3.5 text-rose-600"></i>
+                        Avoid
+                    </p>
                     <p class="mt-2 text-sm text-slate-700">{{ $avoidText }}</p>
                 </article>
                 <article class="ag-card rounded-3xl border border-cyan-100 bg-cyan-50/70 p-4">
-                    <p class="inline-flex rounded-lg bg-cyan-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-cyan-800">Water</p>
+                    <p class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
+                        <i data-lucide="droplets" class="h-3.5 w-3.5 text-cyan-700"></i>
+                        Water
+                    </p>
                     <p class="mt-2 text-sm text-slate-700">{{ $waterText }}</p>
                 </article>
             </section>
 
-            <section class="ag-card weather-snapshot overflow-hidden rounded-3xl border border-sky-200 bg-sky-50/85 p-4 shadow-sm sm:p-5" aria-label="Current weather preview">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <p class="inline-flex rounded-lg bg-sky-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-sky-900">Current weather preview</p>
-                        <p class="mt-2 text-3xl font-extrabold leading-none text-slate-900 sm:text-4xl">
-                            @if ($weather && isset($weather['temp']))
-                                {{ round($weather['temp']) }}°C
-                            @else
-                                —
-                            @endif
-                        </p>
-                        <p class="mt-2 text-sm font-medium text-slate-600">{{ $weatherLabel ?: 'No data' }}</p>
-                    </div>
-                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-2xl sm:h-14 sm:w-14 sm:text-3xl" aria-hidden="true">{{ $weatherEmoji }}</div>
-                </div>
-                <div class="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-                    <article class="rounded-2xl border border-sky-100 bg-sky-50 px-3 py-2"><p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Rain</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ $rainStatIsChance ? $rainStatValue : '—' }}</p></article>
-                    <article class="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2"><p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Humidity</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ is_numeric($humidity) ? ((int) round((float) $humidity)) . '%' : '—' }}</p></article>
-                    <article class="rounded-2xl border border-violet-100 bg-violet-50 px-3 py-2"><p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">Wind</p><p class="mt-1 text-sm font-semibold text-slate-900">{{ is_numeric($windSpeed) ? round((float) $windSpeed, 1) . ' km/h' : '—' }}</p></article>
-                </div>
-            </section>
-
             <section class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5" aria-label="Forecast preview">
-                <h2 class="inline-flex rounded-xl bg-teal-100 px-3 py-1.5 text-sm font-extrabold uppercase tracking-[0.1em] text-teal-900">Forecast preview</h2>
+                <h2 class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
+                    <i data-lucide="calendar-days" class="h-4 w-4 text-violet-600"></i>
+                    Forecast preview
+                </h2>
                 <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3" role="list">
                     @forelse (array_slice($forecast, 0, 5) as $day)
                         @php
@@ -290,36 +282,30 @@
             </section>
 
             <section class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5" aria-label="Farm summary and insights">
-                <h2 class="inline-flex rounded-xl bg-teal-100 px-3 py-1.5 text-sm font-extrabold uppercase tracking-[0.1em] text-teal-900">Farm summary & insights</h2>
+                <h2 class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
+                    <i data-lucide="sprout" class="h-4 w-4 text-emerald-600"></i>
+                    Farm summary & insights
+                </h2>
                 <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
                     <article class="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3"><p class="text-xs text-slate-500">Farm</p><p class="text-sm font-semibold text-slate-800">{{ $farmName }}</p></article>
                     <article class="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-3"><p class="text-xs text-slate-500">Crop</p><p class="text-sm font-semibold text-slate-800">{{ $farmType }}</p></article>
                     <article class="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3"><p class="text-xs text-slate-500">Stage</p><p class="text-sm font-semibold text-slate-800">{{ $farmingStage }}</p></article>
                     <article class="rounded-2xl border border-violet-100 bg-violet-50 px-3 py-3"><p class="text-xs text-slate-500">Location</p><p class="text-sm font-semibold text-slate-800">{{ $locationDisplay }}</p></article>
                 </div>
-                <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-                    <article class="rounded-2xl border border-slate-200 bg-slate-100/80 px-3 py-3">
-                        <p class="text-xs text-slate-500">Flood risk</p>
-                        <p class="mt-1 text-sm font-semibold text-slate-800">{{ $floodRiskLabel }}</p>
-                    </article>
-                    <article class="rounded-2xl border border-slate-200 bg-slate-100/80 px-3 py-3">
-                        <p class="text-xs text-slate-500">Spraying condition</p>
-                        <p class="mt-1 text-sm font-semibold text-slate-800">{{ $sprayingLabel }}</p>
-                    </article>
-                    <article class="rounded-2xl border border-slate-200 bg-slate-100/80 px-3 py-3">
-                        <p class="text-xs text-slate-500">Irrigation need</p>
-                        <p class="mt-1 text-sm font-semibold text-slate-800">{{ $irrigationNeedLabel }}</p>
-                    </article>
-                </div>
             </section>
 
             <section class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5" aria-label="Quick actions">
-                <h2 class="inline-flex rounded-xl bg-teal-100 px-3 py-1.5 text-sm font-extrabold uppercase tracking-[0.1em] text-teal-900">Quick actions</h2>
-                <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+                <h2 class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
+                    <i data-lucide="zap" class="h-4 w-4 text-indigo-600"></i>
+                    Quick actions
+                </h2>
+                <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                    <a href="{{ route('dashboard') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="layout-dashboard" class="h-4 w-4"></i>Dashboard</a>
                     <a href="{{ route('weather-details') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="cloud-sun" class="h-4 w-4"></i>Weather</a>
-                    <a href="{{ route('rainfall-trends') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="bar-chart-3" class="h-4 w-4"></i>Rainfall</a>
-                    <a href="{{ route('settings') }}#farm-profile" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="tractor" class="h-4 w-4"></i>Farm</a>
-                    <a href="{{ route('settings') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="settings" class="h-4 w-4"></i>Settings</a>
+                    <a href="{{ route('rainfall-trends') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="bar-chart-3" class="h-4 w-4"></i>Rainfall Trends</a>
+                    <a href="{{ route('crop-progress.index') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="sprout" class="h-4 w-4"></i>Crop</a>
+                    <a href="{{ route('map.index') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="map" class="h-4 w-4"></i>Map</a>
+                    <a href="{{ route('assistant.index') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="bot" class="h-4 w-4"></i>Assistant</a>
                 </div>
             </section>
         </div>

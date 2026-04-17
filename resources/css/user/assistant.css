@@ -3564,14 +3564,34 @@ body.dashboard-page.assistant-page {
     border-radius: clamp(16px, 3vw, 24px);
 }
 
+/* Separate summary card shell from the chatbot container */
+.dashboard-page.assistant-page .assistant-summary-shell {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0.65rem;
+    border-radius: clamp(16px, 3vw, 24px);
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    box-shadow: 0 14px 34px rgb(15 23 42 / 0.08);
+}
+
 @media (min-width: 640px) {
     .dashboard-page.assistant-page .assistant-unified-shell {
+        padding: 0.75rem 0.85rem;
+    }
+
+    .dashboard-page.assistant-page .assistant-summary-shell {
         padding: 0.75rem 0.85rem;
     }
 }
 
 @media (min-width: 1024px) {
     .dashboard-page.assistant-page .assistant-unified-shell {
+        padding: 12px 14px;
+    }
+
+    .dashboard-page.assistant-page .assistant-summary-shell {
         padding: 12px 14px;
     }
 }
@@ -3614,6 +3634,39 @@ body.dashboard-page.assistant-page {
 .dashboard-page.assistant-page .assistant-card-value {
     overflow-wrap: anywhere;
     word-break: break-word;
+}
+
+.dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.4rem;
+    overflow: visible;
+    padding-bottom: 0;
+}
+
+.dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row .assistant-card {
+    min-width: 0;
+    padding: 0.55rem 0.5rem;
+    border-radius: 12px;
+}
+
+.dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row .assistant-card-head {
+    gap: 0.35rem;
+    margin-bottom: 0.25rem;
+}
+
+.dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row .assistant-card-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row .assistant-card-label {
+    font-size: 0.62rem;
+}
+
+.dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row .assistant-card-value {
+    font-size: 0.74rem;
+    line-height: 1.2;
 }
 
 .dashboard-page.assistant-page .assistant-chat-shell {
@@ -3762,17 +3815,17 @@ body.dashboard-page.assistant-page {
 /* Quick prompts: wrap rows, larger tap targets on small screens */
 .dashboard-page.assistant-page .assistant-quick-actions {
     display: flex;
-    flex-wrap: wrap;
-    overflow-x: visible;
-    overflow-y: visible;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
     gap: 0.45rem 0.4rem;
     padding-bottom: 0.15rem;
     margin-bottom: 0.5rem;
 }
 
 .dashboard-page.assistant-page .assistant-quick-chip {
-    flex: 0 1 auto;
-    white-space: normal;
+    flex: 0 0 auto;
+    white-space: nowrap;
     text-align: left;
     line-height: 1.35;
     min-height: 2.75rem;

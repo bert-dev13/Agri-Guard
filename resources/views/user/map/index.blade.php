@@ -226,6 +226,15 @@
 
                                 <div id="farm-map-container" class="farm-map-leaflet w-full h-full min-h-0"></div>
 
+                                <div id="farm-map-risk-legend" class="farm-map-risk-legend" aria-label="Flood risk legend">
+                                    <p class="farm-map-risk-legend__title">Flood Risk Legend</p>
+                                    <ul class="farm-map-risk-legend__list">
+                                        <li><span class="farm-map-risk-legend__dot farm-map-risk-legend__dot--low" aria-hidden="true"></span>Low Risk</li>
+                                        <li><span class="farm-map-risk-legend__dot farm-map-risk-legend__dot--moderate" aria-hidden="true"></span>Moderate Risk</li>
+                                        <li><span class="farm-map-risk-legend__dot farm-map-risk-legend__dot--high" aria-hidden="true"></span>High Risk</li>
+                                    </ul>
+                                </div>
+
                                 <div id="farm-map-empty-overlay" class="farm-map-empty-overlay {{ $initialHasDeviceGps ? 'hidden' : '' }}" aria-hidden="{{ $initialHasDeviceGps ? 'true' : 'false' }}">
                                     <div class="farm-map-empty-overlay__card">
                                         <p class="farm-map-empty-overlay__title">No GPS pin yet</p>

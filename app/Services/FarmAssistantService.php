@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class FarmAssistantService
@@ -18,7 +19,7 @@ class FarmAssistantService
     public function __construct(
         private readonly TogetherAiService $togetherAiService,
         private readonly FarmWeatherService $farmWeatherService,
-        private readonly FloodRiskAssessmentService $floodRiskService,
+        private readonly FarmRiskSnapshotService $riskSnapshotService,
         private readonly RainfallHeatmapService $rainfallHeatmapService,
         private readonly CropTimelineService $cropTimelineService,
     ) {}
@@ -33,27 +34,25 @@ class FarmAssistantService
         $cropType = trim((string) ($user->crop_type ?? ''));
         $locationDisplay = trim((string) ($user->farm_location_display ?? ''));
 
-        $lat = is_numeric($user->farm_lat ?? null) ? (float) $user->farm_lat : null;
-        $lng = is_numeric($user->farm_lng ?? null) ? (float) $user->farm_lng : null;
-        $hasGps = $lat !== null && $lng !== null;
-
-        $weather = null;
+        $hasGps = is_numeric($user->farm_lat ?? null) && is_numeric($user->farm_lng ?? null);
+        $weather = $this->farmWeatherService->getNormalizedWeatherForUser($user);
         $flood = ['level' => 'LOW', 'label' => 'Low Risk', 'message' => 'No strong flood signal right now.'];
         $rainfallLabel = 'Low';
         $rainfallMm = null;
         $rainfallPop = null;
-
-        if ($hasGps) {
-            $weather = $this->farmWeatherService->getNormalizedWeatherByCoordinates($lat, $lng);
-            $flood = $this->floodRiskService->assess($weather, []);
-            $rainfallLabel = $this->rainfallHeatmapService->intensityLabel($weather);
-            $rainfallMm = isset($weather['today_expected_rainfall']) && is_numeric($weather['today_expected_rainfall'])
-                ? (float) $weather['today_expected_rainfall']
-                : null;
-            $rainfallPop = isset($weather['today_rain_probability']) && is_numeric($weather['today_rain_probability'])
-                ? (int) $weather['today_rain_probability']
-                : null;
-        }
+        $riskSnapshot = $this->riskSnapshotService->buildFromNormalizedWeather($user, $weather);
+        $rainfallLabel = $this->rainfallHeatmapService->intensityLabel($weather);
+        $rainfallMm = isset($weather['today_expected_rainfall']) && is_numeric($weather['today_expected_rainfall'])
+            ? (float) $weather['today_expected_rainfall']
+            : null;
+        $rainfallPop = isset($weather['today_rain_probability']) && is_numeric($weather['today_rain_probability'])
+            ? (int) $weather['today_rain_probability']
+            : null;
+        $flood = [
+            'level' => strtoupper((string) ($riskSnapshot['flood_risk_tone'] ?? 'low')),
+            'label' => (string) ($riskSnapshot['flood_risk_level'] ?? 'Low'),
+            'message' => (string) ($riskSnapshot['flood_risk_message'] ?? 'No strong flood signal right now.'),
+        ];
 
         $sessionLang = (string) session('assistant_language_preference', self::LANG_EN);
         $sessionLang = in_array($sessionLang, [self::LANG_EN, self::LANG_TL, self::LANG_TAGLISH], true)
@@ -76,6 +75,7 @@ class FarmAssistantService
             'flood_risk' => $flood,
             'temperature_c' => is_numeric($weather['current_temperature'] ?? null) ? (float) $weather['current_temperature'] : null,
             'humidity' => is_numeric($weather['humidity'] ?? null) ? (int) $weather['humidity'] : null,
+            'risk_snapshot' => $riskSnapshot,
             'current_date_human' => now()->format('l, F j, Y'),
             'assistant_language_preference' => $sessionLang,
         ];
@@ -112,6 +112,11 @@ class FarmAssistantService
                 'temperature_c' => $context['temperature_c'] ?? null,
                 'humidity' => $context['humidity'] ?? null,
             ],
+            'official_risk_snapshot' => [
+                'estimated_crop_loss' => data_get($context, 'risk_snapshot.estimated_crop_loss', 'N/A'),
+                'three_day_effect' => data_get($context, 'risk_snapshot.three_day_effect', 'No forecast impact available'),
+                'flood_risk_level' => data_get($context, 'risk_snapshot.flood_risk_level', 'Unknown'),
+            ],
             'chat' => [
                 'history' => $history,
                 'latest_user_message' => $normalized,
@@ -119,6 +124,11 @@ class FarmAssistantService
         ];
 
         try {
+            Log::info('Assistant risk snapshot payload', [
+                'user_id' => $user->id,
+                'official_risk_snapshot' => $payload['official_risk_snapshot'],
+                'weather_context' => $payload['weather_context'],
+            ]);
             $result = $this->togetherAiService->generateRecommendation($payload, $this->assistantPrompt());
             $decoded = $this->decode((string) ($result['raw_content'] ?? ''));
             $text = is_array($decoded) ? trim((string) ($decoded['message'] ?? '')) : '';
@@ -241,11 +251,14 @@ Goals:
 - Mirror the user language and style (English, Tagalog, Taglish, or other language).
 - Keep answers short to medium, practical, and friendly.
 - Quietly use payload.farm_context + payload.weather_context for grounded advice.
+- Treat payload.official_risk_snapshot as the system source of truth for crop-loss %, 3-day effect, and flood risk.
 - Avoid robotic formatting, headings, bullet lists, and rigid templates.
 - Use simple words and explain technical ideas in plain language.
 
 Important:
 - Never invent weather or farm facts outside payload.
+- Never recalculate or replace payload.official_risk_snapshot values.
+- If user asks about crop loss, 3-day effect, or flood risk, repeat those exact values and explain them.
 - If some context is missing, say it briefly and still give the best safe guidance.
 - Keep continuity with follow-up questions.
 

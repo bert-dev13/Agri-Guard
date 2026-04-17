@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Services\FarmWeatherService;
+use App\Services\FarmRiskSnapshotService;
 use App\Services\FloodRiskAssessmentService;
 use App\Services\RainfallHeatmapService;
+use App\Services\ThreeDayImpactService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +16,13 @@ use Illuminate\Http\Request;
  */
 class WeatherController extends Controller
 {
-    public function index(Request $request, FarmWeatherService $farmWeather): JsonResponse
+    public function index(
+        Request $request,
+        FarmWeatherService $farmWeather,
+        FloodRiskAssessmentService $floodRiskAssessment,
+        ThreeDayImpactService $threeDayImpactService,
+        FarmRiskSnapshotService $riskSnapshotService
+    ): JsonResponse
     {
         $user = $request->user();
         if (! $user) {
@@ -55,6 +63,27 @@ class WeatherController extends Controller
             }, $forecast),
             'today_rain_probability' => $data['today_rain_probability'],
         ];
+
+        $floodRisk = $floodRiskAssessment->assess([
+            'today_rain_probability' => $data['today_rain_probability'] ?? null,
+            'today_expected_rainfall' => $data['today_expected_rainfall'] ?? null,
+            'condition_id' => $data['condition_id'] ?? null,
+            'condition' => $data['condition'] ?? null,
+        ], [
+            'field_condition' => $user->field_condition,
+        ]);
+
+        $riskSnapshot = $riskSnapshotService->buildFromWeather($user, $current, $forecast);
+        $snapshotFloodLevel = strtolower((string) ($riskSnapshot['flood_risk_tone'] ?? ($floodRisk['level'] ?? 'unknown')));
+
+        $impactAdvisory = $threeDayImpactService->buildImpact(
+            $user,
+            $forecast,
+            $snapshotFloodLevel
+        );
+        $impactAdvisory['effect_summary'] = (string) ($riskSnapshot['three_day_effect'] ?? ($impactAdvisory['effect_summary'] ?? 'No forecast impact available'));
+        $response['impact_advisory'] = $impactAdvisory;
+        $response['risk_snapshot'] = $riskSnapshot;
 
         return response()->json($response);
     }
