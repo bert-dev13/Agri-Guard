@@ -182,16 +182,16 @@
                 <div id="farm-map-boundary-slot" class="farm-map-boundary-slot hidden" aria-hidden="true"></div>
             </section>
 
-            {{-- Smart Advisory: same cp-smart / dash-smart layout as Crop Progress (styles in crop-progress.css) --}}
+            {{-- AI Smart Advisory: emerald dash-smart card (Crop Progress pattern) + separate detail panel --}}
             <div class="farm-map-map-advisory-row">
-                <aside class="farm-map-advisory-column" aria-label="Map smart advisory">
-                    <section
+                <aside class="farm-map-advisory-column space-y-3 sm:space-y-4" aria-label="Map smart advisory">
+                    <article
                         id="farm-map-smart-advisory"
-                        class="ag-card dash-smart cp-smart-panel cp-smart-hero"
-                        aria-label="Map smart advisory"
+                        class="ag-card dash-smart weather-page__smart farm-map-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5"
+                        aria-label="AI smart advisory"
                     >
-                        <div class="cp-smart-hero__status-row dash-smart__debug fm-map-cp-smart__status-row">
-                            <div class="fm-map-cp-smart__status-text">
+                        <div class="farm-map-dash-smart__toolbar fm-map-cp-smart__status-row">
+                            <div class="dash-smart__debug farm-map-dash-smart__debug fm-map-cp-smart__status-text">
                                 <p class="text-xs font-semibold text-slate-700">
                                     <span id="farm-map-advisory-status-line">Loading…</span>
                                 </p>
@@ -199,7 +199,7 @@
                             <button
                                 type="button"
                                 id="farm-map-advisory-refresh"
-                                class="fm-map-cp-smart__refresh"
+                                class="fm-map-cp-smart__refresh farm-map-dash-smart__refresh"
                                 title="Refresh advisory"
                                 aria-label="Refresh advisory"
                             >
@@ -207,12 +207,16 @@
                             </button>
                         </div>
 
-                        <div id="farm-map-advisory-body">
-                            <div id="farm-map-advisory-inner">
-                                <p class="text-sm text-slate-500">Loading advisory…</p>
-                            </div>
+                        <div id="farm-map-advisory-inner">
+                            <p class="text-sm text-slate-500">Loading advisory…</p>
                         </div>
-                    </section>
+                    </article>
+
+                    <section
+                        id="farm-map-advisory-detail"
+                        class="farm-map-advisory-detail hidden relative overflow-hidden rounded-2xl border border-violet-200/50 bg-gradient-to-br from-violet-50/95 via-white to-emerald-50/50 shadow-lg shadow-violet-500/10 ring-1 ring-violet-100/90 sm:rounded-[1.35rem]"
+                        aria-label="Advisory details"
+                    ></section>
                 </aside>
 
                 <div class="farm-map-map-column">
@@ -260,21 +264,41 @@
                         </div>
 
                         <p id="farm-map-layer-legend" class="farm-map-layer-legend" aria-live="polite"></p>
-                        <p class="farm-map-stack__footnote">Forecast-based map guide</p>
                     </section>
                 </div>
             </div>
 
-            {{-- Section 3: Info cards below map --}}
-            <div class="farm-map-below space-y-2">
-                <section id="farm-map-today-one" class="ag-card farm-map-today-one" aria-labelledby="farm-map-today-one-label">
-                    <h2 id="farm-map-today-one-label" class="sr-only">Today</h2>
-                    <p id="farm-map-today-summary" class="farm-map-today-one__text">Loading…</p>
+            {{-- Section 3: Info cards below map — compact snapshot UI --}}
+            <div class="farm-map-below space-y-3 sm:space-y-4">
+                <section
+                    id="farm-map-today-one"
+                    class="ag-card farm-map-today-strip overflow-hidden rounded-2xl border border-teal-200/70 bg-gradient-to-br from-teal-50/95 via-white to-emerald-50/60 p-3 shadow-md shadow-teal-500/5 ring-1 ring-teal-100/90 sm:p-3.5"
+                    aria-labelledby="farm-map-today-one-label"
+                >
+                    <div class="farm-map-today-strip__sheen" aria-hidden="true"></div>
+                    <div class="farm-map-today-strip__inner relative z-[1]">
+                        <span class="farm-map-today-strip__glyph" aria-hidden="true">
+                            <i data-lucide="sun-medium" class="farm-map-today-strip__lucide"></i>
+                        </span>
+                        <div class="farm-map-today-strip__copy">
+                            <p id="farm-map-today-one-label" class="farm-map-today-strip__eyebrow">Today</p>
+                            <p id="farm-map-today-summary" class="farm-map-today-strip__text">Loading…</p>
+                        </div>
+                    </div>
                 </section>
 
-                <section class="ag-card farm-map-info-panel" aria-labelledby="farm-map-snapshot-heading">
-                    <h2 id="farm-map-snapshot-heading" class="farm-map-info-panel__heading">Field snapshot</h2>
-                    <div id="farm-map-summary-grid" class="farm-map-snapshot-grid"></div>
+                <section
+                    class="ag-card farm-map-info-panel farm-map-snapshot-shell overflow-hidden rounded-2xl border border-sky-200/65 bg-gradient-to-br from-sky-50/90 via-white to-indigo-50/45 p-3 shadow-md shadow-sky-500/10 ring-1 ring-sky-100/80 sm:p-3.5"
+                    aria-labelledby="farm-map-snapshot-heading"
+                >
+                    <div class="farm-map-snapshot-shell__sheen" aria-hidden="true"></div>
+                    <header class="farm-map-snapshot-shell__head relative z-[1]">
+                        <span class="farm-map-snapshot-shell__glyph" aria-hidden="true">
+                            <i data-lucide="layout-dashboard" class="farm-map-snapshot-shell__lucide"></i>
+                        </span>
+                        <h2 id="farm-map-snapshot-heading" class="farm-map-snapshot-shell__title">Field snapshot</h2>
+                    </header>
+                    <div id="farm-map-summary-grid" class="farm-map-snapshot-grid relative z-[1]"></div>
                 </section>
 
                 <div id="farm-map-no-gps-hint" class="farm-map-no-gps-inline text-center text-xs text-slate-500 {{ $initialHasDeviceGps ? 'hidden' : '' }}">Save GPS to load map details.</div>

@@ -35,6 +35,22 @@
     if (strcasecmp($impactSummary, 'Plant rice now but prepare for rain on Wednesday') === 0) {
         $impactSummary = '';
     }
+    if (strcasecmp($impactSummary, 'Hold off on irrigation; rely on forecasted rains to keep rice seedlings moist') === 0) {
+        $impactSummary = '';
+    }
+    /* Badge uses main_recommendation; when it duplicates the morning plan (same irrigation tip), hide the pill — it still appears under Advice. */
+    if ($impactAiReady) {
+        $morningTip = trim((string) ($impactReco['today_plan']['morning'] ?? ''));
+        if ($morningTip !== '' && strcasecmp(trim($impactSummary), $morningTip) === 0) {
+            $impactSummary = '';
+        }
+    }
+    /* Explicit hide for common duplicate one-liners from the model */
+    if (
+        strcasecmp(rtrim(trim($impactSummary), '.'), 'Irrigate early morning to keep seedlings moist before afternoon heat') === 0
+    ) {
+        $impactSummary = '';
+    }
     $impactDetails = $impactAiReady
         ? array_values(array_filter(array_unique([
             trim((string) ($impactReco['why'] ?? '')),
@@ -71,8 +87,8 @@
 
     $clay = [
         'sun' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="cs" cx="32%" cy="28%" r="70%"><stop offset="0%" stop-color="#FFFBEB"/><stop offset="45%" stop-color="#FDE047"/><stop offset="100%" stop-color="#EAB308"/></radialGradient><filter id="ds"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".18"/></filter></defs><circle cx="24" cy="26" r="13" fill="url(#cs)" filter="url(#ds)"/><ellipse cx="19" cy="21" rx="5" ry="3" fill="#fff" opacity=".45"/></svg>',
-        'partly_cloudy' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="cs2" cx="30%" cy="25%" r="65%"><stop offset="0%" stop-color="#FEF9C3"/><stop offset="100%" stop-color="#FACC15"/></radialGradient><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#CBD5E1"/></linearGradient><filter id="ds2"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".16"/></filter></defs><circle cx="14" cy="16" r="8" fill="url(#cs2)" filter="url(#ds2)"/><ellipse cx="18" cy="14" rx="3" ry="2" fill="#fff" opacity=".5"/><ellipse cx="26" cy="30" rx="14" ry="10" fill="url(#cg)" filter="url(#ds2)"/><ellipse cx="20" cy="28" rx="9" ry="7" fill="#E2E8F0"/><ellipse cx="32" cy="29" rx="8" ry="6" fill="#F1F5F9"/></svg>',
-        'cloud' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="clg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F8FAFC"/><stop offset="100%" stop-color="#CBD5E1"/></linearGradient><filter id="dsc"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".15"/></filter></defs><ellipse cx="24" cy="28" rx="16" ry="11" fill="url(#clg)" filter="url(#dsc)"/><ellipse cx="16" cy="26" rx="10" ry="8" fill="#E2E8F0"/><ellipse cx="32" cy="26" rx="9" ry="7" fill="#F1F5F9"/></svg>',
+        'partly_cloudy' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><radialGradient id="cs2" cx="30%" cy="25%" r="65%"><stop offset="0%" stop-color="#FEF9C3"/><stop offset="100%" stop-color="#FACC15"/></radialGradient><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#BAE6FD"/><stop offset="100%" stop-color="#0EA5E9"/></linearGradient><filter id="ds2"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0369a1" flood-opacity=".22"/></filter></defs><circle cx="14" cy="16" r="8" fill="url(#cs2)" filter="url(#ds2)"/><ellipse cx="18" cy="14" rx="3" ry="2" fill="#fff" opacity=".5"/><ellipse cx="26" cy="30" rx="14" ry="10" fill="url(#cg)" filter="url(#ds2)"/><ellipse cx="20" cy="28" rx="9" ry="7" fill="#7DD3FC"/><ellipse cx="32" cy="29" rx="8" ry="6" fill="#0284C7"/></svg>',
+        'cloud' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="clg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#BAE6FD"/><stop offset="100%" stop-color="#0284C7"/></linearGradient><filter id="dsc"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0369a1" flood-opacity=".22"/></filter></defs><ellipse cx="24" cy="28" rx="16" ry="11" fill="url(#clg)" filter="url(#dsc)"/><ellipse cx="16" cy="26" rx="10" ry="8" fill="#7DD3FC"/><ellipse cx="32" cy="26" rx="9" ry="7" fill="#0369A1"/></svg>',
         'overcast' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="ov" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E2E8F0"/><stop offset="100%" stop-color="#94A3B8"/></linearGradient><filter id="dso"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0f172a" flood-opacity=".2"/></filter></defs><ellipse cx="24" cy="28" rx="17" ry="12" fill="url(#ov)" filter="url(#dso)"/><ellipse cx="15" cy="26" rx="11" ry="9" fill="#CBD5E1"/><ellipse cx="34" cy="27" rx="10" ry="8" fill="#94A3B8"/></svg>',
         'rain' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="rc" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F1F5F9"/><stop offset="100%" stop-color="#94A3B8"/></linearGradient><linearGradient id="rd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7DD3FC"/><stop offset="100%" stop-color="#38BDF8"/></linearGradient><filter id="dsr"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".16"/></filter></defs><ellipse cx="24" cy="22" rx="15" ry="10" fill="url(#rc)" filter="url(#dsr)"/><ellipse cx="17" cy="21" rx="9" ry="7" fill="#E2E8F0"/><path d="M16 34v8M24 32v9M32 34v7" stroke="url(#rd)" stroke-width="3.5" stroke-linecap="round" filter="url(#dsr)"/></svg>',
         'storm' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs><linearGradient id="stc" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E2E8F0"/><stop offset="100%" stop-color="#64748B"/></linearGradient><filter id="dst"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity=".18"/></filter></defs><ellipse cx="24" cy="22" rx="15" ry="10" fill="url(#stc)" filter="url(#dst)"/><path d="M22 28 L18 36h6l-3 8 10-12h-7l4-4z" fill="#FDE047" stroke="#EAB308" stroke-width="0.5" filter="url(#dst)"/></svg>',
@@ -129,7 +145,7 @@
 @section('main-class', 'pt-20')
 
 @section('content')
-    <section class="dashboard-shell py-4 sm:py-6 pb-24">
+    <section class="dashboard-shell dashboard-shell--dashboard-home py-4 sm:py-6 pb-24">
         <div class="dashboard-container max-w-3xl mx-auto px-4 sm:px-5 space-y-4 sm:space-y-5">
             @php
                 $weatherReco = is_array($recommendation ?? null) ? $recommendation : [];
@@ -218,37 +234,39 @@
                 @php
                     $condId = (int) ($weather['condition']['id'] ?? 800);
                     $condLabel = $weather['simple_label'] ?? \App\Http\Controllers\WeatherDetailsController::simpleWeatherLabel($condId);
-                    $snapshotSummary = $summary_message ?? 'Weather looks stable. Low chance of rain.';
                 @endphp
-                <article class="ag-card weather-snapshot overflow-hidden rounded-2xl border border-sky-200 bg-sky-50/85 p-3 shadow-sm sm:p-3.5" aria-label="Current weather snapshot">
-                    <div class="flex items-start justify-between gap-2.5">
-                        <div class="min-w-0">
-                            <p class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-700 transition-all duration-300 hover:tracking-[0.14em] hover:text-slate-900">
-                                <i data-lucide="cloud-sun" class="h-3.5 w-3.5 text-sky-600"></i>
-                                Current weather snapshot
-                            </p>
-                            <p class="mt-1.5 text-2xl font-extrabold leading-none text-slate-900 sm:text-3xl">{{ round((float) $weather['temp']) }}°C</p>
-                            <p class="mt-1 text-xs font-medium text-slate-600 sm:text-sm">{{ $condLabel }}</p>
+                {{-- Same compact shell as dashboard `weather-snapshot` (padding/radius); different layout + styling --}}
+                <section class="ag-card weather-snapshot weather-page__snap-layout overflow-hidden rounded-3xl border border-teal-200/70 bg-gradient-to-br from-teal-50/95 via-sky-50/88 to-indigo-50/50 p-3.5 shadow-sm sm:p-4" aria-label="Current weather snapshot">
+                    <div class="flex items-start gap-3">
+                        <div class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white to-teal-50 ring-1 ring-teal-100 shadow-sm sm:h-11 sm:w-11" aria-hidden="true">
+                            <img src="{{ $wImg($wWeatherKey((int) ($weather['condition']['id'] ?? 800))) }}" alt="" class="weather-clay-ic h-7 w-7 object-contain sm:h-8 sm:w-8" width="32" height="32" decoding="async">
                         </div>
-                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 sm:h-11 sm:w-11" aria-hidden="true">
-                            <img src="{{ $wImg($wWeatherKey((int) ($weather['condition']['id'] ?? 800))) }}" alt="" class="weather-clay-ic weather-clay-ic--hero" width="32" height="32" decoding="async">
-                        </span>
+                        <div class="min-w-0 flex-1 pt-0.5">
+                            <span class="inline-flex items-center gap-1 rounded-full border border-teal-200/80 bg-white/75 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-teal-900/85 shadow-sm">
+                                <i data-lucide="radio" class="h-3 w-3 shrink-0 text-teal-600"></i>
+                                Field snapshot
+                            </span>
+                            <div class="mt-1.5 flex flex-wrap items-end gap-x-2 gap-y-0.5">
+                                <p class="text-2xl font-extrabold leading-none tracking-tight text-slate-900 sm:text-3xl">{{ round((float) $weather['temp']) }}°C</p>
+                                <p class="max-w-[14rem] text-xs font-semibold leading-snug text-slate-600 sm:text-sm">{{ $condLabel }}</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mt-2.5 grid grid-cols-3 gap-1.5 sm:gap-2">
-                        <article class="rounded-xl border border-sky-100 bg-sky-50 px-2 py-1.5">
-                            <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Rain %</p>
-                            <p class="mt-0.5 text-xs font-semibold text-slate-900 sm:text-sm">{{ $rainStatValue }}</p>
+                    <div class="mt-2.5 flex divide-x divide-slate-200/90 overflow-hidden rounded-2xl border border-slate-200/85 bg-white/65 shadow-inner ring-1 ring-white/60" role="list">
+                        <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Rain</p>
+                            <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ $rainStatValue }}</p>
                         </article>
-                        <article class="rounded-xl border border-emerald-100 bg-emerald-50 px-2 py-1.5">
-                            <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Humidity</p>
-                            <p class="mt-0.5 text-xs font-semibold text-slate-900 sm:text-sm">{{ is_numeric($weather['humidity'] ?? null) ? ((int) round((float) $weather['humidity'])) . '%' : '—' }}</p>
+                        <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Humidity</p>
+                            <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ is_numeric($weather['humidity'] ?? null) ? ((int) round((float) $weather['humidity'])) . '%' : '—' }}</p>
                         </article>
-                        <article class="rounded-xl border border-violet-100 bg-violet-50 px-2 py-1.5">
-                            <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Wind</p>
-                            <p class="mt-0.5 text-xs font-semibold text-slate-900 sm:text-sm">{{ is_numeric($weather['wind_speed'] ?? null) ? round((float) $weather['wind_speed'], 1) . ' km/h' : '—' }}</p>
+                        <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Wind</p>
+                            <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ is_numeric($weather['wind_speed'] ?? null) ? round((float) $weather['wind_speed'], 1) . ' km/h' : '—' }}</p>
                         </article>
                     </div>
-                </article>
+                </section>
             @else
                 <article class="ag-card p-4 text-center weather-page__empty">
                     <img src="{{ $wImg('wifi_off') }}" alt="" class="weather-clay-ic weather-clay-ic--lg mx-auto opacity-90" width="48" height="48" decoding="async">

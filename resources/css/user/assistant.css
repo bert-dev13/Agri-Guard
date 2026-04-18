@@ -3612,7 +3612,7 @@ body.dashboard-page.assistant-page {
 
 @media (min-width: 640px) {
     .dashboard-page.assistant-page .assistant-cards {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.65rem;
     }
 }
@@ -3831,9 +3831,17 @@ body.dashboard-page.assistant-page {
     min-height: 2.75rem;
     display: inline-flex;
     align-items: center;
+    gap: 0.35rem;
     padding: 0.45rem 0.75rem;
     border-radius: 0.75rem;
     font-size: clamp(0.7rem, 0.62rem + 0.35vw, 0.8125rem);
+}
+
+.dashboard-page.assistant-page .assistant-quick-chip__ic {
+    display: inline-flex;
+    flex-shrink: 0;
+    font-size: 1.05em;
+    line-height: 1;
 }
 
 @media (min-width: 480px) {

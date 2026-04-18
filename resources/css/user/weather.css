@@ -135,6 +135,8 @@
     }
 }
 
+/* Weather `.weather-page__snap-layout`: box model comes from Blade/Tailwind only. */
+
 /* ---- Clay <img> icons (data URI SVGs) ---- */
 .weather-clay-ic {
     display: block;

@@ -102,10 +102,6 @@
     background: linear-gradient(90deg, rgb(20 184 166 / 0.95) 0%, rgb(56 189 248 / 0.95) 100%);
 }
 
-.rainfall-page-hero .dashboard-hero__subtitle-ic {
-    background: rgb(15 23 42 / 0.16);
-}
-
 .rainfall-page-hero .dashboard-hero__pill.rainfall-page-hero__pill {
     border-color: rgb(255 255 255 / 0.3);
     background: rgb(255 255 255 / 0.14);
@@ -546,27 +542,9 @@
 .rainfall-page__chart-head {
     display: flex;
     align-items: flex-start;
+    justify-content: space-between;
     gap: 12px;
     margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgb(226 232 240 / 0.95);
-}
-
-.rainfall-page__chart-title {
-    margin: 0;
-    font-size: 1.0625rem;
-    font-weight: 800;
-    color: #0f172a;
-    letter-spacing: -0.02em;
-}
-
-.rainfall-page__chart-sub {
-    margin: 4px 0 0;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #64748b;
-    line-height: 1.4;
-    max-width: 20rem;
 }
 
 .rainfall-page__unit-pill {
@@ -664,14 +642,6 @@
     color: #64748b;
     max-width: 16rem;
     line-height: 1.45;
-}
-
-.rainfall-page__chart-foot {
-    margin: 10px 0 0;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: #64748b;
-    line-height: 1.4;
 }
 
 @media (max-width: 640px) {
@@ -849,24 +819,6 @@
     margin-bottom: 10px;
 }
 
-.rainfall-page__risk--low {
-    background: #d1fae5;
-    color: #065f46;
-    border: 1px solid rgb(110 231 183 / 0.6);
-}
-
-.rainfall-page__risk--mid {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid rgb(253 230 138 / 0.7);
-}
-
-.rainfall-page__risk--high {
-    background: #ffe4e6;
-    color: #9f1239;
-    border: 1px solid rgb(254 205 211 / 0.8);
-}
-
 .dashboard-page.rainfall-page .rainfall-page__split-water {
     background: linear-gradient(160deg, #ecfeff 0%, #cffafe 100%);
     color: #0e7490;
@@ -914,36 +866,25 @@
     box-shadow: 0 4px 20px rgb(15 23 42 / 0.05);
 }
 
-/* History */
+/* History — neutral card + underline kicker (aligned with weather details sections); padding from Blade utilities */
 .rainfall-page__history-card {
-    padding: 14px 14px 16px;
-    border-radius: 18px;
-    border: 1px solid rgb(186 230 253 / 0.9);
-    background: linear-gradient(165deg, #f0f9ff 0%, #e0f2fe 52%, #f8fafc 100%);
-    box-shadow: 0 8px 24px rgb(14 116 144 / 0.08);
+    border-radius: 1.5rem;
+    border: 1px solid rgb(226 232 240);
+    background: rgb(248 250 252 / 0.95);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
 }
 
 .rainfall-page__history-head {
-    margin-bottom: 10px;
-    border-radius: 14px;
-    padding: 10px 12px;
-    border: 1px solid rgb(125 211 252 / 0.7);
-    background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%);
+    margin-bottom: 0.75rem;
+    padding: 0;
+    border: none;
+    background: none;
+    border-radius: 0;
 }
 
 .rainfall-page__history-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     margin: 0;
-    color: #fff;
-}
-
-.rainfall-page__history-sub {
-    margin: 4px 0 0;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: rgb(224 242 254 / 0.95);
+    color: #1e293b;
 }
 
 .rainfall-page__history-list {
@@ -1064,6 +1005,39 @@
         justify-self: stretch;
         text-align: center;
     }
+}
+
+/* Rainfall snapshot card — warmer depth + tinted strips; same Tailwind spacing as weather field snapshot */
+.dashboard-page.rainfall-page .rainfall-page__snap.weather-snapshot {
+    box-shadow:
+        0 1px 0 rgb(255 255 255 / 0.58) inset,
+        0 10px 36px rgb(14 165 233 / 0.09);
+}
+
+.rainfall-page__snap-icon {
+    box-shadow:
+        0 4px 14px rgb(34 211 238 / 0.22),
+        inset 0 1px 0 rgb(255 255 255 / 0.92);
+}
+
+.rainfall-page__snap-strip {
+    isolation: isolate;
+}
+
+.rainfall-page__snap-cell--sky {
+    background: linear-gradient(165deg, rgb(224 242 254 / 0.72) 0%, rgb(248 250 252 / 0.35) 100%);
+}
+
+.rainfall-page__snap-cell--mint {
+    background: linear-gradient(165deg, rgb(209 250 229 / 0.62) 0%, rgb(248 250 252 / 0.35) 100%);
+}
+
+.rainfall-page__snap-cell--violet {
+    background: linear-gradient(165deg, rgb(237 233 254 / 0.78) 0%, rgb(248 250 252 / 0.38) 100%);
+}
+
+.rainfall-page__snap-hero-val {
+    letter-spacing: -0.035em;
 }
 
 .dashboard-page.rainfall-page .dashboard-container > * {

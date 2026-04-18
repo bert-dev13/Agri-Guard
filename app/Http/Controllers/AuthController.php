@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AiRecommendationService;
 use App\Services\CropTimelineService;
 use App\Services\DashboardDisasterSummaryService;
+use App\Services\FarmRiskSnapshotService;
 use App\Services\WeatherAdvisoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -304,7 +305,8 @@ class AuthController extends Controller
     public function dashboard(
         WeatherAdvisoryService $weatherAdvisory,
         AiRecommendationService $aiRecommendationService,
-        DashboardDisasterSummaryService $dashboardSummaryService
+        DashboardDisasterSummaryService $dashboardSummaryService,
+        FarmRiskSnapshotService $riskSnapshotService
     )
     {
         $user = Auth::user();
@@ -433,11 +435,14 @@ class AuthController extends Controller
 
         $disasterSummary = $dashboardSummaryService->build($user, $advisoryData);
 
+        $riskSnapshot = $riskSnapshotService->buildFromWeather($user, $weather, $forecast);
+
         return view('user.dashboard', [
             'advisoryData' => $advisoryData,
             'recommendation' => $smartRecommendation['recommendation'],
             'recommendation_failed' => $smartRecommendation['failed'],
             'disasterSummary' => $disasterSummary,
+            'risk_snapshot' => $riskSnapshot,
         ]);
     }
 

@@ -60,13 +60,6 @@
             ? trim((string) $recommendation['ai_error'])
             : 'AI advisory temporarily unavailable.');
     $cpAiError = trim((string) ($recommendation['ai_error'] ?? ''));
-    $riskLevel = $cpAiOk ? (string) ($recommendation['risk_level'] ?? '') : '';
-    $riskKey = strtolower($riskLevel);
-    $adjustmentLabelClass = match (strtolower((string) ($timeline_adjustment_label ?? ''))) {
-        'growth is slower than expected' => 'cp-status-pill--amber',
-        'growing faster than typical for this season' => 'cp-status-pill--mint',
-        default => 'cp-status-pill--slate',
-    };
     $timelineItems = is_array($timeline ?? null) ? $timeline : [];
     $timelineCount = count($timelineItems);
     $currentIndex = 0;
@@ -77,6 +70,40 @@
         }
     }
     $progressPercent = $timelineCount > 1 ? (int) round(($currentIndex / ($timelineCount - 1)) * 100) : ($timelineCount === 1 ? 100 : 0);
+
+    $cpTimelineCurrentItem = null;
+    $cpTimelineNextItem = null;
+    foreach ($timelineItems as $idx => $stageItem) {
+        if (strtolower((string) ($stageItem['status'] ?? '')) === 'current') {
+            $cpTimelineCurrentItem = $stageItem;
+            for ($j = $idx + 1; $j < $timelineCount; $j++) {
+                $nj = $timelineItems[$j];
+                if (strtolower((string) ($nj['status'] ?? '')) !== 'completed') {
+                    $cpTimelineNextItem = $nj;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    $cpStageDateLine = static function (array $item) use ($user): ?string {
+        $dateLine = $item['date_range_line'] ?? null;
+        if ($dateLine === null && ! empty($item['target_date'])) {
+            try {
+                $dateLine = app(\App\Services\CropTimelineService::class)->formatStageTypicalWindow(
+                    (string) ($item['stage'] ?? ''),
+                    (string) $item['target_date'],
+                    (string) (($user ?? null)?->crop_type ?? '')
+                );
+            } catch (\Throwable) {
+                $dateLine = (string) ($item['target_date'] ?? '');
+            }
+        }
+        $dateLine = $dateLine !== null ? trim((string) $dateLine) : '';
+
+        return $dateLine !== '' ? $dateLine : null;
+    };
 
     $mainAdvice = $cpAiOk ? trim((string) ($recommendation['main_advice'] ?? '')) : '';
     $whatToDo = $cpAiOk ? $cpBulletItems($recommendation['what_to_do'] ?? null) : [];
@@ -144,7 +171,7 @@
 @section('main-class', 'pt-20')
 
 @section('content')
-    <section class="dashboard-shell py-4 sm:py-6 pb-24 cp-page-enter">
+    <section class="dashboard-shell dashboard-shell--dashboard-home py-4 sm:py-6 pb-24 cp-page-enter">
         <div class="dashboard-container max-w-3xl mx-auto px-4 sm:px-5 space-y-4 sm:space-y-5">
             @if (session('success'))
                 <div class="cp-flash-success flex items-center gap-3" role="alert">
@@ -175,15 +202,15 @@
                                 <h1 id="crop-progress-page-hero-heading" class="dashboard-hero__title">
                                     <span class="dashboard-hero__title-line">Crop Progress</span>
                                 </h1>
-                                <p class="dashboard-hero__subtitle crop-progress-page-hero__farm">
-                                    <span class="dashboard-hero__subtitle-ic" aria-hidden="true">
-                                        <i data-lucide="tractor" class="dashboard-hero__lucide dashboard-hero__lucide--xs"></i>
-                                    </span>
-                                    <span>{{ $farm_name }}</span>
-                                </p>
                             </div>
                         </div>
                         <div class="dashboard-hero__meta">
+                            <span class="dashboard-hero__pill crop-progress-page-hero__pill">
+                                <span class="dashboard-hero__pill-ic" aria-hidden="true">
+                                    <i data-lucide="tractor" class="dashboard-hero__lucide"></i>
+                                </span>
+                                <span class="dashboard-hero__pill-text">{{ $farm_name }}</span>
+                            </span>
                             <span class="dashboard-hero__pill crop-progress-page-hero__pill">
                                 <span class="dashboard-hero__pill-ic" aria-hidden="true">
                                     <i data-lucide="leaf" class="dashboard-hero__lucide"></i>
@@ -196,14 +223,6 @@
                                 </span>
                                 <time class="dashboard-hero__pill-text" datetime="{{ now()->toDateString() }}">{{ now()->format('l, F j, Y') }}</time>
                             </span>
-                            @if (!empty($planting_day_line))
-                                <span class="dashboard-hero__pill crop-progress-page-hero__pill">
-                                    <span class="dashboard-hero__pill-ic" aria-hidden="true">
-                                        <i data-lucide="calendar-range" class="dashboard-hero__lucide"></i>
-                                    </span>
-                                    <span class="dashboard-hero__pill-text text-left">{{ $planting_day_line }}</span>
-                                </span>
-                            @endif
                         </div>
                     </div>
                     <div class="dashboard-hero__aside">
@@ -231,231 +250,377 @@
                 </div>
             @endif
 
-            {{-- 2. Stage snapshot (calendar stage + planting + progress) --}}
-            <section class="ag-card cp-stage-highlight-card" aria-label="Current crop stage highlight">
-                <div class="cp-stage-highlight-card__head">
-                    <div class="cp-stage-highlight-card__lead">
-                        <span class="cp-stage-highlight-card__lead-ic" aria-hidden="true">
-                            <img src="{{ $cpImg('leaf_stage') }}" alt="" class="cp-stage-highlight-card__lead-img" width="44" height="44" decoding="async">
+            {{-- Stage snapshot — same section footprint as weather Field snapshot (hero row + stat strip only) --}}
+            <section
+                class="ag-card weather-snapshot weather-page__snap-layout cp-stage-snapshot overflow-hidden rounded-3xl border border-teal-200/70 bg-gradient-to-br from-teal-50/95 via-sky-50/88 to-indigo-50/50 p-3.5 shadow-sm sm:p-4"
+                aria-label="Current crop stage highlight"
+            >
+                <div class="flex items-start gap-3">
+                    <div class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white to-teal-50 ring-1 ring-teal-100 shadow-sm sm:h-11 sm:w-11" aria-hidden="true">
+                        <img src="{{ $cpImg('leaf_stage') }}" alt="" class="weather-clay-ic h-7 w-7 object-contain sm:h-8 sm:w-8" width="32" height="32" decoding="async">
+                    </div>
+                    <div class="min-w-0 flex-1 pt-0.5">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-teal-200/80 bg-white/75 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-teal-900/85 shadow-sm">
+                            <i data-lucide="sprout" class="h-3 w-3 shrink-0 text-teal-600"></i>
+                            Active stage
                         </span>
-                        <div class="cp-stage-highlight-card__titles">
-                            <p class="cp-stage-highlight-card__eyebrow">Stage</p>
-                            <p class="cp-stage-highlight-card__stage-name">{{ $current_stage_label }}</p>
-                            <p class="cp-stage-highlight-card__tagline">Growth lifecycle</p>
+                        <div class="mt-1.5 flex flex-wrap items-end gap-x-2 gap-y-0.5">
+                            <p class="text-2xl font-extrabold leading-none tracking-tight text-slate-900 sm:text-3xl">{{ $current_stage_label }}</p>
+                            <p class="max-w-[14rem] text-xs font-semibold leading-snug text-slate-600 sm:text-sm">Growth lifecycle</p>
                         </div>
                     </div>
-                    <span class="cp-stage-highlight-card__live-badge">
-                        <img src="{{ $cpImg('sprout') }}" alt="" class="cp-stage-highlight-card__live-ic" width="16" height="16" decoding="async">
-                        Active stage
-                    </span>
                 </div>
-
-                <div class="cp-stage-highlight-card__planting-row">
-                    <img src="{{ $cpImg('calendar') }}" alt="" class="cp-stage-highlight-card__planting-hero-ic" width="32" height="32" decoding="async" aria-hidden="true">
-                    <div class="cp-stage-highlight-card__planting-copy">
-                        <p class="cp-stage-highlight-card__planting-label">Planting date</p>
-                        @if (($has_planting_date ?? false) && ! empty($planting_date_formatted))
-                            <div class="cp-stage-highlight-card__date-line">
-                                <time class="cp-stage-highlight-card__planting-date" datetime="{{ $user->planting_date?->format('Y-m-d') }}">{{ $planting_date_formatted }}</time>
-                                <img src="{{ $cpImg('pin') }}" alt="" class="cp-stage-highlight-card__date-ic cp-stage-highlight-card__date-ic--end" width="18" height="18" decoding="async" aria-hidden="true">
-                            </div>
-                        @else
-                            <div class="cp-stage-highlight-card__date-line">
-                                <img src="{{ $cpImg('alert') }}" alt="" class="cp-stage-highlight-card__date-ic" width="18" height="18" decoding="async" aria-hidden="true">
-                                <span class="cp-stage-highlight-card__planting-date cp-stage-highlight-card__planting-date--empty">Not set — add it in Farm Settings</span>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-
-                <div class="cp-stage-highlight-card__progress-block">
-                    <div class="cp-stage-highlight-card__progress-head">
-                        <span class="cp-stage-highlight-card__progress-label">Progress</span>
-                        <span class="cp-stage-highlight-card__progress-pct">{{ (int) $progressPercent }}%</span>
-                    </div>
-                    <div
-                        class="cp-stage-highlight-card__track"
-                        role="progressbar"
-                        aria-valuemin="0"
-                        aria-valuemax="100"
-                        aria-valuenow="{{ (int) $progressPercent }}"
-                        aria-label="Crop timeline progress"
-                    >
-                        <div class="cp-stage-highlight-card__fill" @style(['width' => ((int) $progressPercent).'%'])></div>
-                    </div>
-                </div>
-
-                <div class="cp-stage-highlight-card__stats">
-                    <article class="cp-stage-highlight-card__stat">
-                        <p class="cp-stage-highlight-card__stat-label">Growth speed</p>
-                        <p class="cp-stage-highlight-card__stat-value">{{ ucfirst($growthSpeed) }}</p>
+                <div class="mt-2.5 flex divide-x divide-slate-200/90 overflow-hidden rounded-2xl border border-slate-200/85 bg-white/65 shadow-inner ring-1 ring-white/60" role="list">
+                    <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Growth speed</p>
+                        <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ ucfirst($growthSpeed) }}</p>
                     </article>
-                    <article class="cp-stage-highlight-card__stat">
-                        <p class="cp-stage-highlight-card__stat-label">Confidence</p>
-                        <p class="cp-stage-highlight-card__stat-value">{{ $stageConfidence['label'] ?? 'Medium' }}</p>
+                    <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Confidence</p>
+                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ $stageConfidence['label'] ?? 'Medium' }}</p>
                     </article>
-                    <article class="cp-stage-highlight-card__stat">
-                        <p class="cp-stage-highlight-card__stat-label">Timeline</p>
-                        <p class="cp-stage-highlight-card__stat-value">{{ (int) $progressPercent }}%</p>
-                        <p class="cp-stage-highlight-card__stat-hint">Along growth stages</p>
+                    <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Timeline</p>
+                        <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ (int) $progressPercent }}%</p>
                     </article>
                 </div>
             </section>
 
-            {{-- 2. AI Smart Advisory (hero) --}}
-            <section class="ag-card dash-smart cp-smart-panel cp-smart-hero" aria-label="Smart advice for this stage">
-                <div class="cp-smart-hero__status-row dash-smart__debug">
+            {{-- Planting & progress: compact card with date + timeline progress --}}
+            <section class="ag-card cp-planting-progress cp-planting-progress--enter" aria-labelledby="cp-planting-progress-heading">
+                <div class="cp-planting-progress__ambient" aria-hidden="true"></div>
+                <div class="cp-planting-progress__inner">
+                    <div class="cp-planting-progress__head">
+                        <span class="cp-planting-progress__head-icon" aria-hidden="true">
+                            <i data-lucide="calendar-range" class="cp-planting-progress__lucide-head"></i>
+                        </span>
+                        <h2 id="cp-planting-progress-heading" class="cp-planting-progress__title">Planting &amp; progress</h2>
+                    </div>
+                    <div class="cp-planting-progress__grid">
+                        <div class="cp-planting-progress__date">
+                            <span class="cp-planting-progress__label">Planting date</span>
+                            @if (($has_planting_date ?? false) && ! empty($planting_date_formatted))
+                                <div class="cp-planting-progress__date-row">
+                                    <time class="cp-planting-progress__time" datetime="{{ $user->planting_date?->format('Y-m-d') }}">{{ $planting_date_formatted }}</time>
+                                    <img src="{{ $cpImg('pin') }}" alt="" class="weather-clay-ic cp-planting-progress__pin" width="18" height="18" decoding="async" aria-hidden="true">
+                                </div>
+                            @else
+                                <div class="cp-planting-progress__date-row cp-planting-progress__date-row--missing">
+                                    <img src="{{ $cpImg('alert') }}" alt="" class="weather-clay-ic cp-planting-progress__alert-ic" width="18" height="18" decoding="async" aria-hidden="true">
+                                    <span class="cp-planting-progress__missing">Not set — Farm Settings</span>
+                                </div>
+                            @endif
+                        </div>
+                        <div class="cp-planting-progress__meter">
+                            <div class="cp-planting-progress__meter-top">
+                                <span class="cp-planting-progress__label">Cycle progress</span>
+                                <span class="cp-planting-progress__pct">{{ (int) $progressPercent }}%</span>
+                            </div>
+                            <div
+                                class="cp-planting-progress__track"
+                                role="progressbar"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                                aria-valuenow="{{ (int) $progressPercent }}"
+                                aria-label="Estimated progress through crop cycle"
+                            >
+                                <span class="cp-planting-progress__fill cp-progress-line-fill" @style(['width: '.((int) $progressPercent).'%'])></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {{-- AI Smart Advisory — same section pattern as weather-details (emerald smart card + slate blocks + plan rows + split grid) --}}
+            <article class="ag-card dash-smart weather-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5" aria-label="AI smart advisory">
+                <div class="dash-smart__debug">
                     <p class="text-xs font-semibold text-slate-700">
-                        @if ($cpAiStatus === 'success' && empty($recommendation_failed))
+                        @if ($cpAiOk)
                             <span class="text-emerald-700">AI Smart Advisory: Active</span>
+                        @elseif ($cpAiStatus === 'missing_context')
+                            <span class="text-amber-800">AI Smart Advisory: Profile incomplete</span>
                         @else
                             <span class="text-rose-700">AI Smart Advisory: Unavailable</span>
                         @endif
                     </p>
-                    @if ($cpAiStatus !== 'success' && $cpAiError !== '')
-                        <p class="text-xs text-slate-600 mt-1">Error: {{ $cpAiError }}</p>
+                    @if (! $cpAiOk && $cpAiError !== '')
+                        <p class="mt-1 text-xs text-slate-600">Error: {{ $cpAiError }}</p>
                     @endif
                 </div>
 
-                <header class="cp-smart-head cp-smart-hero__head">
-                    <div class="cp-smart-head__left">
-                        <h2 class="cp-smart-title">
-                            <img src="{{ $cpImg('brain') }}" alt="" class="weather-clay-ic weather-clay-ic--title" width="18" height="18" decoding="async">
-                            AI Smart Advisory
-                        </h2>
-                        <p class="cp-smart-sub">Tailored to your current growth stage</p>
+                <div class="dash-smart__head">
+                    <div class="dash-smart__title-wrap">
+                        <span class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-extrabold uppercase tracking-[0.1em] text-slate-700 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
+                            <i data-lucide="sparkles" class="h-3.5 w-3.5 text-emerald-600"></i>
+                            Smart action
+                        </span>
                     </div>
-                    <div class="cp-smart-badges">
-                        @if ($cpAiOk && $riskLevel !== '')
-                            <span class="dash-smart__badge dash-smart__badge--risk-{{ $riskKey === 'high' ? 'high' : ($riskKey === 'low' ? 'low' : 'mid') }}">
-                                {{ $riskLevel }} risk
+                </div>
+                <div class="dash-smart__body">
+                    <p class="dash-smart__action">{{ $cpAiOk ? $smartActionLine : $cpAiMsg }}</p>
+                </div>
+            </article>
+
+            @if ($cpAiOk)
+                <section class="ag-card cp-advice-compact relative overflow-hidden rounded-2xl border border-violet-200/50 bg-gradient-to-br from-violet-50/95 via-white to-emerald-50/50 shadow-lg shadow-violet-500/10 ring-1 ring-violet-100/90 sm:rounded-[1.35rem]" aria-label="Advice and next steps">
+                    <div class="cp-advice-compact__ambient" aria-hidden="true"></div>
+                    <div class="cp-advice-compact__sheen" aria-hidden="true"></div>
+
+                    <div class="relative space-y-3 px-3 py-3.5 sm:space-y-3.5 sm:px-4 sm:py-4">
+                        <div class="cp-advice-compact__segment cp-advice-compact__segment--summary cp-advice-compact__stagger cp-advice-compact__stagger--1 rounded-xl border border-violet-100/90 bg-white/85 p-3 shadow-sm backdrop-blur-[2px]">
+                            <div class="flex items-center gap-2">
+                                <span class="cp-advice-compact__icon-ring cp-advice-compact__icon-ring--violet">
+                                    <img src="{{ $cpImg('bulb') }}" alt="" class="h-4 w-4 object-contain" width="16" height="16" decoding="async">
+                                </span>
+                                <h2 class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-violet-900/85">Advice summary</h2>
+                            </div>
+                            <p class="cp-advice-compact__prose mt-2 text-[13px] leading-relaxed text-slate-700">
+                                {{ $mainAdvice !== '' ? $mainAdvice : 'No summary returned for this stage yet.' }}
+                            </p>
+                        </div>
+
+                        @if (count($whatToDoRest) > 0)
+                            <div class="cp-advice-compact__segment cp-advice-compact__segment--do cp-advice-compact__stagger cp-advice-compact__stagger--2 rounded-xl border border-emerald-100/95 bg-gradient-to-br from-emerald-50/90 to-white/95 p-3 shadow-sm ring-1 ring-emerald-100/70">
+                                <div class="flex items-center gap-2">
+                                    <span class="cp-advice-compact__icon-ring cp-advice-compact__icon-ring--emerald">
+                                        <img src="{{ $cpImg('sprout') }}" alt="" class="h-4 w-4 object-contain" width="16" height="16" decoding="async">
+                                    </span>
+                                    <h3 class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-emerald-900/85">What to do</h3>
+                                </div>
+                                <ul class="cp-advice-compact__task-list mt-2.5 space-y-2">
+                                    @foreach ($whatToDoRest as $line)
+                                        <li class="cp-advice-compact__task">
+                                            <span class="cp-advice-compact__task-dot" aria-hidden="true"></span>
+                                            <span class="cp-advice-compact__task-text">{{ $line }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+
+                        <div class="cp-advice-compact__segment cp-advice-compact__segment--watch cp-advice-compact__stagger cp-advice-compact__stagger--3 rounded-xl border border-sky-200/80 bg-gradient-to-br from-sky-50/95 to-indigo-50/40 p-3 shadow-md ring-1 ring-sky-100/80">
+                            <div class="flex items-center gap-2">
+                                <span class="cp-advice-compact__icon-ring cp-advice-compact__icon-ring--sky">
+                                    <img src="{{ $cpImg('eye') }}" alt="" class="h-4 w-4 object-contain" width="16" height="16" decoding="async">
+                                </span>
+                                <h3 class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-sky-950/90">What to watch</h3>
+                            </div>
+                            @if (count($whatToWatch) > 0)
+                                <div class="cp-advice-compact__watch-body mt-2.5 space-y-2">
+                                    @foreach ($whatToWatch as $line)
+                                        <p class="cp-advice-compact__watch-line relative rounded-lg border border-sky-100/70 bg-white/75 px-2.5 py-2 text-[13px] leading-snug text-slate-700 shadow-sm">{{ $line }}</p>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="mt-2 text-[13px] text-slate-500">No watch items for this stage.</p>
+                            @endif
+                        </div>
+                    </div>
+                </section>
+            @else
+                <section class="ag-card cp-advice-compact cp-advice-compact--muted relative overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-50/95 p-4 shadow-inner sm:p-4" aria-label="Advice unavailable">
+                    <div class="flex items-center gap-2">
+                        <span class="cp-advice-compact__icon-ring cp-advice-compact__icon-ring--slate">
+                            <img src="{{ $cpImg('bulb') }}" alt="" class="h-4 w-4 object-contain opacity-90" width="16" height="16" decoding="async">
+                        </span>
+                        <h2 class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-600">Advice summary</h2>
+                    </div>
+                    <p class="cp-advice-compact__prose mt-2 text-[13px] leading-relaxed text-slate-600">{{ $cpAiMsg }}</p>
+                </section>
+            @endif
+
+            <section class="cp-insight-split grid gap-3 sm:grid-cols-2 sm:gap-4" aria-label="What to avoid and why this matters">
+                <article class="cp-insight-card cp-insight-card--avoid cp-insight-card--enter cp-insight-card--enter-1 ag-card relative overflow-hidden rounded-[1.35rem] border border-rose-200/85 bg-gradient-to-br from-rose-50/98 via-white to-amber-50/45 shadow-lg shadow-rose-500/10 ring-1 ring-rose-100/90">
+                    <div class="cp-insight-card__ambient cp-insight-card__ambient--rose" aria-hidden="true"></div>
+                    <div class="cp-insight-card__sheen cp-insight-card__sheen--warm" aria-hidden="true"></div>
+                    <div class="relative z-[1] p-4 sm:p-5">
+                        <header class="flex items-start gap-3">
+                            <span class="cp-insight-card__ring cp-insight-card__ring--rose">
+                                <img src="{{ $cpImg('alert') }}" alt="" class="h-[18px] w-[18px] object-contain" width="18" height="18" decoding="async">
                             </span>
-                        @endif
-                    </div>
-                </header>
-
-                <div class="cp-smart-action-callout">
-                    <span class="cp-smart-action-callout__chip" aria-hidden="true">🔥 Smart action</span>
-                    <p class="cp-smart-action-callout__text">
+                            <div class="min-w-0 pt-0.5">
+                                <h2 class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-rose-950/90">What to avoid</h2>
+                                <p class="mt-0.5 text-[10px] font-semibold text-rose-800/65">Actions to skip for today</p>
+                            </div>
+                        </header>
                         @if ($cpAiOk)
-                            {{ $smartActionLine }}
-                        @else
-                            {{ $cpAiMsg }}
-                        @endif
-                    </p>
-                </div>
-
-                <div class="cp-smart-summary cp-smart-hero__summary">
-                    <div class="cp-smart-summary__head">
-                        <img src="{{ $cpImg('bulb') }}" alt="" class="weather-clay-ic weather-clay-ic--plan" width="22" height="22" decoding="async">
-                        <h3 class="cp-smart-block-title">Advice summary</h3>
-                    </div>
-                    <p class="cp-smart-summary__text">
-                        @if ($cpAiOk)
-                            {{ $mainAdvice }}
-                        @else
-                            {{ $cpAiMsg }}
-                        @endif
-                    </p>
-                </div>
-
-                <div class="cp-smart-grid">
-                    <article class="cp-smart-block cp-smart-block--do">
-                        <div class="cp-smart-block__head">
-                            <img src="{{ $cpImg('sprout') }}" alt="" class="weather-clay-ic weather-clay-ic--inline" width="18" height="18" decoding="async">
-                            <h3 class="cp-smart-block-title">What to do</h3>
-                        </div>
-                        <ul class="cp-advice-list">
-                            @if ($cpAiOk)
-                                @forelse ($whatToDoRest as $line)
-                                    <li>{{ $line }}</li>
-                                @empty
-                                @endforelse
-                            @else
-                                <li class="text-slate-500">{{ $cpAiMsg }}</li>
-                            @endif
-                        </ul>
-                    </article>
-                    <article class="cp-smart-block cp-smart-block--watch">
-                        <div class="cp-smart-block__head">
-                            <img src="{{ $cpImg('eye') }}" alt="" class="weather-clay-ic weather-clay-ic--inline" width="18" height="18" decoding="async">
-                            <h3 class="cp-smart-block-title">What to watch</h3>
-                        </div>
-                        <ul class="cp-advice-list">
-                            @if ($cpAiOk)
-                                @forelse ($whatToWatch as $line)
-                                    <li>{{ $line }}</li>
-                                @empty
-                                @endforelse
-                            @else
-                                <li class="text-slate-500">{{ $cpAiMsg }}</li>
-                            @endif
-                        </ul>
-                    </article>
-                    <article class="cp-smart-block cp-smart-block--avoid">
-                        <div class="cp-smart-block__head">
-                            <img src="{{ $cpImg('alert') }}" alt="" class="weather-clay-ic weather-clay-ic--inline" width="18" height="18" decoding="async">
-                            <h3 class="cp-smart-block-title">What to avoid</h3>
-                        </div>
-                        <ul class="cp-advice-list">
-                            @if ($cpAiOk)
+                            <ul class="cp-insight-card__list mt-5 space-y-2 sm:mt-6">
                                 @forelse ($whatToAvoid as $line)
-                                    <li>{{ $line }}</li>
+                                    <li class="cp-insight-card__avoid-row">
+                                        <span class="cp-insight-card__avoid-mark" aria-hidden="true"></span>
+                                        <span class="cp-insight-card__avoid-text">{{ $line }}</span>
+                                    </li>
                                 @empty
+                                    <li class="cp-insight-card__empty">Nothing specific to avoid right now.</li>
                                 @endforelse
-                            @else
-                                <li class="text-slate-500">{{ $cpAiMsg }}</li>
-                            @endif
-                        </ul>
-                    </article>
-                    <article class="cp-smart-block cp-smart-block--why">
-                        <div class="cp-smart-block__head">
-                            <img src="{{ $cpImg('bulb') }}" alt="" class="weather-clay-ic weather-clay-ic--inline" width="18" height="18" decoding="async">
-                            <h3 class="cp-smart-block-title">Why this matters</h3>
-                        </div>
-                        <p class="cp-smart-why-text">
-                            @if ($cpAiOk)
-                                {{ $whyThisMatters }}
-                            @else
-                                {{ $cpAiMsg }}
-                            @endif
-                        </p>
-                    </article>
-                </div>
+                            </ul>
+                        @else
+                            <p class="cp-insight-card__fallback mt-5 text-[13px] leading-relaxed text-slate-600 sm:mt-6">{{ $cpAiMsg }}</p>
+                        @endif
+                    </div>
+                </article>
 
-                @if ($showAiDebug && ! empty($recommendation['ai_error'] ?? ''))
-                    <p class="cp-smart-debug text-xs text-slate-600 mt-3">{{ $recommendation['ai_error'] }}</p>
-                @endif
+                <article class="cp-insight-card cp-insight-card--why cp-insight-card--enter cp-insight-card--enter-2 ag-card relative overflow-hidden rounded-[1.35rem] border border-violet-200/80 bg-gradient-to-br from-violet-50/95 via-fuchsia-50/25 to-indigo-50/40 shadow-lg shadow-violet-500/10 ring-1 ring-violet-100/85">
+                    <div class="cp-insight-card__ambient cp-insight-card__ambient--violet" aria-hidden="true"></div>
+                    <div class="cp-insight-card__sheen cp-insight-card__sheen--cool" aria-hidden="true"></div>
+                    <div class="relative z-[1] p-4 sm:p-5">
+                        <header class="flex items-start gap-3">
+                            <span class="cp-insight-card__ring cp-insight-card__ring--violet">
+                                <img src="{{ $cpImg('bulb') }}" alt="" class="h-[18px] w-[18px] object-contain" width="18" height="18" decoding="async">
+                            </span>
+                            <div class="min-w-0 pt-0.5">
+                                <h2 class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-violet-950/90">Why this matters</h2>
+                                <p class="mt-0.5 text-[10px] font-semibold text-violet-800/65">Context behind the guidance</p>
+                            </div>
+                        </header>
+                        @if ($cpAiOk)
+                            <div class="cp-insight-card__why-panel mt-5 sm:mt-6">
+                                <p class="cp-insight-card__why-text">
+                                    {{ $whyThisMatters !== '' ? $whyThisMatters : '—' }}
+                                </p>
+                            </div>
+                        @else
+                            <p class="cp-insight-card__fallback mt-5 text-[13px] leading-relaxed text-slate-600 sm:mt-6">{{ $cpAiMsg }}</p>
+                        @endif
+                    </div>
+                </article>
             </section>
 
-            {{-- 4. Growth timeline (visual stepper) --}}
-            <section class="ag-card cp-tracker-card" aria-label="Growth timeline">
-                <h2 class="cp-section-title">Growth timeline</h2>
-                <p class="cp-section-lead cp-tracker-card__lead">Stages for your crop — current step is highlighted.</p>
-                <div class="cp-tracker" role="list">
-                    @php
-                        $trackerKeys = array_keys($trackerStages);
-                        $userIdx = array_search($userStageKey, $trackerKeys, true);
-                        $userIdx = $userIdx === false ? 0 : (int) $userIdx;
-                    @endphp
-                    @foreach ($trackerStages as $key => $meta)
+            @if ($showAiDebug && ! empty($recommendation['ai_error'] ?? ''))
+                <p class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">{{ $recommendation['ai_error'] }}</p>
+            @endif
+
+            {{-- Crop Growth Timeline: update stage + stepper + progress + current/next dates --}}
+            <section class="ag-card cp-growth-timeline" aria-labelledby="cp-stage-update-heading cp-growth-timeline-heading">
+                <div class="cp-growth-timeline__update">
+                    <h2 id="cp-stage-update-heading" class="cp-section-title">Update stage</h2>
+                    <form class="cp-override-form cp-growth-timeline__override-form" method="post" action="{{ route('crop-progress.update-current-stage') }}" id="cp-stage-override-form">
+                        @csrf
+                        @method('PUT')
+                        <div class="cp-growth-timeline__field-group">
+                            <label for="cp-stage-select" class="cp-growth-timeline__field-label">Current growth stage</label>
+                            <select name="farming_stage" id="cp-stage-select" class="cp-stage-select">
+                                @php
+                                    $cpNormalizedStage = app(\App\Services\CropTimelineService::class)->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
+                                @endphp
+                                @foreach ($stages as $key => $label)
+                                    <option value="{{ $key }}" @selected($cpNormalizedStage === $key)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <button type="submit" class="cp-btn cp-btn--secondary">Apply</button>
+                    </form>
+                </div>
+
+                <h2 id="cp-growth-timeline-heading" class="cp-growth-timeline__title cp-growth-timeline__title--timeline">Crop Growth Timeline</h2>
+
+                <div class="cp-growth-timeline__stepper-scroll">
+                    <div class="cp-tracker" role="list">
                         @php
-                            $kIdx = array_search($key, $trackerKeys, true);
-                            $kIdx = $kIdx === false ? 0 : (int) $kIdx;
-                            $isHere = $userStageKey === $key;
-                            $isPast = $kIdx < $userIdx;
+                            $trackerKeys = array_keys($trackerStages);
+                            $userIdx = array_search($userStageKey, $trackerKeys, true);
+                            $userIdx = $userIdx === false ? 0 : (int) $userIdx;
                         @endphp
-                        <div class="cp-tracker-node {{ $isHere ? 'cp-tracker-node--here' : '' }} {{ $isPast ? 'cp-tracker-node--past' : '' }}" role="listitem">
-                            <span class="cp-tracker-emoji" aria-hidden="true">{{ $meta['emoji'] }}</span>
-                            <span class="cp-tracker-label">{{ $meta['label'] }}</span>
-                            @if ($isHere)
-                                <span class="cp-tracker-here">You are here</span>
+                        @foreach ($trackerStages as $key => $meta)
+                            @php
+                                $kIdx = array_search($key, $trackerKeys, true);
+                                $kIdx = $kIdx === false ? 0 : (int) $kIdx;
+                                $isHere = $userStageKey === $key;
+                                $isPast = $kIdx < $userIdx;
+                            @endphp
+                            <div class="cp-tracker-node {{ $isHere ? 'cp-tracker-node--here cp-growth-timeline__node--current' : '' }} {{ $isPast ? 'cp-tracker-node--past' : '' }}" role="listitem">
+                                <span class="cp-tracker-emoji" aria-hidden="true">{{ $meta['emoji'] }}</span>
+                                <span class="cp-tracker-label">{{ $meta['label'] }}</span>
+                                @if ($isHere)
+                                    <span class="cp-tracker-here">Current</span>
+                                @endif
+                            </div>
+                            @if (! $loop->last)
+                                <span class="cp-tracker-connector" aria-hidden="true"></span>
+                            @endif
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="cp-growth-timeline__progress-block">
+                    <div class="cp-growth-timeline__progress-row">
+                        <span class="cp-growth-timeline__progress-label">Progress</span>
+                        <span class="cp-growth-timeline__progress-pct">{{ (int) $progressPercent }}%</span>
+                    </div>
+                    <div
+                        class="cp-growth-timeline__track"
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="{{ (int) $progressPercent }}"
+                        aria-label="Crop cycle progress"
+                    >
+                        <span class="cp-growth-timeline__fill cp-progress-line-fill" @style(['width: '.((int) $progressPercent).'%'])></span>
+                    </div>
+                </div>
+
+                @php
+                    $curTitle = $cpTimelineCurrentItem ? (string) ($cpTimelineCurrentItem['stage'] ?? '') : (string) $current_stage_label;
+                    $curEmoji = $timelineStageEmoji($curTitle !== '' ? $curTitle : (string) $current_stage_label);
+                    $curDates = $cpTimelineCurrentItem ? $cpStageDateLine($cpTimelineCurrentItem) : null;
+
+                    $nextTitle = $cpTimelineNextItem
+                        ? (string) ($cpTimelineNextItem['stage'] ?? '')
+                        : (string) ($next_stage ?? '');
+                    $nextEmoji = $nextTitle !== ''
+                        ? $timelineStageEmoji($nextTitle)
+                        : ($next_stage ? $timelineStageEmoji((string) $next_stage) : '🌿');
+                    $nextDates = $cpTimelineNextItem
+                        ? $cpStageDateLine($cpTimelineNextItem)
+                        : null;
+                    if ($nextDates === null && ! empty($next_stage_date_range)) {
+                        $nextDates = trim((string) $next_stage_date_range);
+                    }
+                    if ($nextDates === null && ! empty($next_stage_target_date)) {
+                        try {
+                            $nextDates = app(\App\Services\CropTimelineService::class)->formatStageTypicalWindow(
+                                (string) ($next_stage ?? ''),
+                                (string) $next_stage_target_date,
+                                (string) (($user ?? null)?->crop_type ?? '')
+                            );
+                        } catch (\Throwable) {
+                            $nextDates = null;
+                        }
+                    }
+                    $showNextBlock = trim($nextTitle) !== '';
+                @endphp
+
+                <div class="cp-growth-timeline__details">
+                    <div class="cp-growth-timeline__detail cp-growth-timeline__detail--current">
+                        <div class="cp-growth-timeline__detail-head">
+                            <span class="cp-growth-timeline__detail-emoji" aria-hidden="true">{{ $curEmoji }}</span>
+                            <div class="cp-growth-timeline__detail-text">
+                                <p class="cp-growth-timeline__detail-name">{{ $curTitle !== '' ? $curTitle : $current_stage_label }}</p>
+                                <span class="cp-growth-timeline__detail-badge">Current</span>
+                            </div>
+                        </div>
+                        @if ($curDates)
+                            <p class="cp-growth-timeline__detail-dates">{{ $curDates }}</p>
+                        @endif
+                    </div>
+
+                    @if ($showNextBlock)
+                        <div class="cp-growth-timeline__detail cp-growth-timeline__detail--next">
+                            <p class="cp-growth-timeline__next-label">Next</p>
+                            <div class="cp-growth-timeline__detail-head">
+                                <span class="cp-growth-timeline__detail-emoji" aria-hidden="true">{{ $nextEmoji }}</span>
+                                <div class="cp-growth-timeline__detail-text">
+                                    <p class="cp-growth-timeline__detail-name">{{ $nextTitle }}</p>
+                                </div>
+                            </div>
+                            @if ($nextDates)
+                                <p class="cp-growth-timeline__detail-dates">{{ $nextDates }}</p>
+                            @endif
+                            @if (is_numeric($days_remaining ?? null))
+                                <p class="cp-growth-timeline__days-left">≈ {{ (int) $days_remaining }} days to next stage</p>
                             @endif
                         </div>
-                        @if (!$loop->last)
-                            <span class="cp-tracker-connector" aria-hidden="true"></span>
-                        @endif
-                    @endforeach
+                    @endif
                 </div>
             </section>
 
@@ -480,184 +645,64 @@
                 </div>
             @endif
 
-            {{-- 6. Update stage (action) --}}
-            <section class="ag-card cp-override-card" aria-label="Update current stage">
-                <h2 class="cp-section-title">Update stage</h2>
-                <p class="cp-section-lead">Override if the field is ahead or behind — we’ll refresh dates and advice.</p>
-                <form class="cp-override-form" method="post" action="{{ route('crop-progress.update-current-stage') }}" id="cp-stage-override-form">
-                    @csrf
-                    @method('PUT')
-                    <label class="cp-sr-only" for="cp-stage-select">Current growth stage</label>
-                    <select name="farming_stage" id="cp-stage-select" class="cp-stage-select">
-                        @php
-                            $cpNormalizedStage = app(\App\Services\CropTimelineService::class)->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
-                        @endphp
-                        @foreach ($stages as $key => $label)
-                            <option value="{{ $key }}" @selected($cpNormalizedStage === $key)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <button type="submit" class="cp-btn cp-btn--secondary">Apply</button>
-                </form>
-            </section>
-
-            {{-- 7. Detailed timeline (date ranges & stage breakdown) --}}
-            <section class="ag-card cp-detailed-timeline" aria-labelledby="cp-detailed-timeline-heading">
-                <h2 id="cp-detailed-timeline-heading" class="cp-section-title cp-detailed-timeline__title">
-                    <span aria-hidden="true">📅</span>
-                    Detailed timeline
-                </h2>
-                <p class="cp-section-lead cp-detailed-timeline__lead">Date ranges and stage breakdown</p>
-                <div class="cp-detailed-timeline__body">
-                    <section class="cp-timeline-card cp-timeline-card--nested" aria-labelledby="cp-timeline-heading">
-                        <div class="cp-timeline-card__head">
-                            <h3 id="cp-timeline-heading" class="cp-timeline-card__title">
-                                <img src="{{ $cpImg('chart') }}" alt="" class="weather-clay-ic weather-clay-ic--title" width="18" height="18" decoding="async">
-                                Estimated timeline
-                            </h3>
-                            <div class="cp-timeline-card__meta">
-                                <img src="{{ $cpImg('clock') }}" alt="" class="weather-clay-ic weather-clay-ic--xs" width="14" height="14" decoding="async">
-                                <span class="cp-timeline-pill">{{ $progressPercent }}% along</span>
-                            </div>
-                        </div>
-                        <p class="cp-timeline-intro">Each row starts from your saved planting date for that stage; typical lengths follow your crop profile. Weather may shift when stages end in the field.</p>
-                        <div class="cp-progress-block">
-                            <div class="cp-progress-block__labels">
-                                <span class="cp-progress-block__lbl">Progress</span>
-                                <span class="cp-progress-block__pct">{{ $progressPercent }}%</span>
-                            </div>
-                            <div class="cp-progress-block__track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $progressPercent }}" aria-label="Overall crop stage progress">
-                                <span class="cp-progress-block__fill cp-progress-line-fill" @style(['width: '.$progressPercent.'%'])></span>
-                            </div>
-                        </div>
-                        <div class="cp-timeline-shell">
-                            <div class="cp-progress-line" aria-hidden="true">
-                                <span class="cp-progress-line-fill" @style(['width: '.$progressPercent.'%'])></span>
-                            </div>
-                            <div class="cp-stage-row" role="list">
-                                @foreach ($timelineItems as $idx => $item)
-                                    @php
-                                        $state = strtolower((string) ($item['status'] ?? 'upcoming'));
-                                        $dayMark = (int) (($item['estimated_day_count'] ?? 0) / 1);
-                                        $dateLine = $item['date_range_line'] ?? null;
-                                        if ($dateLine === null && ! empty($item['target_date'])) {
-                                            try {
-                                                $dateLine = app(\App\Services\CropTimelineService::class)->formatStageTypicalWindow(
-                                                    (string) ($item['stage'] ?? ''),
-                                                    (string) $item['target_date'],
-                                                    (string) (($user ?? null)?->crop_type ?? '')
-                                                );
-                                            } catch (\Throwable) {
-                                                $dateLine = (string) ($item['target_date'] ?? '');
-                                            }
-                                        }
-                                        $stageTitle = $item['stage'] ?? 'Stage';
-                                        $stEmoji = $timelineStageEmoji($stageTitle);
-                                        $miniFillPct = ($state === 'completed' || $state === 'current') ? 100 : 0;
-                                    @endphp
-                                    <article class="cp-stage-node cp-stage-{{ $state }} cp-reveal" @style(['--stagger: '.($idx * 70).'ms']) role="listitem">
-                                        <span class="cp-stage-marker" aria-hidden="true">
-                                            @if ($state === 'completed')
-                                                <img src="{{ $cpImg('check') }}" alt="" class="cp-stage-marker__ic" width="18" height="18" decoding="async">
-                                            @else
-                                                <span class="cp-stage-day">{{ $dayMark }}</span>
-                                            @endif
-                                        </span>
-                                        <div class="cp-stage-meta">
-                                            <p class="cp-stage-name">
-                                                <span class="cp-stage-emoji" aria-hidden="true">{{ $stEmoji }}</span>
-                                                {{ $stageTitle }}
-                                                @if ($state === 'current')
-                                                    <span class="cp-stage-current-tag">(Current)</span>
-                                                @endif
-                                            </p>
-                                            <p class="cp-stage-date">{{ $dateLine }}</p>
-                                            <div class="cp-stage-mini" aria-hidden="true">
-                                                <span class="cp-stage-mini__fill" @style(['width: '.$miniFillPct.'%'])></span>
-                                            </div>
-                                        </div>
-                                    </article>
-                                @endforeach
-                            </div>
-                        </div>
-                    </section>
-                    <details class="cp-why-details cp-why-details--nested">
-                        <summary>Why timeline may change</summary>
-                        <ul class="cp-why-list">
-                            <li><strong>Weather</strong> — rain, heat, and wind affect how fast the crop moves.</li>
-                            <li><strong>Water</strong> — too much or too little changes root growth and stage timing.</li>
-                            <li><strong>Soil</strong> — fertility, compaction, and drainage shift real-world progress.</li>
-                        </ul>
-                    </details>
-                </div>
-            </section>
-
-            {{-- 8. Next stage preview --}}
-            <section class="ag-card cp-next-card" aria-label="Next growth stage">
-                <div class="cp-next-card__accent" aria-hidden="true"></div>
-                <div class="cp-next-card__inner">
-                    <div class="cp-next-card__top">
-                        <p class="cp-next-label">Next stage</p>
-                        <span class="cp-next-icon cp-next-icon--emoji" aria-hidden="true">{{ $next_stage ? $timelineStageEmoji((string) $next_stage) : '🌿' }}</span>
-                    </div>
-                    <p class="cp-next-stage">{{ $next_stage ?: 'No upcoming stage' }}</p>
-                    <div class="cp-next-stats">
-                        <div class="cp-next-stat">
-                            <span class="cp-next-stat__lbl">Typical window</span>
-                            <span class="cp-next-stat__val">{{ $next_stage_date_range ?? ($next_stage_target_date ? app(\App\Services\CropTimelineService::class)->formatStageTypicalWindow((string) ($next_stage ?? ''), (string) $next_stage_target_date, (string) (($user ?? null)?->crop_type ?? '')) : '—') }}</span>
-                        </div>
-                        <div class="cp-next-stat">
-                            <span class="cp-next-stat__lbl">Days remaining (approx.)</span>
-                            <span class="cp-next-stat__val cp-next-stat__val--emph">{{ is_numeric($days_remaining) ? (int) $days_remaining : '—' }}</span>
-                        </div>
-                    </div>
-                    <span class="cp-status-pill {{ $adjustmentLabelClass }}">
-                        {{ $timeline_adjustment_label }}
-                    </span>
-                </div>
-            </section>
-
-            {{-- 9. Key details --}}
-            <section class="ag-card farm-dash cp-key-details" aria-label="Key crop details">
-                <div class="cp-key-details__head">
-                    <h2 class="farm-dash__title cp-key-details__title">Key details</h2>
-                </div>
+            {{-- Key details: 4 themed cards --}}
+            <section class="cp-key-details" aria-labelledby="cp-key-details-heading">
+                <h2 id="cp-key-details-heading" class="cp-key-details__heading">Key details</h2>
                 <div class="cp-key-details__grid">
-                    <div class="cp-key-details__item farm-dash__cell farm-dash__cell--slate">
-                        <span class="farm-dash__emoji farm-dash__emoji--clay cp-key-details__ic" aria-hidden="true">
-                            <img src="{{ $cpImg('barn') }}" alt="" class="weather-clay-ic weather-clay-ic--stat" width="28" height="28" decoding="async">
-                        </span>
-                        <div class="cp-key-details__copy">
-                            <p class="farm-dash__lbl">Farm</p>
-                            <p class="farm-dash__val">{{ $farm_name }}</p>
+                    <article class="cp-key-details__card cp-key-details__card--farm cp-key-details__card--enter" style="--kd-delay: 0ms">
+                        <div class="cp-key-details__card-glow" aria-hidden="true"></div>
+                        <div class="cp-key-details__card-inner">
+                            <span class="cp-key-details__icon-wrap cp-key-details__icon-wrap--farm" aria-hidden="true">
+                                <i data-lucide="tractor" class="cp-key-details__lucide"></i>
+                            </span>
+                            <div class="cp-key-details__body">
+                                <h3 class="cp-key-details__label">Farm</h3>
+                                <p class="cp-key-details__value">{{ $farm_name }}</p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="cp-key-details__item farm-dash__cell farm-dash__cell--amber">
-                        <span class="farm-dash__emoji farm-dash__emoji--clay cp-key-details__ic" aria-hidden="true">
-                            <img src="{{ $cpImg('grain') }}" alt="" class="weather-clay-ic weather-clay-ic--stat" width="28" height="28" decoding="async">
-                        </span>
-                        <div class="cp-key-details__copy">
-                            <p class="farm-dash__lbl">Crop</p>
-                            <p class="farm-dash__val">{{ $user->crop_type ?: 'Not set' }}</p>
+                    </article>
+                    <article class="cp-key-details__card cp-key-details__card--crop cp-key-details__card--enter" style="--kd-delay: 55ms">
+                        <div class="cp-key-details__card-glow" aria-hidden="true"></div>
+                        <div class="cp-key-details__card-inner">
+                            <span class="cp-key-details__icon-wrap cp-key-details__icon-wrap--crop" aria-hidden="true">
+                                <i data-lucide="leaf" class="cp-key-details__lucide"></i>
+                            </span>
+                            <div class="cp-key-details__body">
+                                <h3 class="cp-key-details__label">Crop</h3>
+                                <p class="cp-key-details__value">{{ $user->crop_type ?: 'Not set' }}</p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="cp-key-details__item farm-dash__cell farm-dash__cell--mint">
-                        <span class="farm-dash__emoji farm-dash__emoji--clay cp-key-details__ic" aria-hidden="true">
-                            <img src="{{ $cpImg('leaf_stage') }}" alt="" class="weather-clay-ic weather-clay-ic--stat" width="28" height="28" decoding="async">
-                        </span>
-                        <div class="cp-key-details__copy">
-                            <p class="farm-dash__lbl">Stage</p>
-                            <p class="farm-dash__val">{{ $current_stage_label }}</p>
+                    </article>
+                    <article class="cp-key-details__card cp-key-details__card--stage cp-key-details__card--enter" style="--kd-delay: 110ms">
+                        <div class="cp-key-details__card-glow" aria-hidden="true"></div>
+                        <div class="cp-key-details__card-inner">
+                            <span class="cp-key-details__icon-wrap cp-key-details__icon-wrap--stage" aria-hidden="true">
+                                <i data-lucide="sprout" class="cp-key-details__lucide"></i>
+                            </span>
+                            <div class="cp-key-details__body">
+                                <h3 class="cp-key-details__label">Stage</h3>
+                                <p class="cp-key-details__value">{{ $current_stage_label }}</p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="cp-key-details__item farm-dash__cell farm-dash__cell--violet">
-                        <span class="farm-dash__emoji farm-dash__emoji--clay cp-key-details__ic" aria-hidden="true">
-                            <img src="{{ $cpImg('calendar') }}" alt="" class="weather-clay-ic weather-clay-ic--stat" width="28" height="28" decoding="async">
-                        </span>
-                        <div class="cp-key-details__copy">
-                            <p class="farm-dash__lbl">Planting date</p>
-                            <p class="farm-dash__val">{{ $user->planting_date?->format('M d, Y') ?: 'Not set' }}</p>
+                    </article>
+                    <article class="cp-key-details__card cp-key-details__card--plant cp-key-details__card--enter" style="--kd-delay: 165ms">
+                        <div class="cp-key-details__card-glow" aria-hidden="true"></div>
+                        <div class="cp-key-details__card-inner">
+                            <span class="cp-key-details__icon-wrap cp-key-details__icon-wrap--plant" aria-hidden="true">
+                                <i data-lucide="calendar-days" class="cp-key-details__lucide"></i>
+                            </span>
+                            <div class="cp-key-details__body">
+                                <h3 class="cp-key-details__label">Planting date</h3>
+                                <p class="cp-key-details__value cp-key-details__value--date">
+                                    @if (! empty($planting_date_formatted))
+                                        <time datetime="{{ $user->planting_date?->format('Y-m-d') }}">{{ $planting_date_formatted }}</time>
+                                    @else
+                                        Not set
+                                    @endif
+                                </p>
+                            </div>
                         </div>
-                    </div>
+                    </article>
                 </div>
             </section>
         </div>

@@ -325,8 +325,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                     ? Math.round(Number(wx.current_temperature)) + '°C' + (wx.condition ? ' · ' + wx.condition : '')
                     : 'Forecast at your pin';
             var lines = {
-                farm:
-                    'Farm: your saved GPS pin. Shaded ring ≈ area used for map context (not a land survey).',
+                farm: '',
                 weather:
                     'Weather: soft blue zone = forecast context around your farm. Card shows ' + wxLine + '.',
                 rainfall:
@@ -913,6 +912,29 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             return 'limited rain in the forecast';
         }
 
+        function farmMapSnapCardHtml(mod, lucideName, label, valueEscaped, subEscaped) {
+            return (
+                '<article class="farm-map-snap-card farm-map-snap-card--' +
+                mod +
+                ' farm-map-snap-card--enter">' +
+                '<div class="farm-map-snap-card__row">' +
+                '<span class="farm-map-snap-card__icwrap"><i data-lucide="' +
+                lucideName +
+                '" class="farm-map-snap-card__lucide" aria-hidden="true"></i></span>' +
+                '<div class="farm-map-snap-card__main">' +
+                '<p class="farm-map-snap-card__label">' +
+                escapeHtml(label) +
+                '</p>' +
+                '<p class="farm-map-snap-card__value">' +
+                valueEscaped +
+                '</p>' +
+                '<p class="farm-map-snap-card__sub">' +
+                subEscaped +
+                '</p>' +
+                '</div></div></article>'
+            );
+        }
+
         function renderTodaySummary(ctx) {
             if (!todaySummaryEl) {
                 return;
@@ -946,26 +968,42 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             }
             if (!ctx.map_ready) {
                 summaryEl.innerHTML =
-                    '<div class="farm-map-snap-card farm-map-snap-card--empty farm-map-snap-card--loc">' +
-                    '<p class="farm-map-snap-card__label">Location</p>' +
-                    '<p class="farm-map-snap-card__value">No GPS yet</p>' +
-                    '<p class="farm-map-snap-card__sub">Use GPS to load your farm pin.</p>' +
-                    '</div>' +
-                    '<div class="farm-map-snap-card farm-map-snap-card--wx">' +
-                    '<p class="farm-map-snap-card__label">Weather</p>' +
-                    '<p class="farm-map-snap-card__value">—</p>' +
-                    '<p class="farm-map-snap-card__sub">After GPS is saved.</p>' +
-                    '</div>' +
-                    '<div class="farm-map-snap-card farm-map-snap-card--rain">' +
-                    '<p class="farm-map-snap-card__label">Rainfall</p>' +
-                    '<p class="farm-map-snap-card__value">—</p>' +
-                    '<p class="farm-map-snap-card__sub">Forecast at your pin.</p>' +
-                    '</div>' +
-                    '<div class="farm-map-snap-card farm-map-snap-card--flood">' +
-                    '<p class="farm-map-snap-card__label">Flood risk</p>' +
-                    '<p class="farm-map-snap-card__value">—</p>' +
-                    '<p class="farm-map-snap-card__sub">Advisory from weather data.</p>' +
-                    '</div>';
+                    farmMapSnapCardHtml(
+                        'loc',
+                        'map-pin',
+                        'Location',
+                        escapeHtml('No GPS yet'),
+                        escapeHtml('Use GPS to load your farm pin.'),
+                    ) +
+                    farmMapSnapCardHtml(
+                        'wx',
+                        'cloud-sun',
+                        'Weather',
+                        escapeHtml('—'),
+                        escapeHtml('After GPS is saved.'),
+                    ) +
+                    farmMapSnapCardHtml(
+                        'crop',
+                        'percent',
+                        'Estimated Crop Loss',
+                        escapeHtml('—'),
+                        escapeHtml('Potential crop damage from current weather risk'),
+                    ) +
+                    farmMapSnapCardHtml(
+                        'flood',
+                        'waves',
+                        'Flood Risk Level',
+                        escapeHtml('—'),
+                        escapeHtml('Based on local advisory data'),
+                    ) +
+                    farmMapSnapCardHtml(
+                        'effect',
+                        'calendar-range',
+                        '3-Day Effect',
+                        escapeHtml('—'),
+                        escapeHtml('Forecast trend near your farm'),
+                    );
+                lucideRefresh();
                 return;
             }
 
@@ -988,7 +1026,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                     }
                 }
             } else {
-                wxSub = 'Unavailable';
+                wxSub = escapeHtml('Unavailable');
             }
 
             var rainSub = 'Forecast trend near your farm';
@@ -1006,52 +1044,34 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                     ? escapeHtml(floodLbl)
                     : fr.message != null && String(fr.message).trim() !== ''
                       ? escapeHtml(String(fr.message))
-                      : 'Based on local advisory data';
+                      : escapeHtml('Based on local advisory data');
 
             summaryEl.innerHTML =
-                '<div class="farm-map-snap-card farm-map-snap-card--loc">' +
-                '<p class="farm-map-snap-card__label">Location</p>' +
-                '<p class="farm-map-snap-card__value">' +
-                addr +
-                '</p>' +
-                '<p class="farm-map-snap-card__sub">Saved farm location</p>' +
-                '</div>' +
-                '<div class="farm-map-snap-card farm-map-snap-card--wx">' +
-                '<p class="farm-map-snap-card__label">Weather</p>' +
-                '<p class="farm-map-snap-card__value">' +
-                escapeHtml(wxVal) +
-                '</p>' +
-                '<p class="farm-map-snap-card__sub">' +
-                wxSub +
-                '</p>' +
-                '</div>' +
-                '<div class="farm-map-snap-card farm-map-snap-card--rain">' +
-                '<p class="farm-map-snap-card__label">Estimated Crop Loss</p>' +
-                '<p class="farm-map-snap-card__value">' +
-                escapeHtml(snapshotCropLoss) +
-                '</p>' +
-                '<p class="farm-map-snap-card__sub">' +
-                'Potential crop damage from current weather risk' +
-                '</p>' +
-                '</div>' +
-                '<div class="farm-map-snap-card farm-map-snap-card--flood">' +
-                '<p class="farm-map-snap-card__label">Flood Risk Level</p>' +
-                '<p class="farm-map-snap-card__value">' +
-                floodVal +
-                '</p>' +
-                '<p class="farm-map-snap-card__sub">' +
-                floodSub +
-                '</p>' +
-                '</div>' +
-                '<div class="farm-map-snap-card farm-map-snap-card--rain">' +
-                '<p class="farm-map-snap-card__label">3-Day Effect</p>' +
-                '<p class="farm-map-snap-card__value">' +
-                escapeHtml(snapshotEffect) +
-                '</p>' +
-                '<p class="farm-map-snap-card__sub">' +
-                rainSub +
-                '</p>' +
-                '</div>';
+                farmMapSnapCardHtml('loc', 'map-pin', 'Location', addr, escapeHtml('Saved farm location')) +
+                farmMapSnapCardHtml('wx', 'cloud-sun', 'Weather', escapeHtml(wxVal), wxSub) +
+                farmMapSnapCardHtml(
+                    'crop',
+                    'percent',
+                    'Estimated Crop Loss',
+                    escapeHtml(snapshotCropLoss),
+                    escapeHtml('Potential crop damage from current weather risk'),
+                ) +
+                farmMapSnapCardHtml(
+                    'flood',
+                    'waves',
+                    'Flood Risk Level',
+                    floodVal,
+                    floodSub,
+                ) +
+                farmMapSnapCardHtml(
+                    'effect',
+                    'calendar-range',
+                    '3-Day Effect',
+                    escapeHtml(snapshotEffect),
+                    escapeHtml(rainSub),
+                );
+
+            lucideRefresh();
         }
 
         function setAdvisoryLoading(busy) {
@@ -1066,6 +1086,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             if (!lastContext || !lastContext.map_ready) {
                 return;
             }
+            clearFarmMapAdvisoryDetail();
             statusLine.innerHTML = '<span class="text-slate-600">Updating advisory…</span>';
             inner.innerHTML = '<p class="text-sm text-slate-500" role="status">Loading advisory…</p>';
             lucideRefresh();
@@ -1116,28 +1137,6 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             );
         }
 
-        function dashRiskBadgeClass(level) {
-            var l = String(level || 'low').toLowerCase();
-            if (l === 'high') {
-                return 'dash-smart__badge dash-smart__badge--risk-high';
-            }
-            if (l === 'moderate') {
-                return 'dash-smart__badge dash-smart__badge--risk-mid';
-            }
-            return 'dash-smart__badge dash-smart__badge--risk-low';
-        }
-
-        function riskBadgeLabel(level) {
-            var l = String(level || 'low').toLowerCase();
-            if (l === 'high') {
-                return 'High';
-            }
-            if (l === 'moderate') {
-                return 'Moderate';
-            }
-            return 'Low';
-        }
-
         function renderFmAdvListHtml(items, emptyLine) {
             emptyLine = emptyLine || 'AI advisory temporarily unavailable.';
             if (!items || !items.length) {
@@ -1157,6 +1156,32 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             }
         }
 
+        function farmMapAdvSmartActionHtml(actionEscaped) {
+            return (
+                '<div class="dash-smart__head">' +
+                '<div class="dash-smart__title-wrap">' +
+                '<span class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-extrabold uppercase tracking-[0.1em] text-slate-700">' +
+                '<span class="dash-smart__chip-emoji" aria-hidden="true">🔥</span>' +
+                ' Smart action' +
+                '</span>' +
+                '</div>' +
+                '</div>' +
+                '<div class="dash-smart__body">' +
+                '<p class="dash-smart__action">' +
+                actionEscaped +
+                '</p>' +
+                '</div>'
+            );
+        }
+
+        function clearFarmMapAdvisoryDetail() {
+            var detailEl = document.getElementById('farm-map-advisory-detail');
+            if (detailEl) {
+                detailEl.classList.add('hidden');
+                detailEl.innerHTML = '';
+            }
+        }
+
         function renderSmartAdvisory(ctx) {
             var inner = document.getElementById('farm-map-advisory-inner');
             var statusLine = document.getElementById('farm-map-advisory-status-line');
@@ -1165,6 +1190,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             }
 
             if (!ctx.map_ready || !ctx.map_smart_advisory) {
+                clearFarmMapAdvisoryDetail();
                 statusLine.innerHTML =
                     '<span class="text-slate-600">AI Smart Advisory: Waiting for GPS</span>';
                 inner.innerHTML =
@@ -1182,17 +1208,6 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                 ? '<span class="text-emerald-700">AI Smart Advisory: Active</span>'
                 : '<span class="text-rose-700">AI Smart Advisory: Unavailable</span>';
 
-            var risk = a.risk_level || 'low';
-            var riskBadgeHtml = isActive
-                ? '<div class="cp-smart-badges">' +
-                  '<span class="' +
-                  dashRiskBadgeClass(risk) +
-                  '">' +
-                  escapeHtml(riskBadgeLabel(risk)) +
-                  ' risk' +
-                  '</span>' +
-                  '</div>'
-                : '';
             var action = escapeHtml(String(isActive ? a.smart_action || '' : 'AI advisory temporarily unavailable.'));
             var summary = escapeHtml(String(isActive ? a.advice_summary || '' : 'AI advisory temporarily unavailable.'));
             var why = escapeHtml(String(isActive ? a.why_this_matters || a.why_this_tip || '' : 'AI advisory temporarily unavailable.'));
@@ -1210,24 +1225,10 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             doList = doList.slice(0, 4);
             watchList = watchList.slice(0, 4);
 
-            inner.innerHTML =
-                '<header class="cp-smart-head cp-smart-hero__head">' +
-                '<div class="cp-smart-head__left">' +
-                '<h2 class="cp-smart-title">' +
-                mapClayImgHtml('brain', 'weather-clay-ic weather-clay-ic--title', 18, 18) +
-                ' AI Smart Advisory' +
-                '</h2>' +
-                '<p class="cp-smart-sub">Tailored to your farm location and current map conditions</p>' +
-                '</div>' +
-                riskBadgeHtml +
-                '</header>' +
-                '<div class="cp-smart-action-callout">' +
-                '<span class="cp-smart-action-callout__chip" aria-hidden="true">🔥 Smart action</span>' +
-                '<p class="cp-smart-action-callout__text">' +
-                action +
-                '</p>' +
-                '</div>' +
-                '<div class="cp-smart-summary cp-smart-hero__summary">' +
+            inner.innerHTML = farmMapAdvSmartActionHtml(action);
+
+            var detailHtml =
+                '<div class="cp-smart-summary">' +
                 '<div class="cp-smart-summary__head">' +
                 mapClayImgHtml('bulb', 'weather-clay-ic weather-clay-ic--plan', 22, 22) +
                 '<h3 class="cp-smart-block-title">Advice summary</h3>' +
@@ -1268,6 +1269,20 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                 '</p>' +
                 '</article>' +
                 '</div>';
+
+            var detailEl = document.getElementById('farm-map-advisory-detail');
+            if (detailEl) {
+                if (isActive) {
+                    detailEl.classList.remove('hidden');
+                    detailEl.innerHTML =
+                        '<div class="relative space-y-3 px-3 py-3.5 sm:space-y-3.5 sm:px-4 sm:py-4">' +
+                        detailHtml +
+                        '</div>';
+                } else {
+                    detailEl.classList.add('hidden');
+                    detailEl.innerHTML = '';
+                }
+            }
 
             lucideRefresh();
         }
@@ -1560,6 +1575,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                 }
                 var advInner = document.getElementById('farm-map-advisory-inner');
                 var advStatus = document.getElementById('farm-map-advisory-status-line');
+                clearFarmMapAdvisoryDetail();
                 if (advInner) {
                     advInner.innerHTML =
                         '<div class="dash-smart__notice" role="status">' +

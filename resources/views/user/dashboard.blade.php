@@ -67,6 +67,11 @@
     $waterText = $aiAdvisoryReady ? $toText($dashboardReco['water_strategy'] ?? $dashboardReco['water'] ?? null, '') : $advisoryBlockedMessage;
     $weatherAriaTemp = $weather && isset($weather['temp']) ? (string) round($weather['temp']) . ' degrees Celsius' : 'temperature unavailable';
     $weatherAriaLabel = 'Weather: ' . ($weatherLabel ?: 'conditions') . ', ' . $weatherAriaTemp . '. Tap for full weather details';
+
+    $riskSnap = is_array($risk_snapshot ?? null) ? $risk_snapshot : [];
+    $snapshotCropLoss = (string) ($riskSnap['estimated_crop_loss'] ?? 'N/A');
+    $snapshotEffect = (string) ($riskSnap['three_day_effect'] ?? 'No forecast impact available');
+    $snapshotFlood = (string) ($riskSnap['flood_risk_level'] ?? 'Unknown');
 @endphp
 
 @extends('layouts.user')
@@ -183,6 +188,30 @@
                     <article class="rounded-xl border border-violet-100 bg-violet-50 px-2 py-1.5 text-center">
                         <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Wind</p>
                         <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ is_numeric($windSpeed) ? round((float) $windSpeed, 1) . ' km/h' : '—' }}</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="ag-card weather-impact-card border border-slate-200 bg-white p-4 sm:p-5" aria-label="3-day impact">
+                <div class="weather-impact-min__head">
+                    <h2 class="weather-impact-min__title inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
+                        <i data-lucide="triangle-alert" class="h-4 w-4 text-amber-600"></i>
+                        3-Day Impact
+                    </h2>
+                </div>
+
+                <div class="weather-impact-min__kpis">
+                    <article class="weather-impact-min__kpi weather-impact-min__kpi--amber">
+                        <p class="weather-impact-min__kpi-label">Crop loss</p>
+                        <p class="weather-impact-min__kpi-value">{{ $snapshotCropLoss }}</p>
+                    </article>
+                    <article class="weather-impact-min__kpi weather-impact-min__kpi--sky">
+                        <p class="weather-impact-min__kpi-label">Effect</p>
+                        <p class="weather-impact-min__kpi-value weather-impact-min__kpi-value--text">{{ $snapshotEffect }}</p>
+                    </article>
+                    <article class="weather-impact-min__kpi weather-impact-min__kpi--rose">
+                        <p class="weather-impact-min__kpi-label">Flood risk</p>
+                        <p class="weather-impact-min__kpi-value">{{ $snapshotFlood }}</p>
                     </article>
                 </div>
             </section>
