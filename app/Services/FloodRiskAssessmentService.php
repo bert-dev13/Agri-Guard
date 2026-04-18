@@ -196,9 +196,9 @@ class FloodRiskAssessmentService
     private function farmerMessage(string $level): string
     {
         return match ($level) {
-            self::RISK_HIGH => 'Heavy rain may cause flooding. Protect crops and clear water pathways immediately.',
-            self::RISK_MODERATE => 'Water may build up in lower areas. Check drainage canals.',
-            default => 'Rainfall is currently light and flood risk is low.',
+            self::RISK_HIGH => 'Rainfall patterns suggest higher runoff risk — move inputs or tools to safer ground and keep drainage open.',
+            self::RISK_MODERATE => 'Prepare drainage channels and watch low-lying sections if rain increases.',
+            default => 'Keep drainage clear and monitor low spots.',
         };
     }
 }

@@ -17,7 +17,10 @@ class RainfallTrendsController extends Controller
     /**
      * Show the Historical Rainfall Trends page with charts from historical_weather (2014–2024).
      */
-    public function show(WeatherAdvisoryService $weatherAdvisoryService, AiAdvisoryService $aiAdvisory): View
+    public function show(
+        WeatherAdvisoryService $weatherAdvisoryService,
+        AiAdvisoryService $aiAdvisory,
+    ): View
     {
         $user = Auth::user();
         $farmLocationDisplay = $this->farmLocationDisplay($user);

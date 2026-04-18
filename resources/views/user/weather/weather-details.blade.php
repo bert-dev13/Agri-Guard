@@ -26,31 +26,6 @@
     $impactAiStatus = strtolower(trim((string) ($impactReco['ai_status'] ?? 'failed')));
     $impactAiReady = $impactAiStatus === 'success';
     $impactAiError = trim((string) ($impactReco['ai_error'] ?? ''));
-    $impactSummary = $impactAiReady
-        ? trim((string) ($impactReco['main_recommendation'] ?? 'AI advisory active'))
-        : 'AI advisory unavailable';
-    if (strcasecmp($impactSummary, 'Prepare for the upcoming rain to protect newly planted rice.') === 0) {
-        $impactSummary = 'Monitor field conditions today and prepare your crop protection plan before the next rainfall.';
-    }
-    if (strcasecmp($impactSummary, 'Plant rice now but prepare for rain on Wednesday') === 0) {
-        $impactSummary = '';
-    }
-    if (strcasecmp($impactSummary, 'Hold off on irrigation; rely on forecasted rains to keep rice seedlings moist') === 0) {
-        $impactSummary = '';
-    }
-    /* Badge uses main_recommendation; when it duplicates the morning plan (same irrigation tip), hide the pill — it still appears under Advice. */
-    if ($impactAiReady) {
-        $morningTip = trim((string) ($impactReco['today_plan']['morning'] ?? ''));
-        if ($morningTip !== '' && strcasecmp(trim($impactSummary), $morningTip) === 0) {
-            $impactSummary = '';
-        }
-    }
-    /* Explicit hide for common duplicate one-liners from the model */
-    if (
-        strcasecmp(rtrim(trim($impactSummary), '.'), 'Irrigate early morning to keep seedlings moist before afternoon heat') === 0
-    ) {
-        $impactSummary = '';
-    }
     $impactDetails = $impactAiReady
         ? array_values(array_filter(array_unique([
             trim((string) ($impactReco['why'] ?? '')),
@@ -65,21 +40,11 @@
             trim((string) ($impactReco['water_strategy'] ?? '')),
         ]), fn ($item) => $item !== ''))
         : [];
-    $impactLevel = strtolower(trim((string) ($impactReco['risk_level'] ?? $impactReco['risk'] ?? 'unknown')));
     if (! $impactAiReady) {
         $impactDetails = [($impactAiError !== '' ? $impactAiError : 'Together AI advisory is currently unavailable.')];
         $impactAdvice = ['Refresh in a few minutes after weather data updates.'];
     }
-    $impactToneClass = match ($impactLevel) {
-        'critical', 'high' => 'weather-impact__summary-badge--high',
-        'moderate' => 'weather-impact__summary-badge--caution',
-        'low' => 'weather-impact__summary-badge--normal',
-        default => 'weather-impact__summary-badge--unknown',
-    };
     $riskSnapshot = is_array($risk_snapshot ?? null) ? $risk_snapshot : [];
-    $snapshotCropLoss = (string) ($riskSnapshot['estimated_crop_loss'] ?? 'N/A');
-    $snapshotEffect = (string) ($riskSnapshot['three_day_effect'] ?? 'No forecast impact available');
-    $snapshotFlood = (string) ($riskSnapshot['flood_risk_level'] ?? 'Unknown');
 
     $clayDataUri = static function (string $svg): string {
         return 'data:image/svg+xml;base64,' . base64_encode($svg);
@@ -388,35 +353,16 @@
                 </section>
             @endif
 
-            <section class="ag-card weather-impact-card border border-slate-200 bg-white p-4 sm:p-5" aria-label="3-day impact and advisory">
-                <div class="weather-impact-min__head">
-                    <h2 class="weather-impact-min__title inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
-                        <i data-lucide="triangle-alert" class="h-4 w-4 text-amber-600"></i>
-                        3-Day Impact
-                    </h2>
-                    @if ($impactSummary !== '')
-                        <span class="weather-impact__summary-badge {{ $impactToneClass }}">{{ $impactSummary }}</span>
-                    @endif
-                </div>
+            <section class="space-y-4" aria-label="Farm advisory and AI guidance">
+                @include('partials.farm-advisory-card', [
+                    'risk_snapshot' => $riskSnapshot,
+                    'wrapperClass' => 'weather-impact-card weather-impact-card--compact rounded-3xl',
+                    'showRecommended' => true,
+                ])
 
-                <div class="weather-impact-min__kpis">
-                    <article class="weather-impact-min__kpi weather-impact-min__kpi--amber">
-                        <p class="weather-impact-min__kpi-label">Crop loss</p>
-                        <p class="weather-impact-min__kpi-value">{{ $snapshotCropLoss }}</p>
-                    </article>
-                    <article class="weather-impact-min__kpi weather-impact-min__kpi--sky">
-                        <p class="weather-impact-min__kpi-label">Effect</p>
-                        <p class="weather-impact-min__kpi-value weather-impact-min__kpi-value--text">{{ $snapshotEffect }}</p>
-                    </article>
-                    <article class="weather-impact-min__kpi weather-impact-min__kpi--rose">
-                        <p class="weather-impact-min__kpi-label">Flood risk</p>
-                        <p class="weather-impact-min__kpi-value">{{ $snapshotFlood }}</p>
-                    </article>
-                </div>
-
-                <div class="weather-impact-min__grid weather-impact-min__grid--minimal">
+                <div class="weather-impact-min__grid weather-impact-min__grid--minimal ag-card border border-slate-200 bg-white p-3 shadow-sm sm:p-3.5 rounded-3xl">
                     <article class="weather-impact-min__block weather-impact-min__block--effect">
-                        <h3 class="weather-impact-min__block-title">Effects</h3>
+                        <h3 class="weather-impact-min__block-title">Situation notes</h3>
                         @if (!empty($impactDetails))
                             <ul class="weather-impact-min__list">
                                 @foreach ($impactDetails as $effect)
@@ -429,7 +375,7 @@
                     </article>
 
                     <article class="weather-impact-min__block weather-impact-min__block--advice">
-                        <h3 class="weather-impact-min__block-title">Advice</h3>
+                        <h3 class="weather-impact-min__block-title">Additional guidance</h3>
                         @if (!empty($impactAdvice))
                             <ul class="weather-impact-min__list">
                                 @foreach ($impactAdvice as $adviceItem)

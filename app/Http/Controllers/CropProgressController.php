@@ -26,7 +26,8 @@ class CropProgressController extends Controller
     ): View {
         /** @var User $user */
         $user = Auth::user();
-        $weatherContext = $this->buildWeatherContext($user, $weatherAdvisoryService);
+        $advisoryData = $this->loadAdvisoryData($user, $weatherAdvisoryService);
+        $weatherContext = $this->mapAdvisoryToWeatherContext($advisoryData);
         $stageInsights = $this->generateStageAdvice($user, $weatherContext, $aiAdvisoryService);
 
         $rec = $stageInsights['recommendation'];
@@ -322,35 +323,16 @@ class CropProgressController extends Controller
 
     private function buildWeatherContext(User $user, WeatherAdvisoryService $weatherAdvisoryService): array
     {
-        try {
-            $advisory = $weatherAdvisoryService->getAdvisoryData($user);
-            $weather = $advisory['weather'] ?? [];
-            $monthlyTrend = $advisory['charts']['monthly_trend'] ?? [];
+        return $this->mapAdvisoryToWeatherContext($this->loadAdvisoryData($user, $weatherAdvisoryService));
+    }
 
-            return [
-                'condition' => (string) ($weather['condition']['main'] ?? ($weather['condition']['description'] ?? 'Unknown')),
-                'temperature' => is_numeric($weather['temp'] ?? null) ? (float) $weather['temp'] : null,
-                'humidity' => is_numeric($weather['humidity'] ?? null) ? (int) round((float) $weather['humidity']) : null,
-                'rain_chance' => is_numeric($advisory['rain_probability_display'] ?? null)
-                    ? (int) round((float) $advisory['rain_probability_display'])
-                    : null,
-                'wind_speed' => is_numeric($weather['wind_speed'] ?? null) ? (float) $weather['wind_speed'] : null,
-                'recent_weather' => [
-                    'last_updated' => (string) ($advisory['last_updated'] ?? ''),
-                    'condition' => (string) ($weather['condition']['description'] ?? ($weather['condition']['main'] ?? 'Unknown')),
-                    'rainfall_today_mm' => is_numeric($weather['today_expected_rainfall'] ?? null) ? (float) $weather['today_expected_rainfall'] : null,
-                ],
-                'forecast' => array_map(static function (array $day): array {
-                    return [
-                        'day' => (string) ($day['day_name'] ?? ''),
-                        'condition' => (string) ($day['condition']['main'] ?? ($day['condition']['description'] ?? 'Unknown')),
-                        'temp_min' => is_numeric($day['temp_min'] ?? null) ? (float) $day['temp_min'] : null,
-                        'temp_max' => is_numeric($day['temp_max'] ?? null) ? (float) $day['temp_max'] : null,
-                        'rain_chance' => is_numeric($day['pop'] ?? null) ? (int) round((float) $day['pop']) : null,
-                    ];
-                }, array_slice(($advisory['forecast'] ?? []), 0, 5)),
-                'rainfall_trend' => $this->deriveRainfallTrend($monthlyTrend),
-            ];
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadAdvisoryData(User $user, WeatherAdvisoryService $weatherAdvisoryService): array
+    {
+        try {
+            return $weatherAdvisoryService->getAdvisoryData($user);
         } catch (\Throwable $e) {
             Log::warning('Crop progress weather context unavailable', [
                 'user_id' => $user->id,
@@ -358,6 +340,17 @@ class CropProgressController extends Controller
                 'exception' => $e::class,
             ]);
 
+            return [];
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $advisory
+     * @return array<string, mixed>
+     */
+    private function mapAdvisoryToWeatherContext(array $advisory): array
+    {
+        if ($advisory === []) {
             return [
                 'condition' => 'Unknown',
                 'temperature' => null,
@@ -369,6 +362,34 @@ class CropProgressController extends Controller
                 'rainfall_trend' => 'stable',
             ];
         }
+
+        $weather = $advisory['weather'] ?? [];
+        $monthlyTrend = $advisory['charts']['monthly_trend'] ?? [];
+
+        return [
+            'condition' => (string) ($weather['condition']['main'] ?? ($weather['condition']['description'] ?? 'Unknown')),
+            'temperature' => is_numeric($weather['temp'] ?? null) ? (float) $weather['temp'] : null,
+            'humidity' => is_numeric($weather['humidity'] ?? null) ? (int) round((float) $weather['humidity']) : null,
+            'rain_chance' => is_numeric($advisory['rain_probability_display'] ?? null)
+                ? (int) round((float) $advisory['rain_probability_display'])
+                : null,
+            'wind_speed' => is_numeric($weather['wind_speed'] ?? null) ? (float) $weather['wind_speed'] : null,
+            'recent_weather' => [
+                'last_updated' => (string) ($advisory['last_updated'] ?? ''),
+                'condition' => (string) ($weather['condition']['description'] ?? ($weather['condition']['main'] ?? 'Unknown')),
+                'rainfall_today_mm' => is_numeric($weather['today_expected_rainfall'] ?? null) ? (float) $weather['today_expected_rainfall'] : null,
+            ],
+            'forecast' => array_map(static function (array $day): array {
+                return [
+                    'day' => (string) ($day['day_name'] ?? ''),
+                    'condition' => (string) ($day['condition']['main'] ?? ($day['condition']['description'] ?? 'Unknown')),
+                    'temp_min' => is_numeric($day['temp_min'] ?? null) ? (float) $day['temp_min'] : null,
+                    'temp_max' => is_numeric($day['temp_max'] ?? null) ? (float) $day['temp_max'] : null,
+                    'rain_chance' => is_numeric($day['pop'] ?? null) ? (int) round((float) $day['pop']) : null,
+                ];
+            }, array_slice(($advisory['forecast'] ?? []), 0, 5)),
+            'rainfall_trend' => $this->deriveRainfallTrend($monthlyTrend),
+        ];
     }
 
     private function deriveRainfallTrend(array $monthlyTrend): string

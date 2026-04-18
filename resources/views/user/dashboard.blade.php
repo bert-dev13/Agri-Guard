@@ -69,9 +69,6 @@
     $weatherAriaLabel = 'Weather: ' . ($weatherLabel ?: 'conditions') . ', ' . $weatherAriaTemp . '. Tap for full weather details';
 
     $riskSnap = is_array($risk_snapshot ?? null) ? $risk_snapshot : [];
-    $snapshotCropLoss = (string) ($riskSnap['estimated_crop_loss'] ?? 'N/A');
-    $snapshotEffect = (string) ($riskSnap['three_day_effect'] ?? 'No forecast impact available');
-    $snapshotFlood = (string) ($riskSnap['flood_risk_level'] ?? 'Unknown');
 @endphp
 
 @extends('layouts.user')
@@ -192,29 +189,14 @@
                 </div>
             </section>
 
-            <section class="ag-card weather-impact-card border border-slate-200 bg-white p-4 sm:p-5" aria-label="3-day impact">
-                <div class="weather-impact-min__head">
-                    <h2 class="weather-impact-min__title inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
-                        <i data-lucide="triangle-alert" class="h-4 w-4 text-amber-600"></i>
-                        3-Day Impact
-                    </h2>
-                </div>
-
-                <div class="weather-impact-min__kpis">
-                    <article class="weather-impact-min__kpi weather-impact-min__kpi--amber">
-                        <p class="weather-impact-min__kpi-label">Crop loss</p>
-                        <p class="weather-impact-min__kpi-value">{{ $snapshotCropLoss }}</p>
-                    </article>
-                    <article class="weather-impact-min__kpi weather-impact-min__kpi--sky">
-                        <p class="weather-impact-min__kpi-label">Effect</p>
-                        <p class="weather-impact-min__kpi-value weather-impact-min__kpi-value--text">{{ $snapshotEffect }}</p>
-                    </article>
-                    <article class="weather-impact-min__kpi weather-impact-min__kpi--rose">
-                        <p class="weather-impact-min__kpi-label">Flood risk</p>
-                        <p class="weather-impact-min__kpi-value">{{ $snapshotFlood }}</p>
-                    </article>
-                </div>
-            </section>
+            @include('partials.farm-advisory-card', [
+                'risk_snapshot' => $riskSnap,
+                'wrapperClass' => 'rounded-2xl',
+                'detailsLinkHref' => route('weather-details'),
+                'detailsLinkAria' => 'Open full weather details',
+                'detailsLinkSr' => 'Weather details',
+                'showRecommended' => false,
+            ])
 
             <article class="ag-card dash-smart weather-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5" aria-label="AI smart advisory">
                 <div class="dash-smart__debug">

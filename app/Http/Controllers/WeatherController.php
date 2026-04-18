@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\CropImpactService;
 use App\Services\FarmWeatherService;
 use App\Services\FarmRiskSnapshotService;
 use App\Services\FloodRiskAssessmentService;
 use App\Services\RainfallHeatmapService;
-use App\Services\ThreeDayImpactService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,8 +19,7 @@ class WeatherController extends Controller
     public function index(
         Request $request,
         FarmWeatherService $farmWeather,
-        FloodRiskAssessmentService $floodRiskAssessment,
-        ThreeDayImpactService $threeDayImpactService,
+        CropImpactService $cropImpactService,
         FarmRiskSnapshotService $riskSnapshotService
     ): JsonResponse
     {
@@ -64,24 +63,27 @@ class WeatherController extends Controller
             'today_rain_probability' => $data['today_rain_probability'],
         ];
 
-        $floodRisk = $floodRiskAssessment->assess([
+        $riskSnapshot = $riskSnapshotService->buildFromNormalizedWeather($user, $data);
+        $snapshotFloodLevel = strtolower((string) ($riskSnapshot['flood_risk_normalized'] ?? 'low'));
+
+        $weatherBlock = [
             'today_rain_probability' => $data['today_rain_probability'] ?? null,
             'today_expected_rainfall' => $data['today_expected_rainfall'] ?? null,
-            'condition_id' => $data['condition_id'] ?? null,
-            'condition' => $data['condition'] ?? null,
-        ], [
-            'field_condition' => $user->field_condition,
-        ]);
+            'wind_speed' => $data['wind_speed'] ?? null,
+            'humidity' => $data['humidity'] ?? null,
+            'temp' => $data['current_temperature'] ?? null,
+            'condition' => [
+                'id' => $data['condition_id'] ?? null,
+                'main' => $data['condition'] ?? null,
+            ],
+        ];
 
-        $riskSnapshot = $riskSnapshotService->buildFromWeather($user, $current, $forecast);
-        $snapshotFloodLevel = strtolower((string) ($riskSnapshot['flood_risk_tone'] ?? ($floodRisk['level'] ?? 'unknown')));
-
-        $impactAdvisory = $threeDayImpactService->buildImpact(
+        $impactAdvisory = $cropImpactService->buildForecastImpactPayload(
             $user,
+            $weatherBlock,
             $forecast,
             $snapshotFloodLevel
         );
-        $impactAdvisory['effect_summary'] = (string) ($riskSnapshot['three_day_effect'] ?? ($impactAdvisory['effect_summary'] ?? 'No forecast impact available'));
         $response['impact_advisory'] = $impactAdvisory;
         $response['risk_snapshot'] = $riskSnapshot;
 

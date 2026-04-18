@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\AiAdvisory\AiAdvisoryService;
+use App\Services\CropImpactService;
 use App\Services\FarmRiskSnapshotService;
-use App\Services\ThreeDayImpactService;
 use App\Services\WeatherAdvisoryService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -17,7 +17,7 @@ class WeatherDetailsController extends Controller
     public function show(
         WeatherAdvisoryService $weatherService,
         AiAdvisoryService $aiAdvisory,
-        ThreeDayImpactService $threeDayImpactService,
+        CropImpactService $cropImpactService,
         FarmRiskSnapshotService $riskSnapshotService
     ): View
     {
@@ -72,14 +72,14 @@ class WeatherDetailsController extends Controller
         );
 
         $riskSnapshot = $riskSnapshotService->buildFromWeather($user, $weather ?? [], $forecast);
-        $snapshotFloodLevel = strtolower((string) ($riskSnapshot['flood_risk_tone'] ?? 'unknown'));
+        $snapshotFloodLevel = strtolower((string) ($riskSnapshot['flood_risk_normalized'] ?? 'low'));
 
-        $impactAdvisory = $threeDayImpactService->buildImpact(
+        $impactAdvisory = $cropImpactService->buildForecastImpactPayload(
             $user,
+            is_array($weather) ? $weather : [],
             $forecast,
             $snapshotFloodLevel
         );
-        $impactAdvisory['effect_summary'] = (string) ($riskSnapshot['three_day_effect'] ?? ($impactAdvisory['effect_summary'] ?? 'No forecast impact available'));
 
         $dewPoint = self::estimateDewPoint(
             isset($weather['temp']) ? (float) $weather['temp'] : null,

@@ -3,29 +3,22 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\AdvisoryDisclaimer;
 
 class FarmRiskSnapshotService
 {
     public function __construct(
         private readonly FloodRiskAssessmentService $floodRiskAssessment,
-        private readonly CropLossEstimatorService $cropLossEstimator,
-        private readonly ThreeDayImpactService $threeDayImpact
+        private readonly CropImpactEngine $cropImpactEngine,
+        private readonly RiskLabelMapper $riskLabelMapper,
     ) {}
 
     /**
-     * Canonical risk snapshot used by both Dashboard and Assistant.
+     * Canonical risk snapshot + 3-day outlook card data for Dashboard, Weather, Map JSON, Assistant.
      *
      * @param  array<string, mixed>  $weather
      * @param  array<int, array<string, mixed>>  $forecast
-     * @return array{
-     *   estimated_crop_loss_value:int|null,
-     *   estimated_crop_loss:string,
-     *   three_day_effect:string,
-     *   flood_risk_level:string,
-     *   flood_risk_tone:string,
-     *   flood_risk_label:string,
-     *   flood_risk_message:string
-     * }
+     * @return array<string, mixed>
      */
     public function buildFromWeather(User $user, array $weather, array $forecast): array
     {
@@ -39,34 +32,38 @@ class FarmRiskSnapshotService
         ]);
 
         $floodRiskLevel = $this->normalizeFloodLevel((string) ($risk['level'] ?? ''));
-        $impactPayload = $this->threeDayImpact->buildImpact($user, $forecast, $floodRiskLevel);
-        $cropLoss = $this->cropLossEstimator->estimate($user, $weather, $forecast, $floodRiskLevel);
-        $impactText = is_string($impactPayload['effect_summary'] ?? null)
-            ? $impactPayload['effect_summary']
-            : $this->threeDayImpact->predict($user, $forecast, $floodRiskLevel);
+        $floodForEval = $floodRiskLevel === 'unknown' ? 'low' : $floodRiskLevel;
+
+        $eval = $this->cropImpactEngine->evaluate($user, $weather, $forecast, $floodForEval);
+        $level = (string) $eval['crop_impact_level'];
+
+        $floodDisplay = $this->floodDisplayFromLevel($floodRiskLevel);
 
         return [
-            'estimated_crop_loss_value' => $cropLoss,
-            'estimated_crop_loss' => $cropLoss !== null ? $cropLoss.'%' : 'N/A',
-            'three_day_effect' => $impactText ?? 'No forecast impact available',
-            'flood_risk_level' => $floodRiskLevel !== '' ? ucfirst($floodRiskLevel) : 'Unknown',
-            'flood_risk_tone' => $this->riskTone($floodRiskLevel),
+            'crop_impact_level' => $level,
+            'crop_impact_label' => (string) $eval['crop_impact_label'],
+            'possible_loss_range' => (string) $eval['possible_loss_range'],
+            'crop_impact_tone' => $this->riskLabelMapper->cropImpactTone($level),
+
+            'three_day_outlook' => (string) $eval['three_day_outlook'],
+            'recommended_action' => (string) ($eval['recommended_action'] ?? ''),
+
+            'flood_risk_normalized' => $floodForEval,
+            'flood_risk_display' => $floodDisplay,
+            'flood_risk_level' => $floodDisplay,
+            'flood_risk_tone' => $this->riskToneFromFloodDisplay($floodDisplay),
             'flood_risk_label' => (string) ($risk['label'] ?? 'Low Risk'),
             'flood_risk_message' => (string) ($risk['message'] ?? ''),
+
+            'advisory_disclaimer' => AdvisoryDisclaimer::TEXT,
+
+            'estimated_crop_loss' => (string) $eval['possible_loss_range'],
+            'three_day_effect' => (string) $eval['three_day_outlook'],
         ];
     }
 
     /**
      * @param  array<string, mixed>  $normalized
-     * @return array{
-     *   estimated_crop_loss_value:int|null,
-     *   estimated_crop_loss:string,
-     *   three_day_effect:string,
-     *   flood_risk_level:string,
-     *   flood_risk_tone:string,
-     *   flood_risk_label:string,
-     *   flood_risk_message:string
-     * }
      */
     public function buildFromNormalizedWeather(User $user, array $normalized): array
     {
@@ -74,6 +71,8 @@ class FarmRiskSnapshotService
             'today_rain_probability' => $normalized['today_rain_probability'] ?? null,
             'today_expected_rainfall' => $normalized['today_expected_rainfall'] ?? null,
             'wind_speed' => $normalized['wind_speed'] ?? null,
+            'humidity' => $normalized['humidity'] ?? null,
+            'temp' => $normalized['current_temperature'] ?? null,
             'condition' => [
                 'id' => $normalized['condition_id'] ?? null,
                 'main' => $normalized['condition'] ?? null,
@@ -97,15 +96,23 @@ class FarmRiskSnapshotService
         };
     }
 
-    private function riskTone(string $level): string
+    private function floodDisplayFromLevel(string $level): string
     {
         return match ($level) {
-            'low' => 'low',
-            'moderate' => 'moderate',
-            'high' => 'high',
-            'critical' => 'critical',
-            default => 'unknown',
+            'high', 'critical' => 'High',
+            'moderate' => 'Moderate',
+            'low' => 'Low',
+            default => 'Unknown',
         };
     }
 
+    private function riskToneFromFloodDisplay(string $display): string
+    {
+        return match ($display) {
+            'High' => 'high',
+            'Moderate' => 'moderate',
+            'Low' => 'low',
+            default => 'unknown',
+        };
+    }
 }
