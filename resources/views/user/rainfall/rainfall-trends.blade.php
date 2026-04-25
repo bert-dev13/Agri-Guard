@@ -224,6 +224,19 @@
             </section>
 
             {{-- Matches weather-details AI smart advisory (no extra badges) --}}
+            <div class="ag-advisory-toggle-row">
+                <button
+                    type="button"
+                    class="ag-advisory-toggle-btn"
+                    data-ai-advisory-toggle
+                    data-target="advisory-rainfall-section"
+                    data-storage-key="advisory_visibility_rainfall"
+                    aria-pressed="true"
+                >
+                    Hide AI Smart Advisory
+                </button>
+            </div>
+            <section id="advisory-rainfall-section" data-ai-smart-advisory-section>
             <article class="ag-card dash-smart weather-page__smart rainfall-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5" aria-label="AI smart advisory">
                 <div class="dash-smart__debug">
                     <p class="text-xs font-semibold text-slate-700">
@@ -291,6 +304,15 @@
                         <p class="dash-split__body">{{ $rAiAdvisoryReady ? trim((string) ($rainReco['what_to_avoid_today'] ?? '')) : $rBlockedMsg }}</p>
                     </div>
                 </div>
+            </section>
+            <div class="flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600" aria-hidden="true">
+                    <i data-lucide="info" class="h-3.5 w-3.5"></i>
+                </span>
+                <p class="pt-0.5 text-xs leading-relaxed text-slate-600">
+                    AI-generated recommendations only. Based on system data including weather, rainfall, crop, and field conditions. For farm decision support.
+                </p>
+            </div>
             </section>
 
             <section class="ag-card rainfall-page__chart-card" aria-label="Rainfall chart">

@@ -4,7 +4,6 @@ use App\Http\Controllers\Admin\AccountSettingsController;
 use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FarmMonitoringController;
-use App\Http\Controllers\Admin\HistoricalWeatherImportController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\AiFarmChatController;
 use App\Http\Controllers\AuthController;
@@ -135,6 +134,4 @@ Route::middleware(['auth', 'verified.email', 'admin'])
         Route::put('/farms/{user}', [FarmMonitoringController::class, 'update'])->name('farms.update');
 
         Route::get('/analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
-        Route::get('/historical-weather', [HistoricalWeatherImportController::class, 'index'])->name('historical-weather.index');
-        Route::post('/historical-weather', [HistoricalWeatherImportController::class, 'store'])->name('historical-weather.store');
     });

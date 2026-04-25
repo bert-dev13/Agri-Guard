@@ -1,46 +1,44 @@
-/**
- * Farm Map — Leaflet + device GPS + farm context API
- */
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
-import markerIcon from 'leaflet/dist/images/marker-icon.png';
-import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
+import { point as turfPoint } from '@turf/helpers';
 
 (function () {
     'use strict';
 
     const DEFAULT_CENTER = [17.65, 121.72];
-    const EMPTY_ZOOM = 11;
-
-    /** High-visibility device GPS pin (DivIcon). Tip aligns with exact lat/lng. */
-    var cachedGpsPinIcon = null;
-    function getGpsPinIcon() {
-        if (!cachedGpsPinIcon) {
-            cachedGpsPinIcon = L.divIcon({
-                className: 'farm-map-gps-pin-icon',
-                html:
-                    '<div class="farm-map-gps-pin-wrap">' +
-                    '<div class="farm-map-gps-pin" role="img" aria-label="Your farm location">' +
-                    '<span class="farm-map-gps-pin__pulse" aria-hidden="true"></span>' +
-                    '<div class="farm-map-gps-pin__head"></div>' +
-                    '</div>' +
-                    '<span class="farm-map-marker-label">Your Farm</span>' +
-                    '</div>',
-                iconSize: [88, 56],
-                iconAnchor: [44, 48],
-                popupAnchor: [0, -40],
-            });
+    const DEFAULT_ZOOM = 11;
+    const TRACK_ZOOM = 15;
+    const FIXED_FLOOD_RISK_MAP = (function () {
+        function canonical(name) {
+            return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         }
-        return cachedGpsPinIcon;
-    }
-
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-        iconRetinaUrl: markerIcon2x,
-        iconUrl: markerIcon,
-        shadowUrl: markerShadow,
-    });
+        var high = [
+            'Abolo', 'Alit Untung', 'Annafatan', 'Anquiray', 'Babayuan', 'Bauan', 'Baccuit', 'Baculud',
+            'Balauini', 'Calamagui', 'Casingsingan Norte', 'Casingsingan Sur', 'Centro', 'Dafunganay',
+            'Dugayung', 'Estefania', 'Gabut', 'Jurisdiccion', 'Logung', 'Marobbob',
+            'Pacac-Grande', 'Pacac-Pequeño', 'Palacu', 'Palayag',
+            'Unag', 'Concepcion', 'Tana', 'Annabuculan', 'Agguirit', 'Aggurit', 'Goran', 'Monte Alegre',
+        ];
+        var moderate = [
+            'Dadda', 'Cordova', 'Calintaan', 'Caratacat', 'Gangauan', 'Magogod', 'Manalo', 'Masical', 'Nangalasauan',
+        ];
+        var low = [
+            'Nabbialan', 'San Juan', 'La Suerte', 'Bacring', 'Backring', 'Nagsabaran', 'Bayabat',
+            'Nanuccauan', 'Catarauan', 'Cataruan',
+        ];
+        var out = {};
+        high.forEach(function (name) { out[canonical(name)] = 'high'; });
+        moderate.forEach(function (name) { out[canonical(name)] = 'moderate'; });
+        low.forEach(function (name) { out[canonical(name)] = 'low'; });
+        return out;
+    })();
+    const RISK_STYLE = {
+        high: { fill: '#ff0000', line: '#7f1d1d', label: 'High Risk', colorLabel: 'Red' },
+        moderate: { fill: '#ffd700', line: '#854d0e', label: 'Moderate Risk', colorLabel: 'Yellow' },
+        low: { fill: '#00aa00', line: '#14532d', label: 'Low Risk', colorLabel: 'Green' },
+        unknown: { fill: '#94a3b8', line: '#334155', label: 'Unknown Risk' },
+    };
 
     function ready(fn) {
         if (document.readyState !== 'loading') {
@@ -65,62 +63,54 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             }
         }
 
-        var contextUrl = root.dataset.contextUrl;
-        var saveUrl = root.dataset.saveUrl;
+        var contextUrl = root.dataset.contextUrl || '';
+        var saveUrl = root.dataset.saveUrl || '';
+        var geofenceUrl = root.dataset.geofenceUrl || '/amulung.json';
         var csrf = root.dataset.csrfToken || document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
         var mapEl = document.getElementById('farm-map-container');
         var gpsLastEl = document.getElementById('farm-map-gps-last');
         var errEl = document.getElementById('farm-map-gps-error');
-        var statusGpsWrap = document.getElementById('farm-map-status-gps-wrap');
         var statusGpsEl = document.getElementById('farm-map-status-gps');
-        var statusFloodWrap = document.getElementById('farm-map-status-flood-wrap');
-        var statusFloodEl = document.getElementById('farm-map-status-flood');
-        var todaySummaryEl = document.getElementById('farm-map-today-summary');
-        var lastAccuracyM = null;
-        var summaryEl = document.getElementById('farm-map-summary-grid');
+        var statusRainEl = document.getElementById('farm-map-status-rain'); // reused for geofence state text
         var layerEl = document.getElementById('farm-map-layer-toggles');
-        var noGpsHint = document.getElementById('farm-map-no-gps-hint');
-        var weatherFloat = document.getElementById('farm-map-weather-float');
-        var weatherFloatText = document.getElementById('farm-map-weather-float-text');
+        var todaySummaryEl = document.getElementById('farm-map-today-summary');
+        var advisoryStatusEl = document.getElementById('farm-map-advisory-status-line');
+        var advisoryMainActionEl = document.getElementById('farm-map-advisory-main-action');
+        var advisoryPlanEarlyEl = document.getElementById('farm-map-plan-early');
+        var advisoryPlanMiddayEl = document.getElementById('farm-map-plan-midday');
+        var advisoryPlanLateEl = document.getElementById('farm-map-plan-late');
+        var advisoryPlanWaterEl = document.getElementById('farm-map-plan-water');
+        var advisoryPlanAvoidEl = document.getElementById('farm-map-plan-avoid');
+        var snapshotGridEl = document.getElementById('farm-map-summary-grid');
         var btnUse = document.getElementById('farm-map-btn-use-gps');
         var btnRefresh = document.getElementById('farm-map-btn-refresh-gps');
         var btnRetry = document.getElementById('farm-map-gps-retry');
+        var geofenceBadge = document.getElementById('farm-map-geofence-badge');
+        var emptyOverlayEl = document.getElementById('farm-map-empty-overlay');
 
         var map = null;
-        var marker = null;
-        var pendingGpsMarker = null;
-        var pendingAccCircle = null;
-        var rainCircle = null;
-        var floodCircle = null;
-        var weatherCircle = null;
-        var accCircle = null;
-        /** One layer at a time: farm | weather | rainfall | flood */
-        var activeLayer = 'farm';
-        var lastContext = null;
-        var layerAdvisoryTimer = null;
-
-        var emptyOverlayEl = document.getElementById('farm-map-empty-overlay');
-        var mapControlsWired = false;
-        var fullscreenResizeWired = false;
-        var mapResizeGuardsSetup = false;
+        var geofenceLayer = null;
+        var barangayLabelsLayer = null;
+        var clickMarker = null;
+        var gpsMarker = null;
+        var gpsAccuracy = null;
+        var geofenceFeatureCollection = null;
+        var mapReady = false;
+        var activeOverlay = 'none';
+        var LABEL_MIN_ZOOM = 12;
 
         function recenterMap() {
             if (!map) {
                 return;
             }
-            var c = lastContext;
-            if (c && c.map_ready && c.latitude != null && c.longitude != null) {
-                map.flyTo([Number(c.latitude), Number(c.longitude)], Math.max(map.getZoom(), 16), { duration: 0.45 });
+            if (gpsMarker) {
+                map.flyTo(gpsMarker.getLatLng(), TRACK_ZOOM, { duration: 0.35 });
             } else {
-                map.setView(DEFAULT_CENTER, EMPTY_ZOOM);
+                map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.35 });
             }
         }
 
         function wireMapControls() {
-            if (mapControlsWired) {
-                return;
-            }
             var zi = document.getElementById('farm-map-zoom-in');
             var zo = document.getElementById('farm-map-zoom-out');
             var rc = document.getElementById('farm-map-recenter');
@@ -129,16 +119,11 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             if (!zi || !zo || !rc) {
                 return;
             }
-            mapControlsWired = true;
             zi.addEventListener('click', function () {
-                if (map) {
-                    map.zoomIn();
-                }
+                map && map.zoomIn();
             });
             zo.addEventListener('click', function () {
-                if (map) {
-                    map.zoomOut();
-                }
+                map && map.zoomOut();
             });
             rc.addEventListener('click', recenterMap);
             if (rg) {
@@ -156,13 +141,6 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             }
         }
 
-        function updateHero(ctx) {
-            var farmEl = document.getElementById('farm-map-hero-farm');
-            if (farmEl && ctx && ctx.farm_name) {
-                farmEl.textContent = ctx.farm_name;
-            }
-        }
-
         function setEmptyOverlayVisible(visible) {
             if (!emptyOverlayEl) {
                 return;
@@ -174,17 +152,6 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                 emptyOverlayEl.classList.add('hidden');
                 emptyOverlayEl.setAttribute('aria-hidden', 'true');
             }
-        }
-
-        function clearPendingGpsLayers() {
-            if (pendingGpsMarker && map) {
-                map.removeLayer(pendingGpsMarker);
-            }
-            if (pendingAccCircle && map) {
-                map.removeLayer(pendingAccCircle);
-            }
-            pendingGpsMarker = null;
-            pendingAccCircle = null;
         }
 
         function showErr(html) {
@@ -210,645 +177,489 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
         }
 
         function setLoading(isLoading) {
-            if (btnUse) {
-                btnUse.disabled = isLoading;
-            }
-            if (btnRefresh) {
-                btnRefresh.disabled = isLoading;
-            }
+            if (btnUse) btnUse.disabled = isLoading;
+            if (btnRefresh) btnRefresh.disabled = isLoading;
         }
 
-        function initMap() {
-            if (!mapEl) {
-                return;
+        function setGeofenceBadge(state) {
+            if (!geofenceBadge) return;
+            var inside = state === 'inside_geofence';
+            geofenceBadge.className = 'farm-map-geofence-badge ' + (inside ? 'farm-map-geofence-badge--inside' : 'farm-map-geofence-badge--outside');
+            geofenceBadge.textContent = inside ? 'Inside Geofence' : 'Outside Geofence';
+        }
+
+        function setGeofenceStyleForState(state) {
+            if (!geofenceLayer) return;
+            var inside = state === 'inside_geofence';
+            geofenceLayer.setStyle({
+                opacity: inside ? 0.95 : 0.9,
+            });
+        }
+
+        function getRiskStyle(riskLevel) {
+            return RISK_STYLE[riskLevel] || RISK_STYLE.unknown;
+        }
+
+        function getFeatureName(feature) {
+            var p = (feature && feature.properties) || {};
+            return String(p.adm4_en || p.name || p.barangay || p.brgy_name || 'Unknown Barangay').trim();
+        }
+
+        function enrichBarangayRisk(feature) {
+            var name = getFeatureName(feature);
+            var canonical = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+            var riskLevel = FIXED_FLOOD_RISK_MAP[canonical] || 'unknown';
+            var style = getRiskStyle(riskLevel);
+            feature.properties = feature.properties || {};
+            feature.properties.flood_risk_level = riskLevel;
+            feature.properties.flood_risk_label = style.label;
+            feature.properties.flood_risk_color_label = style.colorLabel || 'Unknown';
+            feature.properties.flood_risk_fill = style.fill;
+            feature.properties.risk_reason = 'Configured barangay flood classification';
+            return feature;
+        }
+
+        function updateBarangayRiskData(featureCollection) {
+            if (!featureCollection || !Array.isArray(featureCollection.features)) {
+                return featureCollection;
             }
-            measureMapCanvasHeightImmediate();
-            if (!map) {
-                map = L.map(mapEl, { zoomControl: false, attributionControl: true });
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '&copy; OpenStreetMap',
-                }).addTo(map);
-                map.setView(DEFAULT_CENTER, EMPTY_ZOOM);
-                setupMapResizeGuards();
-                scheduleMapResize();
-                if (!fullscreenResizeWired) {
-                    fullscreenResizeWired = true;
-                    function onFsChange() {
-                        measureMapCanvasHeightImmediate();
-                        scheduleMapResize();
-                        if (!document.fullscreenElement) {
-                            refreshMapLayoutAfterFullscreenExit();
-                            window.setTimeout(function () {
-                                window.dispatchEvent(new Event('resize'));
-                            }, 0);
-                        }
+            featureCollection.features = featureCollection.features.map(function (feature) {
+                return enrichBarangayRisk(feature);
+            });
+            return featureCollection;
+        }
+
+        function detectBarangayAtPoint(latlng) {
+            if (!geofenceFeatureCollection || !Array.isArray(geofenceFeatureCollection.features)) {
+                return null;
+            }
+            var p = turfPoint([latlng.lng, latlng.lat]);
+            for (var i = 0; i < geofenceFeatureCollection.features.length; i += 1) {
+                var feature = geofenceFeatureCollection.features[i];
+                try {
+                    if (booleanPointInPolygon(p, feature, { ignoreBoundary: false })) {
+                        return feature;
                     }
-                    document.addEventListener('fullscreenchange', onFsChange);
-                    document.addEventListener('webkitfullscreenchange', onFsChange);
+                } catch (e) {
+                    // Ignore malformed feature and continue.
                 }
             }
-            wireMapControls();
+            return null;
         }
 
-        function clearMapLayers() {
-            clearPendingGpsLayers();
-            if (marker && map) {
-                map.removeLayer(marker);
+        function detectGeofenceStatus(latlng) {
+            if (!geofenceFeatureCollection || !geofenceFeatureCollection.features || !geofenceFeatureCollection.features.length) {
+                return 'outside_geofence';
             }
-            if (rainCircle && map) {
-                map.removeLayer(rainCircle);
-            }
-            if (floodCircle && map) {
-                map.removeLayer(floodCircle);
-            }
-            if (weatherCircle && map) {
-                map.removeLayer(weatherCircle);
-            }
-            if (accCircle && map) {
-                map.removeLayer(accCircle);
-            }
-            marker = null;
-            rainCircle = null;
-            floodCircle = null;
-            weatherCircle = null;
-            accCircle = null;
+            var p = turfPoint([latlng.lng, latlng.lat]);
+            var isInside = geofenceFeatureCollection.features.some(function (feature) {
+                try {
+                    return booleanPointInPolygon(p, feature, { ignoreBoundary: false });
+                } catch (e) {
+                    return false;
+                }
+            });
+            return isInside ? 'inside_geofence' : 'outside_geofence';
         }
 
-        function removeOverlayFromMap(layer) {
-            if (layer && map && map.hasLayer(layer)) {
-                map.removeLayer(layer);
+        function applyGeofenceResult(latlng, sourceLabel) {
+            var geofenceState = detectGeofenceStatus(latlng);
+            setGeofenceBadge(geofenceState);
+            setGeofenceStyleForState(geofenceState);
+            var popupText = geofenceState === 'inside_geofence' ? 'Inside Geofence' : 'Outside Geofence';
+            var details = (sourceLabel || 'Map point') + ': ' + latlng.lat.toFixed(6) + ', ' + latlng.lng.toFixed(6);
+            var matchedBarangay = detectBarangayAtPoint(latlng);
+            var barangayHtml = '';
+            if (matchedBarangay) {
+                var props = matchedBarangay.properties || {};
+                barangayHtml =
+                    '<br><strong>Barangay:</strong> ' + esc(getFeatureName(matchedBarangay)) +
+                    '<br><strong>Flood risk:</strong> ' + esc(props.flood_risk_label || 'Unknown Risk') +
+                    '<br><strong>Color class:</strong> ' + esc(props.flood_risk_color_label || 'Unknown');
+            } else {
+                barangayHtml = '<br><strong>Barangay:</strong> No polygon match';
             }
-        }
-
-        function ringStyleForRainfall(intensityLabel) {
-            var s = String(intensityLabel || '').toLowerCase();
-            if (s.indexOf('high') !== -1) {
-                return { fillColor: '#1d4ed8', fillOpacity: 0.34, color: '#1e3a8a', weight: 2 };
+            if (clickMarker) {
+                map.removeLayer(clickMarker);
             }
-            if (s.indexOf('moder') !== -1) {
-                return { fillColor: '#3b82f6', fillOpacity: 0.3, color: '#1d4ed8', weight: 2 };
-            }
-            if (s.indexOf('light') !== -1) {
-                return { fillColor: '#93c5fd', fillOpacity: 0.26, color: '#3b82f6', weight: 2 };
-            }
-            return { fillColor: '#cbd5e1', fillOpacity: 0.18, color: '#64748b', weight: 1, dashArray: '6 5' };
-        }
-
-        function ringStyleForFlood(level) {
-            if (level === 'CRITICAL') {
-                return { fillColor: '#7f1d1d', fillOpacity: 0.34, color: '#450a0a', weight: 2 };
-            }
-            if (level === 'HIGH') {
-                return { fillColor: '#ef4444', fillOpacity: 0.32, color: '#991b1b', weight: 2 };
-            }
-            if (level === 'MODERATE') {
-                return { fillColor: '#f97316', fillOpacity: 0.34, color: '#c2410c', weight: 2 };
-            }
-            return { fillColor: '#22c55e', fillOpacity: 0.22, color: '#15803d', weight: 2 };
+            clickMarker = L.circleMarker(latlng, {
+                radius: 7,
+                color: '#1d4ed8',
+                weight: 2,
+                fillColor: '#3b82f6',
+                fillOpacity: 0.9,
+            }).addTo(map);
+            clickMarker.bindPopup('<strong>' + popupText + '</strong><br>' + details + barangayHtml).openPopup();
+            return geofenceState;
         }
 
         function updateLayerLegend() {
             var el = document.getElementById('farm-map-layer-legend');
-            if (!el) {
-                return;
-            }
-            if (!lastContext || !lastContext.map_ready) {
-                el.textContent = '';
-                return;
-            }
-            var rf = (lastContext.rainfall_context || {}).intensity_label || '—';
-            var fl = floodLevelShort((lastContext.flood_risk || {}).level || 'LOW');
-            var wx = lastContext.weather || {};
-            var wxLine =
-                wx.current_temperature != null
-                    ? Math.round(Number(wx.current_temperature)) + '°C' + (wx.condition ? ' · ' + wx.condition : '')
-                    : 'Forecast at your pin';
-            var lines = {
-                farm: '',
-                weather:
-                    'Weather: soft blue zone = forecast context around your farm. Card shows ' + wxLine + '.',
-                rainfall:
-                    'Rainfall: blue zone = forecast rainfall intensity at your pin — ' +
-                    rf +
-                    ' (not radar imagery).',
-                flood:
-                    'Flood: colored zone = advisory risk (' +
-                    fl +
-                    ') from weather — not official flood hazard mapping.',
-            };
-            el.textContent = lines[activeLayer] || '';
+            if (!el) return;
+            el.textContent = activeOverlay === 'none'
+                ? 'Barangays are flood-risk colored by configured classification (red high, yellow moderate, green low).'
+                : activeOverlay === 'flood'
+                  ? 'Flood layer enabled (prototype overlay).'
+                  : activeOverlay === 'crop'
+                    ? 'Crop zone layer enabled (prototype overlay).'
+                    : 'Barangay boundary layer enabled (prototype overlay).';
         }
 
-        function applyLayerVisibility() {
-            if (!map) {
-                return;
-            }
-            removeOverlayFromMap(accCircle);
-            removeOverlayFromMap(weatherCircle);
-            removeOverlayFromMap(rainCircle);
-            removeOverlayFromMap(floodCircle);
+        function applyOverlayVisibility() {
+            updateLayerLegend();
+        }
 
-            if (marker) {
-                if (!map.hasLayer(marker)) {
-                    map.addLayer(marker);
-                }
-            }
+        function buildOverlayDefs(center) {
+            return {
+                flood: L.circle(center, {
+                    radius: 480,
+                    color: '#1d4ed8',
+                    weight: 1,
+                    fillColor: '#60a5fa',
+                    fillOpacity: 0.18,
+                }),
+                crop: L.circle(center, {
+                    radius: 320,
+                    color: '#047857',
+                    weight: 1,
+                    fillColor: '#34d399',
+                    fillOpacity: 0.17,
+                }),
+                barangay: L.circle(center, {
+                    radius: 240,
+                    color: '#6d28d9',
+                    weight: 1,
+                    fillColor: '#a78bfa',
+                    fillOpacity: 0.15,
+                }),
+            };
+        }
 
-            if (!lastContext || !lastContext.map_ready) {
-                if (weatherFloat) {
-                    weatherFloat.classList.add('hidden');
-                    weatherFloat.setAttribute('aria-hidden', 'true');
-                }
-                updateLayerLegend();
-                return;
-            }
+        var overlays = null;
 
-            switch (activeLayer) {
-                case 'farm':
-                    if (accCircle) {
-                        map.addLayer(accCircle);
-                    }
-                    break;
-                case 'weather':
-                    if (weatherCircle) {
-                        map.addLayer(weatherCircle);
-                    }
-                    break;
-                case 'rainfall':
-                    if (rainCircle) {
-                        map.addLayer(rainCircle);
-                    }
-                    break;
-                case 'flood':
-                    if (floodCircle) {
-                        map.addLayer(floodCircle);
-                    }
-                    break;
-                default:
-                    if (accCircle) {
-                        map.addLayer(accCircle);
-                    }
+        function renderOverlay(center) {
+            if (!map) return;
+            if (overlays) {
+                Object.keys(overlays).forEach(function (k) {
+                    map.removeLayer(overlays[k]);
+                });
             }
-
-            if (marker && typeof marker.bringToFront === 'function') {
-                marker.bringToFront();
-            }
-
-            if (weatherFloat) {
-                if (activeLayer === 'weather') {
-                    weatherFloat.classList.remove('hidden');
-                    weatherFloat.setAttribute('aria-hidden', 'false');
-                } else {
-                    weatherFloat.classList.add('hidden');
-                    weatherFloat.setAttribute('aria-hidden', 'true');
-                }
+            overlays = buildOverlayDefs(center);
+            if (activeOverlay !== 'none' && overlays[activeOverlay]) {
+                overlays[activeOverlay].addTo(map);
             }
             updateLayerLegend();
         }
 
-        function fmtCoordExact(v) {
-            if (v == null || v === '') {
-                return '—';
+        function initMap() {
+            if (!mapEl || mapReady) return;
+            map = L.map(mapEl, {
+                zoomControl: false,
+                attributionControl: true,
+            });
+            map.createPane('barangayLabelPane');
+            map.getPane('barangayLabelPane').style.zIndex = '680';
+            map.getPane('barangayLabelPane').style.pointerEvents = 'none';
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap',
+            }).addTo(map);
+            map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+            map.on('click', function (e) {
+                applyGeofenceResult(e.latlng, 'Clicked point');
+            });
+            map.on('zoomend', updateBarangayLabelVisibility);
+            renderOverlay(DEFAULT_CENTER);
+            wireMapControls();
+            mapReady = true;
+            loadGeofenceSource();
+
+            var mapFrame = document.querySelector('.farm-map-stack__frame');
+            if (mapFrame) {
+                document.addEventListener('fullscreenchange', function () {
+                    setTimeout(function () {
+                        map.invalidateSize();
+                    }, 120);
+                });
             }
-            return Number(v).toFixed(6);
         }
 
-        function buildPopupHtml(ctx) {
-            var w = ctx.weather || {};
-            var rf = (ctx.rainfall_context || {}).intensity_label || '—';
-            var fl = (ctx.flood_risk || {}).label || '—';
-            var crop = ctx.crop_type ? String(ctx.crop_type) : 'Not set';
-            var wxRaw =
-                (w.current_temperature != null ? String(w.current_temperature) + '°C' : '—') +
-                (w.condition ? ' · ' + String(w.condition) : '');
-            return (
-                '<div class="farm-map-popup">' +
-                '<p class="farm-map-popup__eyebrow">Farm location</p>' +
-                '<p class="farm-map-popup__title">' +
-                escapeHtml(ctx.farm_name || 'Your farm') +
-                '</p>' +
-                '<p class="farm-map-popup__coords">' +
-                fmtCoordExact(ctx.latitude) +
-                ', ' +
-                fmtCoordExact(ctx.longitude) +
-                '</p>' +
-                '<p class="farm-map-popup__meta"><span>Crop:</span> ' +
-                escapeHtml(crop) +
-                '</p>' +
-                '<p class="farm-map-popup__meta"><span>Flood risk:</span> ' +
-                escapeHtml(fl) +
-                '</p>' +
-                '<p class="farm-map-popup__wx">' +
-                escapeHtml(wxRaw) +
-                '</p>' +
-                '<p class="farm-map-popup__meta"><span>Rainfall:</span> ' +
-                escapeHtml(rf) +
-                '</p>' +
-                '</div>'
-            );
+        function labelTextForFeature(feature) {
+            var p = (feature && feature.properties) || {};
+            return String(
+                p.adm4_en || p.name || p.barangay || p.brgy_name || ''
+            ).trim();
         }
 
-        var tooltipDefaults = {
-            permanent: true,
-            sticky: true,
-            direction: 'top',
-            offset: [0, -10],
-            className: 'farm-map-layer-tooltip',
-            opacity: 0.97,
-        };
+        function buildBarangayLabels(featureCollection) {
+            if (!map || !featureCollection || !Array.isArray(featureCollection.features)) {
+                return;
+            }
+            if (barangayLabelsLayer) {
+                map.removeLayer(barangayLabelsLayer);
+            }
+            barangayLabelsLayer = L.layerGroup();
+            featureCollection.features.forEach(function (feature) {
+                var label = labelTextForFeature(feature);
+                if (!label) {
+                    return;
+                }
+                var featureLayer = L.geoJSON(feature);
+                var bounds = featureLayer.getBounds();
+                if (!bounds || !bounds.isValid()) {
+                    return;
+                }
+                var center = bounds.getCenter();
+                var marker = L.marker(center, {
+                    pane: 'barangayLabelPane',
+                    interactive: false,
+                    keyboard: false,
+                    opacity: 0,
+                });
+                marker.bindTooltip(label, {
+                    permanent: true,
+                    direction: 'center',
+                    className: 'farm-map-barangay-label',
+                    opacity: 1,
+                    interactive: false,
+                });
+                barangayLabelsLayer.addLayer(marker);
+            });
+            barangayLabelsLayer.addTo(map);
+            updateBarangayLabelVisibility();
+        }
 
-        function escapeHtml(s) {
+        function updateBarangayLabelVisibility() {
+            if (!map || !barangayLabelsLayer) {
+                return;
+            }
+            if (map.getZoom() >= LABEL_MIN_ZOOM) {
+                if (!map.hasLayer(barangayLabelsLayer)) {
+                    barangayLabelsLayer.addTo(map);
+                }
+            } else if (map.hasLayer(barangayLabelsLayer)) {
+                map.removeLayer(barangayLabelsLayer);
+            }
+        }
+
+        function loadGeofenceSource() {
+            fetch(geofenceUrl, { headers: { Accept: 'application/json' } })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('geofence fetch failed');
+                    return res.json();
+                })
+                .then(function (geojson) {
+                    geofenceFeatureCollection =
+                        geojson.type === 'FeatureCollection' ? geojson : { type: 'FeatureCollection', features: [geojson] };
+                    var featureBoundsLayer = L.geoJSON(geofenceFeatureCollection);
+                    var bounds = featureBoundsLayer.getBounds && featureBoundsLayer.getBounds().isValid() ? featureBoundsLayer.getBounds() : null;
+                    geofenceFeatureCollection = updateBarangayRiskData(geofenceFeatureCollection);
+                    if (geofenceLayer) {
+                        map.removeLayer(geofenceLayer);
+                    }
+                    geofenceLayer = L.geoJSON(geofenceFeatureCollection, {
+                        style: function (feature) {
+                            var riskLevel = (feature && feature.properties && feature.properties.flood_risk_level) || 'unknown';
+                            var style = getRiskStyle(riskLevel);
+                            return {
+                                color: style.line,
+                                weight: 1.9,
+                                fillColor: style.fill,
+                                fillOpacity: 0.24,
+                            };
+                        },
+                        onEachFeature: function (feature, layer) {
+                            var props = feature.properties || {};
+                            var name = getFeatureName(feature);
+                            var riskLabel = props.flood_risk_label || 'Unknown Risk';
+                            var riskColor = props.flood_risk_color_label || 'Unknown';
+                            var riskReason = props.risk_reason || 'Configured barangay flood classification';
+                            layer.bindTooltip(name + ' • ' + riskLabel, { sticky: true });
+                            layer.bindPopup(
+                                '<strong>' + esc(name) + '</strong><br>' +
+                                'Flood risk: <strong>' + esc(riskLabel) + '</strong><br>' +
+                                'Color class: ' + esc(riskColor) + '<br>' +
+                                'Risk reason: ' + esc(riskReason)
+                            );
+                            layer.on('mouseover', function () {
+                                layer.setStyle({ weight: 3, fillOpacity: 0.35 });
+                            });
+                            layer.on('mouseout', function () {
+                                geofenceLayer.resetStyle(layer);
+                            });
+                        },
+                        interactive: true,
+                    }).addTo(map);
+                    geofenceLayer.bringToFront();
+                    buildBarangayLabels(geofenceFeatureCollection);
+                    if (bounds) {
+                        map.fitBounds(bounds, { padding: [16, 16] });
+                    } else if (geofenceLayer.getBounds && geofenceLayer.getBounds().isValid()) {
+                        map.fitBounds(geofenceLayer.getBounds(), { padding: [16, 16] });
+                    }
+                    setEmptyOverlayVisible(false);
+                    setGeofenceBadge('outside_geofence');
+                    updateLayerLegend();
+                })
+                .catch(function () {
+                    showErr('Could not load Amulung geofence boundary.');
+                });
+        }
+
+        function renderLayerToggles() {
+            if (!layerEl) return;
+            var defs = [
+                { id: 'none', icon: '🧭', label: 'Base' },
+                { id: 'flood', icon: '🌊', label: 'Flood' },
+                { id: 'crop', icon: '🌾', label: 'Crop' },
+                { id: 'barangay', icon: '🧩', label: 'Barangay' },
+            ];
+            layerEl.innerHTML = '';
+            defs.forEach(function (d) {
+                var b = document.createElement('button');
+                var on = activeOverlay === d.id;
+                b.type = 'button';
+                b.className = 'farm-map-layer-btn' + (on ? ' farm-map-layer-btn--on' : '');
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                b.innerHTML =
+                    '<span class="farm-map-layer-btn__ic" aria-hidden="true">' + d.icon + '</span>' +
+                    '<span class="farm-map-layer-btn__lbl">' + d.label + '</span>';
+                b.addEventListener('click', function () {
+                    activeOverlay = d.id;
+                    renderLayerToggles();
+                    if (gpsMarker) {
+                        renderOverlay(gpsMarker.getLatLng());
+                    } else {
+                        renderOverlay(map.getCenter());
+                    }
+                });
+                layerEl.appendChild(b);
+            });
+        }
+
+        function fetchContext() {
+            if (!contextUrl) {
+                return Promise.resolve(null);
+            }
+            return window.axios
+                .get(contextUrl, { headers: { Accept: 'application/json' } })
+                .then(function (res) {
+                    return res.data || null;
+                })
+                .catch(function () {
+                    return null;
+                });
+        }
+
+        function esc(s) {
             var d = document.createElement('div');
-            d.textContent = s;
+            d.textContent = String(s == null ? '' : s);
             return d.innerHTML;
         }
 
-        /**
-         * Leaflet measures the container at init. The map script loads asynchronously, fonts/icons
-         * can reflow the page, and mobile viewports change — all of which require invalidateSize().
-         */
-        function scheduleMapResize() {
-            if (!map) {
-                return;
-            }
-            function inv() {
-                if (map) {
-                    map.invalidateSize({ animate: false });
-                }
-            }
-            requestAnimationFrame(function () {
-                inv();
-                requestAnimationFrame(inv);
-            });
-            [0, 50, 150, 400, 800].forEach(function (ms) {
-                window.setTimeout(inv, ms);
-            });
-        }
-
-        /**
-         * Fullscreen exit often fires before the document has finished reflowing; Leaflet can read a
-         * stale clientWidth/height once and skip updates. Re-measure with pan:false to avoid drift.
-         */
-        function refreshMapLayoutAfterFullscreenExit() {
-            if (!map) {
-                return;
-            }
-            function inv() {
-                if (map) {
-                    map.invalidateSize({ animate: false, pan: false });
-                }
-            }
-            inv();
-            requestAnimationFrame(function () {
-                inv();
-                requestAnimationFrame(function () {
-                    inv();
-                });
-            });
-            [16, 50, 100, 200, 400, 600, 1000].forEach(function (ms) {
-                window.setTimeout(inv, ms);
-            });
-        }
-
-        /**
-         * Map height: fill space below the map tile; enforce a minimum share of the visual viewport.
-         * Debounced remeasure + hysteresis avoid feedback loops (ResizeObserver / row reflow / Leaflet).
-         */
-        var mapCanvasHeightDebounce = null;
-        var MAP_CANVAS_DEBOUNCE_MS = 120;
-
-        function scheduleMapCanvasHeight() {
-            if (mapCanvasHeightDebounce != null) {
-                clearTimeout(mapCanvasHeightDebounce);
-            }
-            mapCanvasHeightDebounce = window.setTimeout(function () {
-                mapCanvasHeightDebounce = null;
-                measureMapCanvasHeightImmediate();
-            }, MAP_CANVAS_DEBOUNCE_MS);
-        }
-
-        function measureMapCanvasHeightImmediate() {
-            var el = document.querySelector('.farm-map-main-canvas');
-            if (!el) {
-                return;
-            }
-            var pageRoot = document.getElementById('farm-map-page');
-            var autoHeightOff =
-                el.getAttribute('data-farm-map-auto-height') === 'false' ||
-                (pageRoot && pageRoot.getAttribute('data-farm-map-auto-height') === 'false');
-
-            if (document.fullscreenElement && document.fullscreenElement.contains(el)) {
-                el.style.height = '';
-                if (map) {
-                    scheduleMapResize();
-                }
-                return;
-            }
-
-            /* Let CSS fully control height/min-height (Leaflet still needs a definite box — set height or min-height in CSS). */
-            if (autoHeightOff) {
-                el.style.height = '';
-                if (map) {
-                    scheduleMapResize();
-                }
-                return;
-            }
-
-            var cs = getComputedStyle(el);
-            var cssMinH = parseFloat(cs.minHeight);
-            if (isNaN(cssMinH) || cssMinH < 0) {
-                cssMinH = 0;
-            }
-
-            var vv = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            var top = el.getBoundingClientRect().top;
-            var gap = 8;
-            var remaining = Math.floor(vv - top - gap);
-            /* At least ~62% of viewport height, floor 560px — keeps the map tall even with UI above */
-            var minShare = Math.max(560, Math.floor(vv * 0.62));
-            /* Respect stylesheet min-height / --farm-map-canvas-min-height (inline height would otherwise override CSS height). */
-            var minH = Math.max(720, minShare, cssMinH);
-            var h = Math.max(minH, remaining);
-            var maxH = Math.floor(vv * 0.98);
-            if (h > maxH) {
-                h = maxH;
-            }
-            if (cssMinH > 0 && h < cssMinH && cssMinH <= maxH) {
-                h = cssMinH;
-            }
-
-            var prev = parseFloat(String(el.style.height || '').replace(/px$/i, ''), 10);
-            if (!isNaN(prev) && Math.abs(h - prev) < 8) {
-                if (map) {
-                    scheduleMapResize();
-                }
-                return;
-            }
-
-            el.style.height = h + 'px';
-            if (map) {
-                scheduleMapResize();
-            }
-        }
-
-        var advisoryResizeObs = null;
-        function setupAdvisoryResizeObserver() {
-            if (advisoryResizeObs || typeof ResizeObserver === 'undefined') {
-                return;
-            }
-            var adv = document.getElementById('farm-map-smart-advisory');
-            if (!adv) {
-                return;
-            }
-            /* Only the advisory card — do NOT observe the row that contains the map (resize loop). */
-            advisoryResizeObs = new ResizeObserver(function () {
-                scheduleMapCanvasHeight();
-            });
-            advisoryResizeObs.observe(adv);
-        }
-
-        function setupMapResizeGuards() {
-            if (mapResizeGuardsSetup || !map || !mapEl) {
-                return;
-            }
-            mapResizeGuardsSetup = true;
-
-            function onViewportChange() {
-                scheduleMapCanvasHeight();
-            }
-
-            measureMapCanvasHeightImmediate();
-            setupAdvisoryResizeObserver();
-            if (document.readyState !== 'complete') {
-                window.addEventListener('load', measureMapCanvasHeightImmediate, { once: true, passive: true });
-            }
-            window.addEventListener('resize', onViewportChange, { passive: true });
-            window.addEventListener('orientationchange', onViewportChange, { passive: true });
-            window.addEventListener(
-                'pageshow',
-                function (ev) {
-                    if (ev.persisted) {
-                        measureMapCanvasHeightImmediate();
-                    }
-                },
-                { passive: true }
-            );
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', onViewportChange, { passive: true });
-            }
-            if (typeof ResizeObserver !== 'undefined') {
-                var roFrame = null;
-                var ro = new ResizeObserver(function () {
-                    if (!map) {
-                        return;
-                    }
-                    if (roFrame != null) {
-                        cancelAnimationFrame(roFrame);
-                    }
-                    roFrame = requestAnimationFrame(function () {
-                        roFrame = null;
-                        if (map) {
-                            map.invalidateSize({ animate: false });
-                        }
-                    });
-                });
-                ro.observe(mapEl);
-                var inner = mapEl.closest('.farm-map-stack__map-inner');
-                if (inner) {
-                    ro.observe(inner);
-                }
-                var mapFrame = document.querySelector('.farm-map-stack__frame');
-                if (mapFrame) {
-                    ro.observe(mapFrame);
-                }
-            }
-        }
-
-        /**
-         * Shows the browser’s latest GPS fix as a pin immediately (before save completes).
-         */
-        function showLiveGpsPin(pos) {
-            initMap();
-            clearMapLayers();
-            setEmptyOverlayVisible(false);
-
-            var lat = pos.coords.latitude;
-            var lng = pos.coords.longitude;
-            var ll = L.latLng(lat, lng);
-            var acc = typeof pos.coords.accuracy === 'number' ? pos.coords.accuracy : null;
-            lastAccuracyM = acc;
-
-            if (acc != null && acc > 4 && acc < 800) {
-                pendingAccCircle = L.circle(ll, {
-                    radius: acc,
-                    color: '#475569',
-                    weight: 1,
-                    dashArray: '5 6',
-                    fillColor: '#64748b',
-                    fillOpacity: 0.06,
-                }).addTo(map);
-            }
-
-            pendingGpsMarker = L.marker([lat, lng], {
-                icon: getGpsPinIcon(),
-                zIndexOffset: 5000,
-                riseOnHover: true,
-                keyboard: true,
-                title: 'Your device GPS position',
-            }).addTo(map);
-
-            pendingGpsMarker.bindPopup(
-                '<div class="text-xs space-y-1" style="min-width:200px">' +
-                    '<p class="farm-map-popup-gps-label">Live GPS</p>' +
-                    '<p class="text-slate-700 font-semibold">Saving…</p>' +
-                    '<p><span class="text-slate-500">Lat, lng:</span> ' +
-                    fmtCoordExact(lat) +
-                    ', ' +
-                    fmtCoordExact(lng) +
-                    '</p>' +
-                    (acc != null ? '<p class="text-slate-500">~' + Math.round(acc) + ' m</p>' : '') +
-                    '</div>',
-                { maxWidth: 280 }
-            );
-            pendingGpsMarker.openPopup();
-
-            map.setView(ll, 17);
-            wireMapControls();
-            scheduleMapResize();
-        }
-
-        function drawFarmMap(ctx) {
-            initMap();
-            clearMapLayers();
-            if (!map || !ctx.map_ready || ctx.latitude == null || ctx.longitude == null) {
-                map.setView(DEFAULT_CENTER, EMPTY_ZOOM);
-                setEmptyOverlayVisible(true);
-                scheduleMapResize();
-                updateLayerLegend();
-                return;
-            }
-
-            setEmptyOverlayVisible(false);
-
-            var lat = Number(ctx.latitude);
-            var lng = Number(ctx.longitude);
-            var ll = L.latLng(lat, lng);
-
-            var ov = ctx.overlays || {};
-            var r = ov.rainfall || {};
-            var f = ov.flood || {};
-            var rfLabel = (ctx.rainfall_context || {}).intensity_label || '—';
-            var flvl = (ctx.flood_risk || {}).level || 'LOW';
-
-            accCircle = L.circle(ll, {
-                radius: 95,
-                color: '#64748b',
-                weight: 1,
-                dashArray: '5 6',
-                fillColor: '#94a3b8',
-                fillOpacity: 0.1,
-            });
-            accCircle.bindTooltip('Farm — saved pin & ring', tooltipDefaults);
-
-            var rainSt = ringStyleForRainfall(rfLabel);
-            var rainOpts = {
-                radius: r.radius_m || 420,
-                color: rainSt.color,
-                weight: rainSt.weight,
-                fillColor: rainSt.fillColor,
-                fillOpacity: rainSt.fillOpacity,
-            };
-            if (rainSt.dashArray) {
-                rainOpts.dashArray = rainSt.dashArray;
-            }
-            rainCircle = L.circle(ll, rainOpts);
-            rainCircle.bindTooltip('Rainfall — ' + rfLabel + ' · forecast', tooltipDefaults);
-
-            var floodSt = ringStyleForFlood(flvl);
-            floodCircle = L.circle(ll, {
-                radius: f.radius_m || 380,
-                color: floodSt.color,
-                weight: floodSt.weight,
-                fillColor: floodSt.fillColor,
-                fillOpacity: floodSt.fillOpacity,
-            });
-            floodCircle.bindTooltip(
-                'Flood — ' + floodLevelShort(flvl) + ' risk (advisory)',
-                tooltipDefaults
-            );
-
-            weatherCircle = L.circle(ll, {
-                radius: 460,
-                color: '#93c5fd',
-                weight: 1,
-                dashArray: '2 6',
-                fillColor: '#3b82f6',
-                fillOpacity: 0.08,
-            });
-            weatherCircle.bindTooltip('Weather — forecast zone', tooltipDefaults);
-
-            marker = L.marker([lat, lng], {
-                icon: getGpsPinIcon(),
-                zIndexOffset: 5000,
-                riseOnHover: true,
-                keyboard: true,
-                title: 'Your farm — tap for details',
-            }).addTo(map);
-            marker.bindPopup(buildPopupHtml(ctx), { maxWidth: 280 });
-
-            map.fitBounds(L.latLngBounds(ll, ll).pad(0.35));
-            map.setView(ll, Math.max(map.getZoom(), 16));
-
-            var w = ctx.weather || {};
-            if (weatherFloatText) {
-                var t = w.current_temperature != null ? Math.round(Number(w.current_temperature)) + '°C' : '—';
-                var c = w.condition ? String(w.condition) : '';
-                weatherFloatText.textContent = (t !== '—' ? t + ' · ' : '') + c;
-            }
-
-            applyLayerVisibility();
-            scheduleMapResize();
-        }
-
-        function floodChipTone(level) {
-            if (level === 'HIGH') {
-                return 'bad';
-            }
-            if (level === 'MODERATE') {
-                return 'warn';
-            }
-            if (level === 'LOW') {
-                return 'ok';
-            }
-            return 'muted';
-        }
-
-        function setStatusChip(wrapEl, tone) {
-            if (!wrapEl) {
-                return;
-            }
-            wrapEl.className = 'farm-map-status-chip farm-map-status-chip--' + tone;
-        }
-
-        function renderControlStripStatus(ctx) {
-            if (!statusGpsEl || !statusFloodEl) {
-                return;
-            }
+        function renderSnapshotCards(ctx) {
+            if (!snapshotGridEl) return;
             if (!ctx || !ctx.map_ready) {
-                setStatusChip(statusGpsWrap, 'muted');
-                statusGpsEl.textContent = 'Not connected';
-                setStatusChip(statusFloodWrap, 'muted');
-                statusFloodEl.textContent = '—';
+                snapshotGridEl.innerHTML =
+                    '<article class="farm-map-snap-card farm-map-snap-card--loc"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Location</p><p class="farm-map-snap-card__value">GPS connected, syncing farm data…</p><p class="farm-map-snap-card__sub">Snapshot will appear once context is available.</p></div></div></article>' +
+                    '<article class="farm-map-snap-card farm-map-snap-card--rain"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Rain Chance</p><p class="farm-map-snap-card__value">Waiting for weather data</p><p class="farm-map-snap-card__sub">Forecast probability will populate automatically.</p></div></div></article>';
                 return;
             }
 
-            setStatusChip(statusGpsWrap, 'ok');
-            statusGpsEl.textContent = 'Connected';
+            var weather = ctx.weather || {};
+            var snapshot = ctx.risk_snapshot || {};
+            var location = esc(ctx.location_display || 'Saved farm location');
+            var rainChance = esc(snapshot.rain_chance_display || '—');
+            var temp = weather.current_temperature != null ? Math.round(Number(weather.current_temperature)) + '°C' : '—';
+            var cond = esc(weather.condition || 'No condition data');
+            var effect = esc(snapshot.three_day_effect || 'No forecast impact available');
+            snapshotGridEl.innerHTML =
+                '<article class="farm-map-snap-card farm-map-snap-card--loc"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Location</p><p class="farm-map-snap-card__value">' + location + '</p><p class="farm-map-snap-card__sub">Saved farm location</p></div></div></article>' +
+                '<article class="farm-map-snap-card farm-map-snap-card--wx"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Weather</p><p class="farm-map-snap-card__value">' + esc(temp) + '</p><p class="farm-map-snap-card__sub">' + cond + '</p></div></div></article>' +
+                '<article class="farm-map-snap-card farm-map-snap-card--rain"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Rain Chance</p><p class="farm-map-snap-card__value">' + rainChance + '</p><p class="farm-map-snap-card__sub">Forecast probability</p></div></div></article>' +
+                '<article class="farm-map-snap-card farm-map-snap-card--effect"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">3-Day Effect</p><p class="farm-map-snap-card__value">' + effect + '</p><p class="farm-map-snap-card__sub">Forecast trend near your farm</p></div></div></article>';
+        }
 
-            var flvl = (ctx.flood_risk || {}).level || 'LOW';
-            setStatusChip(statusFloodWrap, floodChipTone(flvl));
-            statusFloodEl.textContent = floodLevelShort(flvl);
+        function renderTodaySummary(ctx) {
+            if (!todaySummaryEl) return;
+            if (!ctx || !ctx.map_ready) {
+                todaySummaryEl.textContent = 'GPS connected, syncing farm insights…';
+                return;
+            }
+            var weather = ctx.weather || {};
+            var rainProb = weather.today_rain_probability;
+            var chance = Number.isFinite(Number(rainProb)) ? Math.round(Number(rainProb)) + '% rain chance' : 'rain chance unavailable';
+            var effect = (ctx.risk_snapshot || {}).three_day_effect || 'No forecast impact available';
+            todaySummaryEl.textContent = 'Today: ' + chance + '. ' + effect + '.';
+        }
+
+        function renderAdvisory(ctx) {
+            if (!advisoryStatusEl || !advisoryMainActionEl) return;
+            function setAdviceBodies(main, early, midday, late, water, avoid) {
+                advisoryMainActionEl.textContent = main;
+                if (advisoryPlanEarlyEl) advisoryPlanEarlyEl.textContent = early;
+                if (advisoryPlanMiddayEl) advisoryPlanMiddayEl.textContent = midday;
+                if (advisoryPlanLateEl) advisoryPlanLateEl.textContent = late;
+                if (advisoryPlanWaterEl) advisoryPlanWaterEl.textContent = water;
+                if (advisoryPlanAvoidEl) advisoryPlanAvoidEl.textContent = avoid;
+            }
+
+            if (!ctx || !ctx.map_ready) {
+                advisoryStatusEl.innerHTML = '<span class="text-slate-600">AI Smart Advisory: Waiting for GPS</span>';
+                setAdviceBodies(
+                    'GPS connected, syncing advisory data…',
+                    'Waiting for weather data.',
+                    'Waiting for weather data.',
+                    'Waiting for weather data.',
+                    'Waiting for weather data.',
+                    'Waiting for weather data.'
+                );
+                return;
+            }
+
+            var m = ctx.map_smart_advisory || null;
+            if (!m || m.status !== 'active') {
+                advisoryStatusEl.innerHTML = '<span class="text-slate-600">AI Smart Advisory: Ready</span>';
+                setAdviceBodies(
+                    'No advisory available yet.',
+                    'No early-day guidance available yet.',
+                    'No midday guidance available yet.',
+                    'No late-day guidance available yet.',
+                    'No water and drainage guidance available yet.',
+                    'No avoid-today guidance available yet.'
+                );
+                return;
+            }
+
+            var doList = Array.isArray(m.what_to_do) ? m.what_to_do : [];
+            var watchList = Array.isArray(m.what_to_watch) ? m.what_to_watch : [];
+            var avoidList = Array.isArray(m.what_to_avoid) ? m.what_to_avoid : [];
+            var smartAction = String(m.smart_action || '').trim() || 'No smart action provided.';
+            var earlyDay = String(m.early_day || doList[0] || watchList[0] || 'No early-day guidance.').trim();
+            var midday = String(m.midday || doList[1] || watchList[1] || doList[0] || 'No midday guidance.').trim();
+            var lateDay = String(m.late_day || doList[2] || watchList[2] || watchList[0] || 'No late-day guidance.').trim();
+            var waterDrainage = String(
+                m.water_drainage || m.drainage_irrigation_advice || watchList[0] || doList[0] || 'No water and drainage guidance.'
+            ).trim();
+            var avoidToday = String(
+                m.what_to_avoid_today || avoidList[0] || m.avoid || 'No avoid-today guidance.'
+            ).trim();
+
+            advisoryStatusEl.innerHTML = '<span class="text-emerald-700">AI Smart Advisory: Active</span>';
+            setAdviceBodies(smartAction, earlyDay, midday, lateDay, waterDrainage, avoidToday);
+        }
+
+        function applyContextToUI(ctx) {
+            renderTodaySummary(ctx);
+            renderSnapshotCards(ctx);
+            renderAdvisory(ctx);
+            if (statusGpsEl) {
+                statusGpsEl.textContent = ctx && ctx.map_ready ? 'Connected' : 'Syncing';
+            }
+            if (statusRainEl) {
+                var rainProb = Number((ctx && ctx.weather ? ctx.weather.today_rain_probability : NaN));
+                statusRainEl.textContent = Number.isFinite(rainProb) ? Math.round(rainProb) + '%' : '—';
+            }
         }
 
         function formatGpsTime(iso) {
@@ -869,513 +680,6 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             } catch (e) {
                 return '—';
             }
-        }
-
-        function updateGpsPanel(ctx) {
-            if (!gpsLastEl) {
-                return;
-            }
-            if (ctx.map_ready && ctx.gps_captured_at) {
-                gpsLastEl.textContent = 'Last updated: ' + formatGpsTime(ctx.gps_captured_at);
-            } else if (ctx.map_ready) {
-                gpsLastEl.textContent = 'Last updated: —';
-            } else {
-                gpsLastEl.textContent = 'Last updated —';
-            }
-        }
-
-        function floodLevelShort(level) {
-            if (level === 'CRITICAL') {
-                return 'Critical';
-            }
-            if (level === 'HIGH') {
-                return 'High';
-            }
-            if (level === 'MODERATE') {
-                return 'Moderate';
-            }
-            return 'Low';
-        }
-
-        function rainPhraseFromCtx(ctx) {
-            var rf = (ctx.rainfall_context || {}).intensity_label || '';
-            var rl = String(rf).toLowerCase();
-            if (rl.indexOf('high') !== -1) {
-                return 'heavy rain';
-            }
-            if (rl.indexOf('moder') !== -1) {
-                return 'moderate rain';
-            }
-            if (rl.indexOf('light') !== -1) {
-                return 'light rain';
-            }
-            return 'limited rain in the forecast';
-        }
-
-        function farmMapSnapCardHtml(mod, lucideName, label, valueEscaped, subEscaped) {
-            return (
-                '<article class="farm-map-snap-card farm-map-snap-card--' +
-                mod +
-                ' farm-map-snap-card--enter">' +
-                '<div class="farm-map-snap-card__row">' +
-                '<span class="farm-map-snap-card__icwrap"><i data-lucide="' +
-                lucideName +
-                '" class="farm-map-snap-card__lucide" aria-hidden="true"></i></span>' +
-                '<div class="farm-map-snap-card__main">' +
-                '<p class="farm-map-snap-card__label">' +
-                escapeHtml(label) +
-                '</p>' +
-                '<p class="farm-map-snap-card__value">' +
-                valueEscaped +
-                '</p>' +
-                '<p class="farm-map-snap-card__sub">' +
-                subEscaped +
-                '</p>' +
-                '</div></div></article>'
-            );
-        }
-
-        function renderTodaySummary(ctx) {
-            if (!todaySummaryEl) {
-                return;
-            }
-            if (!ctx.map_ready) {
-                todaySummaryEl.textContent =
-                    'Save GPS to see today’s snapshot: flood risk, rainfall, and weather at your pin.';
-                return;
-            }
-            var flvl = (ctx.flood_risk || {}).level || 'LOW';
-            var floodAdj = floodLevelShort(flvl);
-            var rain = rainPhraseFromCtx(ctx);
-            var snapshot = ctx.risk_snapshot || {};
-            var snapshotEffect = String(snapshot.three_day_effect || '').trim();
-            var tail = 'Normal farm activity is okay.';
-            if (flvl === 'HIGH') {
-                tail = 'Limit work in low spots and check drainage.';
-            } else if (flvl === 'MODERATE') {
-                tail = 'Watch fields if rain increases.';
-            }
-            if (snapshotEffect !== '' && snapshotEffect.toLowerCase() !== 'no forecast impact available') {
-                tail = snapshotEffect + '. ' + tail;
-            }
-            todaySummaryEl.textContent =
-                'Today: ' + floodAdj + ' flood risk and ' + rain + '. ' + tail;
-        }
-
-        function renderSummary(ctx) {
-            if (!summaryEl) {
-                return;
-            }
-            if (!ctx.map_ready) {
-                summaryEl.innerHTML =
-                    farmMapSnapCardHtml(
-                        'loc',
-                        'map-pin',
-                        'Location',
-                        escapeHtml('No GPS yet'),
-                        escapeHtml('Use GPS to load your farm pin.'),
-                    ) +
-                    farmMapSnapCardHtml(
-                        'wx',
-                        'cloud-sun',
-                        'Weather',
-                        escapeHtml('—'),
-                        escapeHtml('After GPS is saved.'),
-                    ) +
-                    farmMapSnapCardHtml(
-                        'crop',
-                        'percent',
-                        'Estimated Crop Loss',
-                        escapeHtml('—'),
-                        escapeHtml('Potential crop damage from current weather risk'),
-                    ) +
-                    farmMapSnapCardHtml(
-                        'flood',
-                        'waves',
-                        'Flood Risk Level',
-                        escapeHtml('—'),
-                        escapeHtml('Based on local advisory data'),
-                    ) +
-                    farmMapSnapCardHtml(
-                        'effect',
-                        'calendar-range',
-                        '3-Day Effect',
-                        escapeHtml('—'),
-                        escapeHtml('Forecast trend near your farm'),
-                    );
-                lucideRefresh();
-                return;
-            }
-
-            var w = ctx.weather || {};
-            var addr = escapeHtml(ctx.location_display || '') || '—';
-
-            var wxVal = '—';
-            var wxSub = '—';
-            var weatherUnavailable = w.current_temperature == null && !w.condition;
-            if (!weatherUnavailable) {
-                wxVal =
-                    w.current_temperature != null ? String(Math.round(Number(w.current_temperature))) + '°C' : '—';
-                wxSub = escapeHtml(w.condition || '');
-                if (w.wind_speed != null) {
-                    var ws = Number(w.wind_speed);
-                    if (ws >= 30) {
-                        wxSub += wxSub ? ' · Breezy' : 'Breezy';
-                    } else if (ws >= 15) {
-                        wxSub += wxSub ? ' · Light wind' : 'Light wind';
-                    }
-                }
-            } else {
-                wxSub = escapeHtml('Unavailable');
-            }
-
-            var rainSub = 'Forecast trend near your farm';
-
-            var fr = ctx.flood_risk || {};
-            var flvl = fr.level || 'LOW';
-            var snapshot = ctx.risk_snapshot || {};
-            var snapshotFlood = String(snapshot.flood_risk_level || '').trim();
-            var snapshotCropLoss = String(snapshot.estimated_crop_loss || 'N/A').trim() || 'N/A';
-            var snapshotEffect = String(snapshot.three_day_effect || 'No forecast impact available').trim() || 'No forecast impact available';
-            var floodVal = escapeHtml(snapshotFlood !== '' ? snapshotFlood : floodLevelShort(flvl));
-            var floodLbl = fr.label != null && String(fr.label).trim() !== '' ? String(fr.label) : '';
-            var floodSub =
-                floodLbl !== ''
-                    ? escapeHtml(floodLbl)
-                    : fr.message != null && String(fr.message).trim() !== ''
-                      ? escapeHtml(String(fr.message))
-                      : escapeHtml('Based on local advisory data');
-
-            summaryEl.innerHTML =
-                farmMapSnapCardHtml('loc', 'map-pin', 'Location', addr, escapeHtml('Saved farm location')) +
-                farmMapSnapCardHtml('wx', 'cloud-sun', 'Weather', escapeHtml(wxVal), wxSub) +
-                farmMapSnapCardHtml(
-                    'crop',
-                    'percent',
-                    'Estimated Crop Loss',
-                    escapeHtml(snapshotCropLoss),
-                    escapeHtml('Potential crop damage from current weather risk'),
-                ) +
-                farmMapSnapCardHtml(
-                    'flood',
-                    'waves',
-                    'Flood Risk Level',
-                    floodVal,
-                    floodSub,
-                ) +
-                farmMapSnapCardHtml(
-                    'effect',
-                    'calendar-range',
-                    '3-Day Effect',
-                    escapeHtml(snapshotEffect),
-                    escapeHtml(rainSub),
-                );
-
-            lucideRefresh();
-        }
-
-        function setAdvisoryLoading(busy) {
-            var statusLine = document.getElementById('farm-map-advisory-status-line');
-            var inner = document.getElementById('farm-map-advisory-inner');
-            if (!statusLine || !inner) {
-                return;
-            }
-            if (!busy) {
-                return;
-            }
-            if (!lastContext || !lastContext.map_ready) {
-                return;
-            }
-            clearFarmMapAdvisoryDetail();
-            statusLine.innerHTML = '<span class="text-slate-600">Updating advisory…</span>';
-            inner.innerHTML = '<p class="text-sm text-slate-500" role="status">Loading advisory…</p>';
-            lucideRefresh();
-        }
-
-        function scheduleAdvisoryRefetch() {
-            if (!lastContext || !lastContext.map_ready) {
-                return;
-            }
-            if (layerAdvisoryTimer != null) {
-                clearTimeout(layerAdvisoryTimer);
-            }
-            setAdvisoryLoading(true);
-            layerAdvisoryTimer = setTimeout(function () {
-                layerAdvisoryTimer = null;
-                fetchContext({ silent: true })
-                    .then(function (ctx) {
-                        if (ctx) {
-                            applyContext(ctx);
-                        } else if (lastContext) {
-                            renderSmartAdvisory(lastContext);
-                        }
-                    });
-            }, 380);
-        }
-
-        function mapClaySrc(key) {
-            var c =
-                typeof window !== 'undefined' && window.AGRI_MAP_ADV_CLAY ? window.AGRI_MAP_ADV_CLAY : {};
-            return c[key] || '';
-        }
-
-        function mapClayImgHtml(key, cls, w, h) {
-            var src = mapClaySrc(key);
-            if (!src) {
-                return '';
-            }
-            return (
-                '<img src="' +
-                escapeHtml(src) +
-                '" alt="" class="' +
-                cls +
-                '" width="' +
-                String(w) +
-                '" height="' +
-                String(h) +
-                '" decoding="async">'
-            );
-        }
-
-        function renderFmAdvListHtml(items, emptyLine) {
-            emptyLine = emptyLine || 'AI advisory temporarily unavailable.';
-            if (!items || !items.length) {
-                return '<ul class="cp-advice-list"><li>' + escapeHtml(emptyLine) + '</li></ul>';
-            }
-            var lis = items
-                .map(function (line) {
-                    return '<li>' + escapeHtml(String(line)) + '</li>';
-                })
-                .join('');
-            return '<ul class="cp-advice-list">' + lis + '</ul>';
-        }
-
-        function lucideRefresh() {
-            if (typeof window.lucide !== 'undefined') {
-                window.lucide.createIcons();
-            }
-        }
-
-        function farmMapAdvSmartActionHtml(actionEscaped) {
-            return (
-                '<div class="dash-smart__head">' +
-                '<div class="dash-smart__title-wrap">' +
-                '<span class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-extrabold uppercase tracking-[0.1em] text-slate-700">' +
-                '<span class="dash-smart__chip-emoji" aria-hidden="true">🔥</span>' +
-                ' Smart action' +
-                '</span>' +
-                '</div>' +
-                '</div>' +
-                '<div class="dash-smart__body">' +
-                '<p class="dash-smart__action">' +
-                actionEscaped +
-                '</p>' +
-                '</div>'
-            );
-        }
-
-        function clearFarmMapAdvisoryDetail() {
-            var detailEl = document.getElementById('farm-map-advisory-detail');
-            if (detailEl) {
-                detailEl.classList.add('hidden');
-                detailEl.innerHTML = '';
-            }
-        }
-
-        function renderSmartAdvisory(ctx) {
-            var inner = document.getElementById('farm-map-advisory-inner');
-            var statusLine = document.getElementById('farm-map-advisory-status-line');
-            if (!inner || !statusLine) {
-                return;
-            }
-
-            if (!ctx.map_ready || !ctx.map_smart_advisory) {
-                clearFarmMapAdvisoryDetail();
-                statusLine.innerHTML =
-                    '<span class="text-slate-600">AI Smart Advisory: Waiting for GPS</span>';
-                inner.innerHTML =
-                    '<div class="dash-smart__notice" role="status">' +
-                    '<i data-lucide="map-pin" class="dash-smart__notice-icon" aria-hidden="true"></i>' +
-                    '<p>Save your farm GPS pin to unlock map overlays, local weather, and this advisory for your field.</p>' +
-                    '</div>';
-                lucideRefresh();
-                return;
-            }
-
-            var a = ctx.map_smart_advisory;
-            var isActive = a.status === 'active';
-            statusLine.innerHTML = isActive
-                ? '<span class="text-emerald-700">AI Smart Advisory: Active</span>'
-                : '<span class="text-rose-700">AI Smart Advisory: Unavailable</span>';
-
-            var action = escapeHtml(String(isActive ? a.smart_action || '' : 'AI advisory temporarily unavailable.'));
-            var summary = escapeHtml(String(isActive ? a.advice_summary || '' : 'AI advisory temporarily unavailable.'));
-            var why = escapeHtml(String(isActive ? a.why_this_matters || a.why_this_tip || '' : 'AI advisory temporarily unavailable.'));
-
-            var doList = isActive && a.what_to_do ? a.what_to_do : [];
-            if (!doList || !doList.length) {
-                doList = [];
-            }
-            var watchList = isActive && a.what_to_watch ? a.what_to_watch : [];
-            if (!watchList || !watchList.length) {
-                watchList = [];
-            }
-            var avoidSrc = isActive ? a.what_to_avoid || a.avoid || [] : [];
-            var avoidList = avoidSrc.slice(0, 3);
-            doList = doList.slice(0, 4);
-            watchList = watchList.slice(0, 4);
-
-            inner.innerHTML = farmMapAdvSmartActionHtml(action);
-
-            var detailHtml =
-                '<div class="cp-smart-summary">' +
-                '<div class="cp-smart-summary__head">' +
-                mapClayImgHtml('bulb', 'weather-clay-ic weather-clay-ic--plan', 22, 22) +
-                '<h3 class="cp-smart-block-title">Advice summary</h3>' +
-                '</div>' +
-                '<p class="cp-smart-summary__text">' +
-                summary +
-                '</p>' +
-                '</div>' +
-                '<div class="cp-smart-grid">' +
-                '<article class="cp-smart-block cp-smart-block--do">' +
-                '<div class="cp-smart-block__head">' +
-                mapClayImgHtml('sprout', 'weather-clay-ic weather-clay-ic--inline', 18, 18) +
-                '<h3 class="cp-smart-block-title">What to do</h3>' +
-                '</div>' +
-                renderFmAdvListHtml(doList, '') +
-                '</article>' +
-                '<article class="cp-smart-block cp-smart-block--watch">' +
-                '<div class="cp-smart-block__head">' +
-                mapClayImgHtml('eye', 'weather-clay-ic weather-clay-ic--inline', 18, 18) +
-                '<h3 class="cp-smart-block-title">What to watch</h3>' +
-                '</div>' +
-                renderFmAdvListHtml(watchList, '') +
-                '</article>' +
-                '<article class="cp-smart-block cp-smart-block--avoid">' +
-                '<div class="cp-smart-block__head">' +
-                mapClayImgHtml('alert', 'weather-clay-ic weather-clay-ic--inline', 18, 18) +
-                '<h3 class="cp-smart-block-title">What to avoid</h3>' +
-                '</div>' +
-                renderFmAdvListHtml(avoidList, '') +
-                '</article>' +
-                '<article class="cp-smart-block cp-smart-block--why">' +
-                '<div class="cp-smart-block__head">' +
-                mapClayImgHtml('bulb', 'weather-clay-ic weather-clay-ic--inline', 18, 18) +
-                '<h3 class="cp-smart-block-title">Why this matters</h3>' +
-                '</div>' +
-                '<p class="cp-smart-why-text">' +
-                why +
-                '</p>' +
-                '</article>' +
-                '</div>';
-
-            var detailEl = document.getElementById('farm-map-advisory-detail');
-            if (detailEl) {
-                if (isActive) {
-                    detailEl.classList.remove('hidden');
-                    detailEl.innerHTML =
-                        '<div class="relative space-y-3 px-3 py-3.5 sm:space-y-3.5 sm:px-4 sm:py-4">' +
-                        detailHtml +
-                        '</div>';
-                } else {
-                    detailEl.classList.add('hidden');
-                    detailEl.innerHTML = '';
-                }
-            }
-
-            lucideRefresh();
-        }
-
-        function renderLayerToggles() {
-            if (!layerEl) {
-                return;
-            }
-            var defs = [
-                { id: 'farm', icon: '📍', label: 'Farm' },
-                { id: 'weather', icon: '☁', label: 'Weather' },
-                { id: 'rainfall', icon: '🌧', label: 'Rainfall' },
-                { id: 'flood', icon: '⚠', label: 'Flood' },
-            ];
-            layerEl.innerHTML = '';
-            defs.forEach(function (d) {
-                var b = document.createElement('button');
-                b.type = 'button';
-                var isOn = activeLayer === d.id;
-                b.className = 'farm-map-layer-btn' + (isOn ? ' farm-map-layer-btn--on' : '');
-                b.setAttribute('aria-pressed', isOn ? 'true' : 'false');
-                b.dataset.layer = d.id;
-                b.title =
-                    d.id === 'farm'
-                        ? 'Farm: pin and saved area'
-                        : d.id === 'weather'
-                          ? 'Weather: forecast zone and conditions'
-                          : d.id === 'rainfall'
-                            ? 'Rainfall: forecast intensity zone'
-                            : 'Flood: advisory risk zone';
-                b.innerHTML =
-                    '<span class="farm-map-layer-btn__ic" aria-hidden="true">' +
-                    d.icon +
-                    '</span><span class="farm-map-layer-btn__lbl">' +
-                    d.label +
-                    '</span>';
-                b.addEventListener('click', function () {
-                    activeLayer = d.id;
-                    renderLayerToggles();
-                    applyLayerVisibility();
-                    scheduleMapResize();
-                    scheduleAdvisoryRefetch();
-                });
-                layerEl.appendChild(b);
-            });
-        }
-
-        function applyContext(ctx) {
-            lastContext = ctx;
-            updateHero(ctx);
-            renderControlStripStatus(ctx);
-            updateGpsPanel(ctx);
-            renderTodaySummary(ctx);
-            renderSummary(ctx);
-            renderLayerToggles();
-            renderSmartAdvisory(ctx);
-            drawFarmMap(ctx);
-
-            if (noGpsHint) {
-                if (ctx.map_ready) {
-                    noGpsHint.classList.add('hidden');
-                } else {
-                    noGpsHint.classList.remove('hidden');
-                }
-            }
-
-            requestAnimationFrame(function () {
-                requestAnimationFrame(function () {
-                    measureMapCanvasHeightImmediate();
-                });
-            });
-        }
-
-        function fetchContext(opts) {
-            opts = opts || {};
-            var params = {};
-            if (activeLayer) {
-                params.map_layer = activeLayer;
-            }
-            return window.axios
-                .get(contextUrl, {
-                    params: params,
-                    headers: { Accept: 'application/json' },
-                })
-                .then(function (res) {
-                    return res.data;
-                })
-                .catch(function () {
-                    if (!opts.silent) {
-                        showErr('<strong>Could not load map data.</strong> Check your connection and try again.');
-                    }
-                    return null;
-                });
         }
 
         function saveGps(lat, lng) {
@@ -1415,6 +719,32 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                 .finally(function () {
                     setLoading(false);
                 });
+        }
+
+        function setGpsVisual(latlng, accuracy) {
+            if (!map) return;
+            if (!gpsMarker) {
+                gpsMarker = L.circleMarker(latlng, {
+                    radius: 8,
+                    color: '#ffffff',
+                    weight: 2,
+                    fillColor: '#2563eb',
+                    fillOpacity: 1,
+                }).addTo(map);
+            } else {
+                gpsMarker.setLatLng(latlng);
+            }
+            if (gpsAccuracy) {
+                map.removeLayer(gpsAccuracy);
+            }
+            gpsAccuracy = L.circle(latlng, {
+                radius: Math.max(accuracy || 0, 8),
+                color: '#2563eb',
+                weight: 1,
+                fillColor: '#60a5fa',
+                fillOpacity: 0.12,
+            }).addTo(map);
+            renderOverlay(latlng);
         }
 
         function geoErrorMessage(err) {
@@ -1463,20 +793,18 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             }
             fetchContext()
                 .then(function (ctx) {
-                    if (ctx) {
-                        applyContext(ctx);
-                    } else if (lastContext) {
-                        applyContext(lastContext);
-                    } else if (gpsLastEl) {
-                        gpsLastEl.textContent = 'Last updated —';
+                    if (!ctx) return;
+                    applyContextToUI(ctx);
+                    if (ctx.latitude != null && ctx.longitude != null && map) {
+                        var latlng = L.latLng(Number(ctx.latitude), Number(ctx.longitude));
+                        setGpsVisual(latlng, 20);
+                        applyGeofenceResult(latlng, 'Saved GPS');
+                        map.flyTo(latlng, TRACK_ZOOM, { duration: 0.35 });
                     }
+                    if (gpsLastEl) gpsLastEl.textContent = 'Last updated: ' + formatGpsTime(ctx.gps_captured_at);
                 })
                 .finally(function () {
-                    if (btnRefresh) {
-                        btnRefresh.disabled = false;
-                    }
-                    scheduleMapResize();
-                    lucideRefresh();
+                    if (btnRefresh) btnRefresh.disabled = false;
                 });
         }
 
@@ -1488,42 +816,30 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             setLoading(true);
             getPosition()
                 .then(function (pos) {
-                    showLiveGpsPin(pos);
+                    var latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+                    setGpsVisual(latlng, pos.coords.accuracy || 0);
+                    applyGeofenceResult(latlng, 'Live GPS');
+                    map.flyTo(latlng, TRACK_ZOOM, { duration: 0.35 });
                     if (gpsLastEl) {
                         gpsLastEl.textContent = 'Saving…';
                     }
                     var lat = pos.coords.latitude;
                     var lng = pos.coords.longitude;
-                    if (typeof pos.coords.accuracy === 'number') {
-                        lastAccuracyM = pos.coords.accuracy;
-                    }
-                    return saveGps(lat, lng).then(function (saveRes) {
-                        if (!saveRes) {
-                            clearPendingGpsLayers();
-                            return fetchContext();
-                        }
-                        return fetchContext();
-                    });
+                    return saveGps(lat, lng);
+                })
+                .then(function () {
+                    return fetchContext();
                 })
                 .then(function (ctx) {
-                    if (ctx) {
-                        applyContext(ctx);
-                    } else if (lastContext) {
-                        applyContext(lastContext);
-                    } else {
-                        drawFarmMap({ map_ready: false });
+                    if (ctx && gpsLastEl) {
+                        applyContextToUI(ctx);
+                        gpsLastEl.textContent = 'Last updated: ' + formatGpsTime(ctx.gps_captured_at);
                     }
                 })
                 .catch(function (err) {
                     showErr(geoErrorMessage(err));
                     if (gpsLastEl) {
                         gpsLastEl.textContent = 'Last updated —';
-                    }
-                    clearPendingGpsLayers();
-                    if (lastContext && lastContext.map_ready) {
-                        applyContext(lastContext);
-                    } else if (map) {
-                        drawFarmMap({ map_ready: false });
                     }
                 })
                 .finally(function () {
@@ -1541,57 +857,29 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
             btnRetry.addEventListener('click', runGpsFlow);
         }
 
-        var advRefresh = document.getElementById('farm-map-advisory-refresh');
-        if (advRefresh) {
-            advRefresh.addEventListener('click', function () {
-                advRefresh.disabled = true;
-                fetchContext()
-                    .then(function (ctx) {
-                        if (ctx) {
-                            applyContext(ctx);
-                        }
-                    })
-                    .finally(function () {
-                        advRefresh.disabled = false;
-                        if (typeof window.lucide !== 'undefined') {
-                            window.lucide.createIcons();
-                        }
-                    });
-            });
-        }
-
         if (gpsLastEl) {
             gpsLastEl.textContent = 'Loading…';
         }
+        if (statusGpsEl) {
+            statusGpsEl.textContent = 'Ready';
+        }
+        if (statusRainEl) {
+            statusRainEl.textContent = '—';
+        }
+        applyContextToUI(null);
+        initMap();
+        renderLayerToggles();
+
         fetchContext().then(function (ctx) {
-            if (ctx) {
-                applyContext(ctx);
-            } else {
-                if (gpsLastEl) {
-                    gpsLastEl.textContent = 'Last updated —';
-                }
-                if (todaySummaryEl) {
-                    todaySummaryEl.textContent = 'Could not load today’s summary.';
-                }
-                var advInner = document.getElementById('farm-map-advisory-inner');
-                var advStatus = document.getElementById('farm-map-advisory-status-line');
-                clearFarmMapAdvisoryDetail();
-                if (advInner) {
-                    advInner.innerHTML =
-                        '<div class="dash-smart__notice" role="status">' +
-                        '<i data-lucide="wifi-off" class="dash-smart__notice-icon" aria-hidden="true"></i>' +
-                        '<p>Advisory unavailable — check your connection and refresh.</p>' +
-                        '</div>';
-                    lucideRefresh();
-                }
-                if (advStatus) {
-                    advStatus.innerHTML =
-                        '<span class="text-rose-700">AI Smart Advisory: Unavailable</span>';
-                }
-                var ts = document.getElementById('farm-map-advisory-updated');
-                if (ts) {
-                    ts.textContent = '';
-                }
+            if (ctx && ctx.latitude != null && ctx.longitude != null && map) {
+                applyContextToUI(ctx);
+                var latlng = L.latLng(Number(ctx.latitude), Number(ctx.longitude));
+                setGpsVisual(latlng, 20);
+                applyGeofenceResult(latlng, 'Saved GPS');
+                if (gpsLastEl) gpsLastEl.textContent = 'Last updated: ' + formatGpsTime(ctx.gps_captured_at);
+            } else if (gpsLastEl) {
+                gpsLastEl.textContent = 'Last updated —';
+                applyContextToUI(ctx);
             }
         });
     });

@@ -72,13 +72,13 @@ class WeatherDetailsController extends Controller
         );
 
         $riskSnapshot = $riskSnapshotService->buildFromWeather($user, $weather ?? [], $forecast);
-        $snapshotFloodLevel = strtolower((string) ($riskSnapshot['flood_risk_normalized'] ?? 'low'));
+        $rainfallSeverity = $this->rainfallSeverity($rainProbDisplay ?? $forecastRainProb);
 
         $impactAdvisory = $cropImpactService->buildForecastImpactPayload(
             $user,
             is_array($weather) ? $weather : [],
             $forecast,
-            $snapshotFloodLevel
+            $rainfallSeverity
         );
 
         $dewPoint = self::estimateDewPoint(
@@ -421,5 +421,18 @@ class WeatherDetailsController extends Controller
             'crop_safety' => $cropSafety,
             'alert' => $alert,
         ];
+    }
+
+    private function rainfallSeverity(?int $rainProbability): string
+    {
+        if ($rainProbability === null) {
+            return 'low';
+        }
+
+        return match (true) {
+            $rainProbability >= 70 => 'high',
+            $rainProbability >= 40 => 'moderate',
+            default => 'low',
+        };
     }
 }

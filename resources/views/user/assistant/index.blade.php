@@ -124,12 +124,12 @@
                         <p class="assistant-card-value">{{ data_get($ctx, 'risk_snapshot.estimated_crop_loss', 'N/A') }}</p>
                     </article>
 
-                    <article class="assistant-card assistant-card--flood">
+                    <article class="assistant-card assistant-card--weather">
                         <div class="assistant-card-head">
-                            <span class="assistant-card-icon"><i data-lucide="waves"></i></span>
-                            <p class="assistant-card-label">Flood Risk Level</p>
+                            <span class="assistant-card-icon"><i data-lucide="cloud-rain"></i></span>
+                            <p class="assistant-card-label">Rain Chance</p>
                         </div>
-                        <p class="assistant-card-value">{{ data_get($ctx, 'risk_snapshot.flood_risk_level', 'Unknown') }}</p>
+                        <p class="assistant-card-value">{{ data_get($ctx, 'risk_snapshot.rain_chance_display', '—') }}</p>
                     </article>
                 </div>
             </section>
@@ -171,9 +171,9 @@
                 <section class="assistant-bottom-bar assistant-bottom-bar--inline" aria-label="Assistant input actions">
                     <div class="assistant-bottom-inner">
                         <div class="assistant-quick-actions" aria-label="Suggested quick prompts">
-                            <button type="button" class="assistant-quick-chip" data-assistant-prompt="Estimate my crop loss based on current flood and weather risk."><span class="assistant-quick-chip__ic" aria-hidden="true">📉</span>Estimated Crop Loss</button>
+                            <button type="button" class="assistant-quick-chip" data-assistant-prompt="Estimate my crop loss based on current weather and rain chance."><span class="assistant-quick-chip__ic" aria-hidden="true">📉</span>Estimated Crop Loss</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="Give crop advice based on today's weather and growth stage.">🌱 Crop advice</button>
-                            <button type="button" class="assistant-quick-chip" data-assistant-prompt="What is the flood risk for my farm today?">🌧 Flood risk</button>
+                            <button type="button" class="assistant-quick-chip" data-assistant-prompt="What is the rain chance for my farm today?">🌧 Rain chance</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="How should I handle irrigation today?">💧 Irrigation</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="What pest control steps should I prioritize this week?">🐛 Pest control</button>
                         </div>

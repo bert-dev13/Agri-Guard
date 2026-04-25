@@ -46,13 +46,6 @@
             <span class="admin-sidebar__link-icon" aria-hidden="true"><i data-lucide="chart-column"></i></span>
             <span class="admin-sidebar__link-label">Analytics</span>
         </a>
-        <a href="{{ route('admin.historical-weather.index') }}"
-           class="admin-sidebar__link {{ request()->routeIs('admin.historical-weather.*') ? 'is-active' : '' }}"
-           title="Historical Weather Import"
-           data-tooltip="Weather Import">
-            <span class="admin-sidebar__link-icon" aria-hidden="true"><i data-lucide="cloud-upload"></i></span>
-            <span class="admin-sidebar__link-label">Weather Import</span>
-        </a>
         <a href="{{ route('admin.account-settings.index') }}"
            class="admin-sidebar__link {{ request()->routeIs('admin.account-settings.*') ? 'is-active' : '' }}"
            title="Account settings"

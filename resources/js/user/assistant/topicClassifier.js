@@ -80,22 +80,6 @@ const TOPIC_KEYWORDS = {
         'wash off',
         'huhugasan',
     ],
-    flood_risk: [
-        'flood',
-        'flooding',
-        'baha',
-        'binaha',
-        'drainage',
-        'drain',
-        'waterlogging',
-        'overflow',
-        'low area',
-        'waterlogged',
-        'stop irrigation',
-        'open drainage',
-        'drain',
-        'mud',
-    ],
     crop_stage: [
         'crop stage',
         'growth stage',
@@ -236,9 +220,6 @@ function getDepthLevel(topic, text) {
     } else if (topic === 'spraying') {
         if (hasAny(['wind safe', 'rain wash', 'humidity', 'leaf wetness', 'delay', 'tomorrow', 'drift'])) lvl = Math.max(lvl, 1);
         if (hasAny(['second application', 're-spraying', 'safest timing', 'spray again'])) lvl = Math.max(lvl, 2);
-    } else if (topic === 'flood_risk') {
-        if (hasAny(['heavy rain', 'prepare', 'open drainage', 'waterlogging', 'which part', 'move tools', 'flood risk'])) lvl = Math.max(lvl, 1);
-        if (hasAny(['stop irrigation', 'recover', 'root health', 'monitor', 'adjust inputs'])) lvl = Math.max(lvl, 2);
     } else if (topic === 'crop_stage') {
         if (hasAny(['fertilizer needed', 'common problems', 'monitor', 'sensitive', 'this stage'])) lvl = Math.max(lvl, 1);
         if (hasAny(['next stage', 'adjust watering', 'next 7 days', 'flowering', 'prioritize'])) lvl = Math.max(lvl, 2);

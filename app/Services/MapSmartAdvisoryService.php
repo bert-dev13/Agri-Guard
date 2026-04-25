@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Services\AiAdvisory\AiAdvisoryService;
 
 /**
- * Farm Map page — AI advisory via centralized Together AI service only (no rule-based copy).
+ * Farm Map page — AI advisory via centralized Together AI service only.
  */
 class MapSmartAdvisoryService
 {
@@ -17,17 +17,15 @@ class MapSmartAdvisoryService
 
     /**
      * @param  array<string, mixed>  $weather  Normalized weather block from FarmWeatherService
-     * @param  array<string, mixed>  $floodResult  From FloodRiskAssessmentService::assess
      * @param  array<string, mixed>  $rainfallContext
      * @param  array<string, mixed>  $advisory  RuleBasedAdvisoryService output (signals for AI context only)
      * @param  array<string, mixed>  $smartAdvisory  Reserved for future context expansion
-     * @param  array<string, mixed>  $mapUiState  e.g. selected_layer: farm|weather|rainfall|flood
+     * @param  array<string, mixed>  $mapUiState  e.g. selected_layer: farm|weather|rainfall
      * @return array<string, mixed>
      */
     public function build(
         User $user,
         array $weather,
-        array $floodResult,
         array $rainfallContext,
         array $advisory,
         array $smartAdvisory,
@@ -38,7 +36,6 @@ class MapSmartAdvisoryService
         $payload = $this->compactContextForAi(
             $user,
             $weather,
-            $floodResult,
             $rainfallContext,
             $forecastMaxDailyMm,
             $advisory,
@@ -52,7 +49,6 @@ class MapSmartAdvisoryService
 
     /**
      * @param  array<string, mixed>  $weather
-     * @param  array<string, mixed>  $floodResult
      * @param  array<string, mixed>  $rainfallContext
      * @param  array<string, mixed>  $advisory
      * @param  array<string, mixed>  $mapUiState
@@ -61,7 +57,6 @@ class MapSmartAdvisoryService
     private function compactContextForAi(
         User $user,
         array $weather,
-        array $floodResult,
         array $rainfallContext,
         ?float $forecastMaxDailyMm,
         array $advisory,
@@ -86,7 +81,7 @@ class MapSmartAdvisoryService
             ],
             'map' => [
                 'selected_layer' => $layer,
-                'layers_available' => ['farm', 'weather', 'rainfall', 'flood'],
+                'layers_available' => ['farm', 'weather', 'rainfall'],
             ],
             'weather_at_pin' => [
                 'condition' => $weather['condition'] ?? null,
@@ -99,11 +94,6 @@ class MapSmartAdvisoryService
                 'intensity_label' => $rainfallContext['intensity_label'] ?? null,
                 'accumulation_label' => $rainfallContext['accumulation_label'] ?? null,
                 'forecast_peak_daily_mm' => $forecastMaxDailyMm,
-            ],
-            'flood_overlay' => [
-                'level' => $floodResult['level'] ?? 'LOW',
-                'label' => $floodResult['label'] ?? '',
-                'message' => $floodResult['message'] ?? '',
             ],
             'advisory_engine_signals' => [
                 'rule_based_risk_level' => $advisory['risk_level'] ?? null,
@@ -122,6 +112,6 @@ class MapSmartAdvisoryService
     {
         $r = strtolower(trim($raw));
 
-        return in_array($r, ['farm', 'weather', 'rainfall', 'flood'], true) ? $r : 'farm';
+        return in_array($r, ['farm', 'weather', 'rainfall'], true) ? $r : 'farm';
     }
 }

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Services\CropImpactService;
 use App\Services\FarmWeatherService;
 use App\Services\FarmRiskSnapshotService;
-use App\Services\FloodRiskAssessmentService;
 use App\Services\RainfallHeatmapService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -64,8 +63,6 @@ class WeatherController extends Controller
         ];
 
         $riskSnapshot = $riskSnapshotService->buildFromNormalizedWeather($user, $data);
-        $snapshotFloodLevel = strtolower((string) ($riskSnapshot['flood_risk_normalized'] ?? 'low'));
-
         $weatherBlock = [
             'today_rain_probability' => $data['today_rain_probability'] ?? null,
             'today_expected_rainfall' => $data['today_expected_rainfall'] ?? null,
@@ -77,12 +74,13 @@ class WeatherController extends Controller
                 'main' => $data['condition'] ?? null,
             ],
         ];
+        $rainfallSeverity = $this->rainfallSeverityFromWeather($weatherBlock, $forecast);
 
         $impactAdvisory = $cropImpactService->buildForecastImpactPayload(
             $user,
             $weatherBlock,
             $forecast,
-            $snapshotFloodLevel
+            $rainfallSeverity
         );
         $response['impact_advisory'] = $impactAdvisory;
         $response['risk_snapshot'] = $riskSnapshot;
@@ -91,10 +89,10 @@ class WeatherController extends Controller
     }
 
     /**
-     * Weather + flood risk for given coordinates (e.g. device GPS).
+     * Weather + rainfall context for given coordinates (e.g. device GPS).
      * Uses current GPS; no saved farm location.
      */
-    public function byCoordinates(Request $request, FarmWeatherService $farmWeather, FloodRiskAssessmentService $floodRisk, RainfallHeatmapService $heatmap): JsonResponse
+    public function byCoordinates(Request $request, FarmWeatherService $farmWeather, RainfallHeatmapService $heatmap): JsonResponse
     {
         if (! $request->user()) {
             return response()->json(['error' => 'Unauthenticated.'], 401);
@@ -113,10 +111,7 @@ class WeatherController extends Controller
         }
 
         $weather = $farmWeather->getNormalizedWeatherByCoordinates($lat, $lng);
-        $userContext = [];
-        $riskResult = $floodRisk->assess($weather, $userContext);
-        $areaCondition = $floodRisk->areaConditionLabel($userContext);
-        $rainfallAccumulationLabel = $floodRisk->rainfallAccumulationLabel(
+        $rainfallAccumulationLabel = $this->rainfallAccumulationLabel(
             isset($weather['today_expected_rainfall']) ? (float) $weather['today_expected_rainfall'] : null
         );
 
@@ -134,13 +129,6 @@ class WeatherController extends Controller
                 'last_updated' => $weather['last_updated'],
                 'daily_forecast' => $weather['daily_forecast'] ?? [],
             ],
-            'flood_risk' => [
-                'level' => $riskResult['level'],
-                'label' => $riskResult['label'],
-                'color' => $riskResult['color'],
-                'message' => $riskResult['message'],
-            ],
-            'area_condition' => $areaCondition,
             'rainfall_accumulation_label' => $rainfallAccumulationLabel,
             'rainfall_intensity' => [
                 'label' => $rainfallIntensityLabel,
@@ -149,5 +137,43 @@ class WeatherController extends Controller
             'heatmap_points' => $heatmapPoints,
             'coordinates' => ['lat' => $lat, 'lng' => $lng],
         ]);
+    }
+
+    private function rainfallAccumulationLabel(?float $todayExpectedRainfallMm): string
+    {
+        if ($todayExpectedRainfallMm === null) {
+            return 'Unknown';
+        }
+
+        return match (true) {
+            $todayExpectedRainfallMm >= 30.0 => 'High',
+            $todayExpectedRainfallMm >= 10.0 => 'Moderate',
+            $todayExpectedRainfallMm > 0 => 'Light',
+            default => 'Minimal',
+        };
+    }
+
+    /**
+     * Legacy crop impact service expects a low/moderate/high severity string.
+     */
+    private function rainfallSeverityFromWeather(array $weatherBlock, array $forecast): string
+    {
+        $pop = is_numeric($weatherBlock['today_rain_probability'] ?? null)
+            ? (int) $weatherBlock['today_rain_probability']
+            : null;
+        if ($pop === null && $forecast !== []) {
+            $pops = array_filter(array_column($forecast, 'pop'), static fn ($v) => is_numeric($v));
+            $pop = $pops !== [] ? (int) max($pops) : null;
+        }
+
+        if ($pop === null) {
+            return 'low';
+        }
+
+        return match (true) {
+            $pop >= 70 => 'high',
+            $pop >= 40 => 'moderate',
+            default => 'low',
+        };
     }
 }

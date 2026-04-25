@@ -7,7 +7,6 @@ export const ASSISTANT_TOPICS = [
     'planting',
     'watering',
     'spraying',
-    'flood_risk',
     'crop_stage',
     'fertilizer',
     'pest_health',
@@ -77,26 +76,6 @@ const EN = {
             'What is the safest timing for re-spraying?',
         ],
     },
-    flood_risk: {
-        base: [
-            'What should I prepare before heavy rain?',
-            'Do I need to open drainage now?',
-            'Which part of the farm is most at risk?',
-            'Is spraying still safe if flood risk rises?',
-            'Should I move tools or inputs now?',
-        ],
-        followup: [
-            'Should I stop irrigation because of flood risk?',
-            'Which field area should I check first?',
-            'How do I reduce waterlogging damage?',
-            'Do I need to protect seedlings from waterlogging?',
-        ],
-        deeper: [
-            'How can I recover after flooding damage?',
-            'What should I monitor for root health next?',
-            'Should I adjust inputs after flood exposure?',
-        ],
-    },
     crop_stage: {
         base: [
             'What should I do at this crop stage?',
@@ -134,7 +113,7 @@ const EN = {
         deeper: [
             'How do I avoid nutrient burn?',
             'What should I monitor after fertilizer application?',
-            'Should I adjust fertilizer if flooding risk is high?',
+            'Should I adjust fertilizer if heavy rain is expected?',
         ],
     },
     pest_health: {
@@ -202,7 +181,7 @@ const EN = {
             'Can I plant today?',
             'Do I need to water today?',
             'Is spraying safe today?',
-            'Is there flood risk?',
+            'How strong is the rain chance today?',
             'What should I do at my crop stage?',
         ],
         followup: [
@@ -279,26 +258,6 @@ const TAG = {
             'Kailan safest timing for re-spraying?',
         ],
     },
-    flood_risk: {
-        base: [
-            'Ano ihahanda bago mabigat na ulan?',
-            'Buksan ba ang drainage ngayon?',
-            'Saan pinaka-risk na area?',
-            'Safe pa ba ang spray kapag tumataas ang flood risk?',
-            'Ililipat ko na ba tools o inputs ngayon?',
-        ],
-        followup: [
-            'Itigil ko ba ang pagdidilig dahil sa flood risk?',
-            'Aling area muna ang i-check ko?',
-            'Paano mabawasan ang waterlogging damage?',
-            'Paano protektahan ang seedlings sa waterlogging?',
-        ],
-        deeper: [
-            'Paano mag-recover after baha?',
-            'Ano i-monitor para sa root health?',
-            'Kailangan ba i-adjust ang inputs pagkatapos ng baha?',
-        ],
-    },
     crop_stage: {
         base: [
             'Ano dapat gawin sa crop stage na ito?',
@@ -336,7 +295,7 @@ const TAG = {
         deeper: [
             'Paano iwas nutrient burn?',
             'Ano i-monitor after maglagay ng pataba?',
-            'Dapat ba i-adjust kung mataas ang flood risk?',
+            'Dapat ba i-adjust kung tuloy-tuloy ang ulan?',
         ],
     },
     pest_health: {
@@ -404,7 +363,7 @@ const TAG = {
             'Pwede ba akong magtanim today?',
             'Kailangan ko bang magdidilig today?',
             'Safe ba ang spray today?',
-            'May flood risk ba?',
+            'Gaano kataas ang chance ng ulan ngayon?',
             'Ano next step sa crop stage ko?',
         ],
         followup: [

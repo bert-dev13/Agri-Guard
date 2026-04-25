@@ -1,4 +1,7 @@
 @php
+    $currentDate = now();
+    $currentDateIso = $currentDate->toDateString();
+    $currentDateDisplay = $currentDate->format('l, F j, Y');
     $rainProbDisplay = $rain_probability_display ?? $forecast_rain_probability ?? ($weatherData['today_rain_probability'] ?? null);
     $rainfallMm = $weather['today_expected_rainfall'] ?? ($weatherData['today_expected_rainfall'] ?? null);
     $rainStatIsChance = is_numeric($rainProbDisplay);
@@ -157,7 +160,7 @@
                                 <span class="dashboard-hero__pill-ic" aria-hidden="true">
                                     <i data-lucide="calendar-days" class="dashboard-hero__lucide"></i>
                                 </span>
-                                <time class="dashboard-hero__pill-text" datetime="{{ now()->toDateString() }}">{{ now()->format('l, F j, Y') }}</time>
+                                <time class="dashboard-hero__pill-text" datetime="{{ $currentDateIso }}">{{ $currentDateDisplay }}</time>
                             </span>
                         </div>
                     </div>
@@ -239,6 +242,19 @@
                 </article>
             @endif
 
+            <div class="ag-advisory-toggle-row">
+                <button
+                    type="button"
+                    class="ag-advisory-toggle-btn"
+                    data-ai-advisory-toggle
+                    data-target="advisory-weather-section"
+                    data-storage-key="advisory_visibility_weather"
+                    aria-pressed="true"
+                >
+                    Hide AI Smart Advisory
+                </button>
+            </div>
+            <section id="advisory-weather-section" data-ai-smart-advisory-section>
             <article class="ag-card dash-smart weather-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5" aria-label="AI smart advisory">
                 <div class="dash-smart__debug">
                     <p class="text-xs font-semibold text-slate-700">
@@ -307,13 +323,37 @@
                     </div>
                 </div>
             </section>
+            <div class="flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600" aria-hidden="true">
+                    <i data-lucide="info" class="h-3.5 w-3.5"></i>
+                </span>
+                <p class="pt-0.5 text-xs leading-relaxed text-slate-600">
+                    AI-generated recommendations only. Based on system data including weather, rainfall, crop, and field conditions. For farm decision support.
+                </p>
+            </div>
+            </section>
 
             @if (!empty($forecast))
+                @php
+                    $forecastDateRange = '';
+                    $forecastStartRaw = $forecast[0]['date'] ?? null;
+                    $forecastEndRaw = $forecast[min(4, count($forecast) - 1)]['date'] ?? null;
+                    if ($forecastStartRaw && $forecastEndRaw) {
+                        $forecastStartDate = \Carbon\Carbon::parse($forecastStartRaw);
+                        $forecastEndDate = \Carbon\Carbon::parse($forecastEndRaw);
+                        $forecastDateRange = $forecastStartDate->isSameDay($forecastEndDate)
+                            ? $forecastStartDate->format('l, F j, Y')
+                            : $forecastStartDate->format('M j') . ' - ' . $forecastEndDate->format('M j, Y');
+                    } else {
+                        $forecastDateRange = $currentDateDisplay;
+                    }
+                @endphp
                 <section class="ag-card weather-page__fc-card weather-page__fc-card--emph bg-slate-50/90" aria-label="Five day forecast">
                     <div class="weather-page__fc-head rounded-2xl px-3 py-2">
                         <img src="{{ $wImg('calendar') }}" alt="" class="weather-clay-ic weather-clay-ic--fc-head" width="28" height="28" decoding="async">
                         <div>
                             <h2 class="weather-page__fc-title inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">5-Day Forecast</h2>
+                            <p class="mt-1 text-xs font-medium text-slate-600">{{ $forecastDateRange }}</p>
                         </div>
                     </div>
                     <div class="weather-page__fc-list" role="list">

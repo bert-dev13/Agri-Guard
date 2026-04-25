@@ -29,8 +29,6 @@
     $humidity = $weather['humidity'] ?? null;
     $windSpeed = $weather['wind_speed'] ?? null;
     $recommendationRisk = strtolower((string) ($recommendation['risk'] ?? 'moderate'));
-    $floodRiskLabel = $recommendationRisk === 'high' ? 'Risk' : ($recommendationRisk === 'low' ? 'Safe' : 'Caution');
-
     $dashboardReco = is_array($recommendation ?? null) ? $recommendation : [];
     $aiStatus = strtolower(trim((string) ($dashboardReco['ai_status'] ?? '')));
     $aiAdvisoryReady = $aiStatus === 'success';
@@ -160,6 +158,10 @@
                         <p class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-700 transition-all duration-300 hover:tracking-[0.14em] hover:text-slate-900">
                             <i data-lucide="cloud-sun" class="h-3.5 w-3.5 text-sky-600"></i>
                             TODAYS WEATHER                        </p>
+                        <p class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-slate-600">
+                            <i data-lucide="calendar-days" class="h-3.5 w-3.5 text-slate-500"></i>
+                            <time datetime="{{ now()->toDateString() }}">{{ now()->format('F j, Y') }}</time>
+                        </p>
                         <div class="mt-1.5 flex items-end gap-2">
                             <p class="text-2xl font-extrabold leading-none text-slate-900 sm:text-3xl">
                                 @if ($weather && isset($weather['temp']))
@@ -198,6 +200,19 @@
                 'showRecommended' => false,
             ])
 
+            <div class="ag-advisory-toggle-row">
+                <button
+                    type="button"
+                    class="ag-advisory-toggle-btn"
+                    data-ai-advisory-toggle
+                    data-target="advisory-dashboard-section"
+                    data-storage-key="advisory_visibility_dashboard"
+                    aria-pressed="true"
+                >
+                    Hide AI Smart Advisory
+                </button>
+            </div>
+            <section id="advisory-dashboard-section" data-ai-smart-advisory-section>
             <article class="ag-card dash-smart weather-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5" aria-label="AI smart advisory">
                 <div class="dash-smart__debug">
                     <p class="text-xs font-semibold text-slate-700">
@@ -261,6 +276,15 @@
                     </p>
                     <p class="mt-2 text-sm text-slate-700">{{ $waterText }}</p>
                 </article>
+            </section>
+            <div class="flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600" aria-hidden="true">
+                    <i data-lucide="info" class="h-3.5 w-3.5"></i>
+                </span>
+                <p class="pt-0.5 text-xs leading-relaxed text-slate-600">
+                    AI-generated recommendations only. Based on system data including weather, rainfall, crop, and field conditions. For farm decision support.
+                </p>
+            </div>
             </section>
 
             <section class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5" aria-label="Forecast preview">

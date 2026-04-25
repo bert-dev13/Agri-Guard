@@ -8,7 +8,6 @@ use App\Support\AdvisoryDisclaimer;
 class FarmRiskSnapshotService
 {
     public function __construct(
-        private readonly FloodRiskAssessmentService $floodRiskAssessment,
         private readonly CropImpactEngine $cropImpactEngine,
         private readonly RiskLabelMapper $riskLabelMapper,
     ) {}
@@ -22,22 +21,17 @@ class FarmRiskSnapshotService
      */
     public function buildFromWeather(User $user, array $weather, array $forecast): array
     {
-        $risk = $this->floodRiskAssessment->assess([
-            'today_rain_probability' => $weather['today_rain_probability'] ?? null,
-            'today_expected_rainfall' => $weather['today_expected_rainfall'] ?? null,
-            'condition_id' => $weather['condition']['id'] ?? null,
-            'condition' => $weather['condition']['main'] ?? null,
-        ], [
-            'field_condition' => $user->field_condition,
-        ]);
+        $rainChance = is_numeric($weather['today_rain_probability'] ?? null)
+            ? (int) $weather['today_rain_probability']
+            : null;
+        if ($rainChance === null && $forecast !== []) {
+            $pops = array_filter(array_column($forecast, 'pop'), static fn ($v) => is_numeric($v));
+            $rainChance = $pops !== [] ? (int) max($pops) : null;
+        }
+        $rainfallSeverity = $this->rainfallSeverity($rainChance);
 
-        $floodRiskLevel = $this->normalizeFloodLevel((string) ($risk['level'] ?? ''));
-        $floodForEval = $floodRiskLevel === 'unknown' ? 'low' : $floodRiskLevel;
-
-        $eval = $this->cropImpactEngine->evaluate($user, $weather, $forecast, $floodForEval);
+        $eval = $this->cropImpactEngine->evaluate($user, $weather, $forecast, $rainfallSeverity);
         $level = (string) $eval['crop_impact_level'];
-
-        $floodDisplay = $this->floodDisplayFromLevel($floodRiskLevel);
 
         return [
             'crop_impact_level' => $level,
@@ -47,13 +41,8 @@ class FarmRiskSnapshotService
 
             'three_day_outlook' => (string) $eval['three_day_outlook'],
             'recommended_action' => (string) ($eval['recommended_action'] ?? ''),
-
-            'flood_risk_normalized' => $floodForEval,
-            'flood_risk_display' => $floodDisplay,
-            'flood_risk_level' => $floodDisplay,
-            'flood_risk_tone' => $this->riskToneFromFloodDisplay($floodDisplay),
-            'flood_risk_label' => (string) ($risk['label'] ?? 'Low Risk'),
-            'flood_risk_message' => (string) ($risk['message'] ?? ''),
+            'rain_chance_display' => $rainChance !== null ? "{$rainChance}%" : '—',
+            'rainfall_severity' => ucfirst($rainfallSeverity),
 
             'advisory_disclaimer' => AdvisoryDisclaimer::TEXT,
 
@@ -83,36 +72,16 @@ class FarmRiskSnapshotService
         return $this->buildFromWeather($user, $weather, $forecast);
     }
 
-    private function normalizeFloodLevel(string $raw): string
+    private function rainfallSeverity(?int $rainProbability): string
     {
-        $value = strtolower(trim($raw));
+        if ($rainProbability === null) {
+            return 'low';
+        }
 
-        return match ($value) {
-            'low' => 'low',
-            'moderate' => 'moderate',
-            'high' => 'high',
-            'critical' => 'critical',
-            default => 'unknown',
-        };
-    }
-
-    private function floodDisplayFromLevel(string $level): string
-    {
-        return match ($level) {
-            'high', 'critical' => 'High',
-            'moderate' => 'Moderate',
-            'low' => 'Low',
-            default => 'Unknown',
-        };
-    }
-
-    private function riskToneFromFloodDisplay(string $display): string
-    {
-        return match ($display) {
-            'High' => 'high',
-            'Moderate' => 'moderate',
-            'Low' => 'low',
-            default => 'unknown',
+        return match (true) {
+            $rainProbability >= 70 => 'high',
+            $rainProbability >= 40 => 'moderate',
+            default => 'low',
         };
     }
 }

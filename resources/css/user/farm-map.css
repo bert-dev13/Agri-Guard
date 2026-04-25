@@ -1029,7 +1029,7 @@
     color: #0f172a;
 }
 
-/* Fixed map legend for flood risk colors */
+/* Fixed map legend colors */
 .farm-map-risk-legend {
     position: absolute;
     right: 10px;
@@ -1484,7 +1484,6 @@
 }
 
 .farm-map-snap-card--loc {
-    grid-column: 1 / -1;
     border-color: rgb(167 243 208 / 0.65);
     background: linear-gradient(165deg, rgb(240 253 244 / 0.98) 0%, rgb(255 255 255 / 0.96) 100%);
 }
@@ -1499,7 +1498,7 @@
     background: linear-gradient(165deg, rgb(250 245 255 / 0.98) 0%, rgb(255 255 255 / 0.96) 100%);
 }
 
-.farm-map-snap-card--flood {
+.farm-map-snap-card--rain {
     border-color: rgb(254 243 199 / 0.95);
     background: linear-gradient(165deg, rgb(255 251 235 / 0.98) 0%, rgb(255 255 255 / 0.96) 100%);
 }
@@ -1562,12 +1561,12 @@
     color: rgb(126 34 206);
 }
 
-.farm-map-snap-card--flood .farm-map-snap-card__icwrap {
+.farm-map-snap-card--rain .farm-map-snap-card__icwrap {
     border-color: rgb(253 224 71 / 0.55);
     background: linear-gradient(145deg, rgb(254 252 232) 0%, rgb(254 243 199 / 0.55) 100%);
 }
 
-.farm-map-snap-card--flood .farm-map-snap-card__lucide {
+.farm-map-snap-card--rain .farm-map-snap-card__lucide {
     color: rgb(180 83 9);
 }
 
@@ -1840,6 +1839,38 @@
     line-height: 1.15;
 }
 
+.farm-map-geofence-badge {
+    position: absolute;
+    top: 10px;
+    right: 64px;
+    z-index: 620;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 14px rgb(15 23 42 / 0.12);
+}
+
+.farm-map-geofence-badge--inside {
+    color: #065f46;
+    border-color: #6ee7b7;
+    background: rgba(236, 253, 245, 0.96);
+}
+
+.farm-map-geofence-badge--outside {
+    color: #991b1b;
+    border-color: #fca5a5;
+    background: rgba(254, 242, 242, 0.96);
+}
+
+.farm-map-leaflet .mapboxgl-canvas {
+    outline: none;
+}
+
 /* ---- Top status mini cards (hero) ---- */
 .farm-map-sc {
     display: flex;
@@ -1908,15 +1939,15 @@
     color: #b91c1c;
 }
 
-.farm-map-sc--flood-low .farm-map-sc__val {
+.farm-map-sc--rain-low .farm-map-sc__val {
     color: #0d9488;
 }
 
-.farm-map-sc--flood-mod .farm-map-sc__val {
+.farm-map-sc--rain-mod .farm-map-sc__val {
     color: #b45309;
 }
 
-.farm-map-sc--flood-high .farm-map-sc__val {
+.farm-map-sc--rain-high .farm-map-sc__val {
     color: #b91c1c;
 }
 
@@ -2186,6 +2217,25 @@
     min-width: 0;
     text-align: center;
     box-shadow: 0 4px 14px rgb(15 23 42 / 0.1);
+}
+
+.leaflet-tooltip.farm-map-barangay-label {
+    border: 0;
+    box-shadow: none;
+    background: rgb(15 23 42 / 0.6);
+    color: #fff;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-shadow:
+        -1px -1px 0 rgb(0 0 0 / 0.35),
+        1px -1px 0 rgb(0 0 0 / 0.35),
+        -1px 1px 0 rgb(0 0 0 / 0.35),
+        1px 1px 0 rgb(0 0 0 / 0.35);
 }
 
 /* ---- AI Smart Advisory first, then Farm Map: full-width rows (stacked) ---- */
@@ -2502,4 +2552,75 @@
 .farm-map-page .fm-map-cp-smart__refresh-ic {
     width: 18px;
     height: 18px;
+}
+
+/* Rainfall-style advisory sections for map page (not shared component) */
+.farm-map-page__timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+}
+
+.farm-map-page__timeline-list::before {
+    content: "";
+    position: absolute;
+    left: 20px;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    background: linear-gradient(180deg, #bae6fd 0%, #c4b5fd 100%);
+}
+
+.farm-map-page__timeline-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 16px;
+    border: 1px solid rgb(226 232 240 / 0.9);
+}
+
+.farm-map-page__timeline-item--morning {
+    background: #fffbeb;
+    border-color: rgb(253 230 138 / 0.7);
+}
+
+.farm-map-page__timeline-item--midday {
+    background: #f0f9ff;
+    border-color: rgb(186 230 253 / 0.8);
+}
+
+.farm-map-page__timeline-item--late {
+    background: #f5f3ff;
+    border-color: rgb(221 214 254 / 0.8);
+}
+
+.farm-map-page__timeline-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid rgb(226 232 240 / 0.95);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    z-index: 1;
+    font-size: 0.75rem;
+}
+
+.dashboard-page.farm-map-page .farm-map-page__split-water .dash-split__body {
+    margin-top: 12px;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    color: #155e75;
+}
+
+.dashboard-page.farm-map-page .farm-map-page__split-avoid .dash-split__body {
+    margin-top: 12px;
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    color: #9f1239;
 }

@@ -9,26 +9,39 @@ use Illuminate\Support\Facades\Hash;
 class AdminSeeder extends Seeder
 {
     /**
-     * Default admin for AGRIGUARD (password is hashed via User model cast).
-     * admin@agriguard.com / admin123
+     * Seed 2 functional admin accounts.
      */
     public function run(): void
     {
-        // Do not overwrite existing accounts; only create if missing.
-        if (User::query()->where('email', 'admin@agriguard.com')->exists()) {
-            return;
-        }
+        $password = Hash::make('Admin123!');
+        $admins = [
+            [
+                'name' => 'Admin-1',
+                'email' => 'Admin1@agriguard.ph',
+            ],
+            [
+                'name' => 'Admin-2',
+                'email' => 'Admin2@agriguard.ph',
+            ],
+        ];
 
-        User::create([
-            'name' => 'System Administrator',
-            'email' => 'admin@agriguard.com',
-            'password' => Hash::make('admin123'),
-            'role' => 'admin',
-            'email_verified_at' => now(),
-            'email_verification_code' => null,
-            'email_verification_expires_at' => null,
-            'verification_attempts' => 0,
-            'verification_locked_until' => null,
-        ]);
+        foreach ($admins as $admin) {
+            $email = strtolower(trim($admin['email']));
+            if (User::query()->where('email', $email)->exists()) {
+                continue;
+            }
+
+            User::create([
+                'name' => $admin['name'],
+                'email' => $email,
+                'password' => $password,
+                'role' => 'admin',
+                'email_verified_at' => now(),
+                'email_verification_code' => null,
+                'email_verification_expires_at' => null,
+                'verification_attempts' => 0,
+                'verification_locked_until' => null,
+            ]);
+        }
     }
 }

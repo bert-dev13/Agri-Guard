@@ -1,5 +1,5 @@
 {{--
-    3-Day Outlook card — fixed layout (crop impact · possible loss · flood · outlook).
+    3-Day Outlook card — fixed layout (crop impact · possible loss · rain chance · outlook).
     Expects $risk_snapshot from FarmRiskSnapshotService::buildFromWeather().
 --}}
 @php
@@ -14,17 +14,10 @@
     };
     $snapshotImpactLabel = (string) ($rs['crop_impact_label'] ?? '—');
     $snapshotLossRange = (string) ($rs['possible_loss_range'] ?? ($rs['estimated_crop_loss'] ?? '—'));
-    $snapshotFlood = (string) ($rs['flood_risk_display'] ?? $rs['flood_risk_level'] ?? 'Unknown');
+    $snapshotRainChance = data_get($rs, 'rain_chance_display', '—');
     $snapshotOutlook = (string) ($rs['three_day_outlook'] ?? $rs['three_day_effect'] ?? '');
     $snapshotReco = (string) ($rs['recommended_action'] ?? '');
     $snapshotDisclaimer = (string) ($rs['advisory_disclaimer'] ?? '');
-    $wxFloodKey = strtolower((string) strtok(trim($snapshotFlood), ' '));
-    $wxFloodCardClass = match ($wxFloodKey) {
-        'low' => 'border-emerald-100 bg-emerald-50/80',
-        'moderate' => 'border-amber-100 bg-amber-50/80',
-        'high' => 'border-rose-100 bg-rose-50/80',
-        default => 'border-slate-100 bg-slate-50/80',
-    };
     $showRecommended = (bool) ($showRecommended ?? false);
 @endphp
 <section class="ag-card weather-impact-card weather-impact-card--compact border border-slate-200 bg-white p-3 shadow-sm sm:p-3.5 {{ $wrapperClass ?? '' }}" aria-label="Crop impact and three-day outlook">
@@ -70,14 +63,14 @@
             </p>
         </article>
 
-        <article class="flex min-h-0 min-w-0 flex-col rounded-xl border p-1.5 shadow-sm sm:p-2 {{ $wxFloodCardClass }}">
+        <article class="flex min-h-0 min-w-0 flex-col rounded-xl border border-sky-100 bg-sky-50/80 p-1.5 shadow-sm sm:p-2">
             <div class="flex flex-col items-center gap-0.5 text-slate-800 sm:flex-row sm:justify-center sm:gap-1">
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/80 shadow-sm ring-1 ring-black/5 sm:h-7 sm:w-7" aria-hidden="true">
-                    <i data-lucide="waves" class="h-3.5 w-3.5 text-sky-700 sm:h-4 sm:w-4"></i>
+                    <i data-lucide="cloud-rain" class="h-3.5 w-3.5 text-sky-700 sm:h-4 sm:w-4"></i>
                 </span>
-                <span class="text-center text-[8px] font-bold uppercase leading-tight tracking-wide text-slate-600 sm:text-[9px]">Flood risk</span>
+                <span class="text-center text-[8px] font-bold uppercase leading-tight tracking-wide text-slate-600 sm:text-[9px]">Rain chance</span>
             </div>
-            <p class="mt-1 flex flex-1 items-center justify-center px-0.5 text-center text-[12px] font-extrabold leading-tight text-slate-900 sm:text-sm">{{ $snapshotFlood }}</p>
+            <p class="mt-1 flex flex-1 items-center justify-center px-0.5 text-center text-[12px] font-extrabold leading-tight text-slate-900 sm:text-sm">{{ $snapshotRainChance }}</p>
         </article>
 
         <article class="flex min-h-0 min-w-0 flex-col rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50/90 to-white p-1.5 shadow-sm sm:p-2">

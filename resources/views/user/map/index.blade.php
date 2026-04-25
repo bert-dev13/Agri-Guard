@@ -62,6 +62,7 @@
             data-csrf-token="{{ csrf_token() }}"
             data-context-url="{{ route('map.farm-context') }}"
             data-save-url="{{ route('map.save-gps') }}"
+            data-geofence-url="{{ asset('amulung.json') }}"
             data-initial-has-gps="{{ $initialHasDeviceGps ? '1' : '0' }}"
             data-adv-clay-b64="{{ base64_encode(json_encode($mapAdvClayUrls, JSON_UNESCAPED_SLASHES)) }}"
         >
@@ -143,14 +144,11 @@
                                 <span id="farm-map-status-gps" class="farm-map-status-chip__value">Not connected</span>
                             </span>
                         </div>
-                        <div
-                            id="farm-map-status-flood-wrap"
-                            class="farm-map-status-chip farm-map-status-chip--muted"
-                        >
-                            <span class="farm-map-status-chip__ic" aria-hidden="true">⚠</span>
+                        <div class="farm-map-status-chip farm-map-status-chip--muted">
+                            <span class="farm-map-status-chip__ic" aria-hidden="true">🌧</span>
                             <span class="farm-map-status-chip__text">
-                                <span class="farm-map-status-chip__label">Flood</span><span class="farm-map-status-chip__colon">:</span>
-                                <span id="farm-map-status-flood" class="farm-map-status-chip__value">—</span>
+                                <span class="farm-map-status-chip__label">Rain chance</span><span class="farm-map-status-chip__colon">:</span>
+                                <span id="farm-map-status-rain" class="farm-map-status-chip__value">—</span>
                             </span>
                         </div>
                     </div>
@@ -182,42 +180,110 @@
                 <div id="farm-map-boundary-slot" class="farm-map-boundary-slot hidden" aria-hidden="true"></div>
             </section>
 
-            {{-- AI Smart Advisory: emerald dash-smart card (Crop Progress pattern) + separate detail panel --}}
+            {{-- AI Smart Advisory (Rainfall-trends style, map-specific implementation) --}}
             <div class="farm-map-map-advisory-row">
-                <aside class="farm-map-advisory-column space-y-3 sm:space-y-4" aria-label="Map smart advisory">
+                <div>
+                    <div class="ag-advisory-toggle-row">
+                        <button
+                            type="button"
+                            class="ag-advisory-toggle-btn"
+                            data-ai-advisory-toggle
+                            data-target="advisory-map-section"
+                            data-storage-key="advisory_visibility_map"
+                            aria-pressed="true"
+                        >
+                            Hide AI Smart Advisory
+                        </button>
+                    </div>
+                    <aside id="advisory-map-section" class="farm-map-advisory-column space-y-3 sm:space-y-4" aria-label="Map smart advisory" data-ai-smart-advisory-section>
                     <article
                         id="farm-map-smart-advisory"
                         class="ag-card dash-smart weather-page__smart farm-map-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5"
                         aria-label="AI smart advisory"
                     >
-                        <div class="farm-map-dash-smart__toolbar fm-map-cp-smart__status-row">
-                            <div class="dash-smart__debug farm-map-dash-smart__debug fm-map-cp-smart__status-text">
-                                <p class="text-xs font-semibold text-slate-700">
-                                    <span id="farm-map-advisory-status-line">Loading…</span>
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                id="farm-map-advisory-refresh"
-                                class="fm-map-cp-smart__refresh farm-map-dash-smart__refresh"
-                                title="Refresh advisory"
-                                aria-label="Refresh advisory"
-                            >
-                                <i data-lucide="refresh-cw" class="fm-map-cp-smart__refresh-ic" aria-hidden="true"></i>
-                            </button>
+                        <div class="dash-smart__debug">
+                            <p class="text-xs font-semibold text-slate-700">
+                                <span id="farm-map-advisory-status-line">AI Smart Advisory: Syncing</span>
+                            </p>
                         </div>
-
-                        <div id="farm-map-advisory-inner">
-                            <p class="text-sm text-slate-500">Loading advisory…</p>
+                        <div class="dash-smart__head">
+                            <div class="dash-smart__title-wrap">
+                                <span class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-extrabold uppercase tracking-[0.1em] text-slate-700">
+                                    <i data-lucide="sparkles" class="h-3.5 w-3.5 text-emerald-600"></i>
+                                    Smart action
+                                </span>
+                            </div>
+                        </div>
+                        <div class="dash-smart__body">
+                            <p id="farm-map-advisory-main-action" class="dash-smart__action">Loading advisory…</p>
                         </div>
                     </article>
 
                     <section
-                        id="farm-map-advisory-detail"
-                        class="farm-map-advisory-detail hidden relative overflow-hidden rounded-2xl border border-violet-200/50 bg-gradient-to-br from-violet-50/95 via-white to-emerald-50/50 shadow-lg shadow-violet-500/10 ring-1 ring-violet-100/90 sm:rounded-[1.35rem]"
-                        aria-label="Advisory details"
-                    ></section>
-                </aside>
+                        id="farm-map-field-day-plan"
+                        class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5 shadow-sm farm-map-page__timeline"
+                        aria-label="Field day plan"
+                    >
+                        <h2 class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800">
+                            <i data-lucide="calendar-check-2" class="h-4 w-4 text-amber-600"></i>
+                            Field Day Plan
+                        </h2>
+                        <div class="farm-map-page__timeline-list mt-3">
+                            <article class="farm-map-page__timeline-item farm-map-page__timeline-item--morning">
+                                <span class="farm-map-page__timeline-dot">☀️</span>
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-800">Early day</p>
+                                    <p id="farm-map-plan-early" class="text-sm text-slate-600">Loading…</p>
+                                </div>
+                            </article>
+                            <article class="farm-map-page__timeline-item farm-map-page__timeline-item--midday">
+                                <span class="farm-map-page__timeline-dot">⛅</span>
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-800">Midday</p>
+                                    <p id="farm-map-plan-midday" class="text-sm text-slate-600">Loading…</p>
+                                </div>
+                            </article>
+                            <article class="farm-map-page__timeline-item farm-map-page__timeline-item--late">
+                                <span class="farm-map-page__timeline-dot">🌙</span>
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-800">Late day</p>
+                                    <p id="farm-map-plan-late" class="text-sm text-slate-600">Loading…</p>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="grid gap-3 sm:grid-cols-2" aria-label="Water, drainage, and avoid">
+                        <div class="ag-card rounded-3xl border border-cyan-100 bg-cyan-50/70 p-4">
+                            <div class="dash-split__card dash-split__card--water farm-map-page__split-water">
+                                <div class="dash-split__head inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700">
+                                    <i data-lucide="droplets" class="h-3.5 w-3.5 text-cyan-600"></i>
+                                    Water & Drainage
+                                </div>
+                                <p id="farm-map-plan-water" class="dash-split__body">Loading…</p>
+                            </div>
+                        </div>
+                        <div class="ag-card rounded-3xl border border-rose-100 bg-rose-50/70 p-4">
+                            <div class="dash-split__card dash-split__card--avoid farm-map-page__split-avoid">
+                                <div class="dash-split__head inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700">
+                                    <i data-lucide="triangle-alert" class="h-3.5 w-3.5 text-rose-600"></i>
+                                    Avoid Today
+                                </div>
+                                <p id="farm-map-plan-avoid" class="dash-split__body">Loading…</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                        <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600" aria-hidden="true">
+                            <i data-lucide="info" class="h-3.5 w-3.5"></i>
+                        </span>
+                        <p class="pt-0.5 text-xs leading-relaxed text-slate-600">
+                            AI-generated recommendations only. Based on system data including weather, rainfall, crop, and field conditions. For farm decision support.
+                        </p>
+                    </div>
+                    </aside>
+                </div>
 
                 <div class="farm-map-map-column">
                     <section class="ag-card farm-map-stack farm-map-stack--focus" aria-label="Farm map">
@@ -226,18 +292,15 @@
                         </div>
                         <div class="farm-map-stack__frame">
                             <div class="farm-map-stack__map-inner farm-map-stack__map-inner--tall farm-map-main-canvas">
-                                <div id="farm-map-layer-toggles" class="farm-map-layer-toggles farm-map-layer-toggles--float" role="toolbar" aria-label="Map layers"></div>
+                                <div id="farm-map-geofence-badge" class="farm-map-geofence-badge farm-map-geofence-badge--outside" aria-live="polite">Outside Geofence</div>
+                                <div class="absolute left-3 top-3 z-[710] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm backdrop-blur">
+                                    <p class="font-bold uppercase tracking-wide text-slate-800">Flood Risk Legend</p>
+                                    <p class="mt-1"><span class="inline-block h-2.5 w-2.5 rounded-sm align-middle mr-1" style="background:#ff0000;"></span>Red = High Risk</p>
+                                    <p><span class="inline-block h-2.5 w-2.5 rounded-sm align-middle mr-1" style="background:#ffd700;"></span>Yellow = Moderate Risk</p>
+                                    <p><span class="inline-block h-2.5 w-2.5 rounded-sm align-middle mr-1" style="background:#00aa00;"></span>Green = Low Risk</p>
+                                </div>
 
                                 <div id="farm-map-container" class="farm-map-leaflet w-full h-full min-h-0"></div>
-
-                                <div id="farm-map-risk-legend" class="farm-map-risk-legend" aria-label="Flood risk legend">
-                                    <p class="farm-map-risk-legend__title">Flood Risk Legend</p>
-                                    <ul class="farm-map-risk-legend__list">
-                                        <li><span class="farm-map-risk-legend__dot farm-map-risk-legend__dot--low" aria-hidden="true"></span>Low Risk</li>
-                                        <li><span class="farm-map-risk-legend__dot farm-map-risk-legend__dot--moderate" aria-hidden="true"></span>Moderate Risk</li>
-                                        <li><span class="farm-map-risk-legend__dot farm-map-risk-legend__dot--high" aria-hidden="true"></span>High Risk</li>
-                                    </ul>
-                                </div>
 
                                 <div id="farm-map-empty-overlay" class="farm-map-empty-overlay {{ $initialHasDeviceGps ? 'hidden' : '' }}" aria-hidden="{{ $initialHasDeviceGps ? 'true' : 'false' }}">
                                     <div class="farm-map-empty-overlay__card">

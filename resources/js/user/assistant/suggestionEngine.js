@@ -19,11 +19,6 @@ function isSoilTooWet(farmContext) {
     return s.indexOf('wet') !== -1 || s.indexOf('basa') !== -1 || s.indexOf('mud') !== -1;
 }
 
-function riskIsHigh(farmContext) {
-    var r = (farmContext && farmContext.flood_risk && farmContext.flood_risk.level) ? String(farmContext.flood_risk.level).toUpperCase() : '';
-    return r === 'HIGH';
-}
-
 export function getDynamicSuggestionChips(opts) {
     var topic = opts.topic || 'fallback';
     var depth = typeof opts.depth === 'number' ? opts.depth : 0;
@@ -63,9 +58,9 @@ export function getDynamicSuggestionChips(opts) {
 
     // Lightweight context ordering tweaks:
     // - If soil is too wet, prefer chips about checking moisture/avoid application.
-    // - If flood risk is high, prefer drainage-related watering chips (still within watering topic).
+    // - If rain chance is high, prefer drainage-related watering chips.
     var tooWet = isSoilTooWet(farmContext);
-    var highFlood = riskIsHigh(farmContext);
+    var highRainChance = Number(farmContext && farmContext.rainfall_probability) >= 70;
 
     if (topic === 'watering' && tooWet) {
         candidates = candidates.slice().sort(function (a, b) {
@@ -74,10 +69,10 @@ export function getDynamicSuggestionChips(opts) {
             return (bw ? 1 : 0) - (aw ? 1 : 0);
         });
     }
-    if (topic === 'watering' && highFlood) {
+    if (topic === 'watering' && highRainChance) {
         candidates = candidates.slice().sort(function (a, b) {
-            var aw = a.toLowerCase().indexOf('drain') !== -1 || a.toLowerCase().indexOf('flood') !== -1;
-            var bw = b.toLowerCase().indexOf('drain') !== -1 || b.toLowerCase().indexOf('flood') !== -1;
+            var aw = a.toLowerCase().indexOf('drain') !== -1 || a.toLowerCase().indexOf('rain') !== -1;
+            var bw = b.toLowerCase().indexOf('drain') !== -1 || b.toLowerCase().indexOf('rain') !== -1;
             return (bw ? 1 : 0) - (aw ? 1 : 0);
         });
     }

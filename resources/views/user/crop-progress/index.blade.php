@@ -332,6 +332,19 @@
             </section>
 
             {{-- AI Smart Advisory — same section pattern as weather-details (emerald smart card + slate blocks + plan rows + split grid) --}}
+            <div class="ag-advisory-toggle-row">
+                <button
+                    type="button"
+                    class="ag-advisory-toggle-btn"
+                    data-ai-advisory-toggle
+                    data-target="advisory-crop-progress-section"
+                    data-storage-key="advisory_visibility_crop_progress"
+                    aria-pressed="true"
+                >
+                    Hide AI Smart Advisory
+                </button>
+            </div>
+            <section id="advisory-crop-progress-section" data-ai-smart-advisory-section>
             <article class="ag-card dash-smart weather-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5" aria-label="AI smart advisory">
                 <div class="dash-smart__debug">
                     <p class="text-xs font-semibold text-slate-700">
@@ -485,10 +498,19 @@
                     </div>
                 </article>
             </section>
+            <div class="flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600" aria-hidden="true">
+                    <i data-lucide="info" class="h-3.5 w-3.5"></i>
+                </span>
+                <p class="pt-0.5 text-xs leading-relaxed text-slate-600">
+                    AI-generated recommendations only. Based on system data including weather, rainfall, crop, and field conditions. For farm decision support.
+                </p>
+            </div>
 
             @if ($showAiDebug && ! empty($recommendation['ai_error'] ?? ''))
                 <p class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">{{ $recommendation['ai_error'] }}</p>
             @endif
+            </section>
 
             {{-- Crop Growth Timeline: update stage + stepper + progress + current/next dates --}}
             <section class="ag-card cp-growth-timeline" aria-labelledby="cp-stage-update-heading cp-growth-timeline-heading">
