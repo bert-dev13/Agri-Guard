@@ -21,6 +21,10 @@ if (document.getElementById('farm-map-page')) {
     import('./user/farm-map');
 }
 
+if (document.getElementById('structures-page')) {
+    import('./user/structures');
+}
+
 if (document.querySelector('.admin-users-page')) {
     import('./admin/user-management');
 }

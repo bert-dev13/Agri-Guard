@@ -14,6 +14,7 @@ use App\Http\Controllers\LandingController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\RainfallTrendsController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\StructureAnalysisController;
 use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\WeatherDetailsController;
 use Illuminate\Http\Request;
@@ -91,6 +92,9 @@ Route::middleware(['auth', 'verified.email'])->group(function () {
     Route::get('/map', [FarmMapController::class, 'index'])->name('map.index');
     Route::post('/api/map/save-gps-location', [FarmMapController::class, 'saveGpsLocation'])->name('map.save-gps');
     Route::get('/api/map/farm-context', [FarmMapController::class, 'farmContext'])->name('map.farm-context');
+    Route::get('/structures', [StructureAnalysisController::class, 'index'])->name('structures.index');
+    Route::post('/api/structure-location', [StructureAnalysisController::class, 'detectLocation'])->name('structures.location');
+    Route::post('/api/structure-analysis', [StructureAnalysisController::class, 'analyze'])->name('structures.analysis');
     Route::get('/assistant', [AiFarmChatController::class, 'show'])->name('assistant.index');
     Route::post('/api/assistant/chat', [AiFarmChatController::class, 'chat'])->name('assistant.chat');
     Route::post('/api/assistant/clear', [AiFarmChatController::class, 'clear'])->name('assistant.clear');

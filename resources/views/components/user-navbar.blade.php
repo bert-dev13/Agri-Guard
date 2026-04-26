@@ -41,6 +41,10 @@
                 <span class="user-navbar-link-icon" aria-hidden="true"><i data-lucide="map"></i></span>
                 <span class="user-navbar-link-text">Map</span>
             </a>
+            <a href="{{ route('structures.index') }}" class="user-navbar-link {{ request()->routeIs('structures.*') ? 'active' : '' }}" aria-label="Structures">
+                <span class="user-navbar-link-icon" aria-hidden="true"><i data-lucide="warehouse"></i></span>
+                <span class="user-navbar-link-text">Structures</span>
+            </a>
             <a href="{{ route('assistant.index') }}" class="user-navbar-link {{ request()->routeIs('assistant.*') ? 'active' : '' }}" aria-label="Assistant">
                 <span class="user-navbar-link-icon" aria-hidden="true"><i data-lucide="bot"></i></span>
                 <span class="user-navbar-link-text">Assistant</span>
@@ -113,6 +117,10 @@
             <a href="{{ route('map.index') }}" class="user-navbar-mobile-link {{ request()->routeIs('map.*') ? 'active' : '' }}">
                 <span class="user-navbar-mobile-link-icon" aria-hidden="true"><i data-lucide="map"></i></span>
                 Map
+            </a>
+            <a href="{{ route('structures.index') }}" class="user-navbar-mobile-link {{ request()->routeIs('structures.*') ? 'active' : '' }}">
+                <span class="user-navbar-mobile-link-icon" aria-hidden="true"><i data-lucide="warehouse"></i></span>
+                Structures
             </a>
             <a href="{{ route('assistant.index') }}" class="user-navbar-mobile-link {{ request()->routeIs('assistant.*') ? 'active' : '' }}">
                 <span class="user-navbar-mobile-link-icon" aria-hidden="true"><i data-lucide="bot"></i></span>
