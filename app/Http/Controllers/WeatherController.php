@@ -6,6 +6,7 @@ use App\Services\CropImpactService;
 use App\Services\FarmWeatherService;
 use App\Services\FarmRiskSnapshotService;
 use App\Services\RainfallHeatmapService;
+use App\Services\ThreeDayWeatherOutlookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +20,8 @@ class WeatherController extends Controller
         Request $request,
         FarmWeatherService $farmWeather,
         CropImpactService $cropImpactService,
-        FarmRiskSnapshotService $riskSnapshotService
+        FarmRiskSnapshotService $riskSnapshotService,
+        ThreeDayWeatherOutlookService $threeDayOutlook
     ): JsonResponse
     {
         $user = $request->user();
@@ -84,6 +86,7 @@ class WeatherController extends Controller
         );
         $response['impact_advisory'] = $impactAdvisory;
         $response['risk_snapshot'] = $riskSnapshot;
+        $response['weather_outlook'] = $threeDayOutlook->build($weatherBlock, $forecast);
 
         return response()->json($response);
     }

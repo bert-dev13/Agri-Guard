@@ -39,7 +39,11 @@ class FarmAssistantService
         $rainfallLabel = 'Low';
         $rainfallMm = null;
         $rainfallPop = null;
-        $riskSnapshot = $this->riskSnapshotService->buildFromNormalizedWeather($user, $weather);
+        $riskFull = $this->riskSnapshotService->buildFromNormalizedWeather($user, $weather);
+        $riskSnapshot = [
+            'rain_chance_display' => (string) ($riskFull['rain_chance_display'] ?? '—'),
+            'three_day_effect' => (string) ($riskFull['three_day_outlook'] ?? $riskFull['three_day_effect'] ?? ''),
+        ];
         $rainfallLabel = $this->rainfallHeatmapService->intensityLabel($weather);
         $rainfallMm = isset($weather['today_expected_rainfall']) && is_numeric($weather['today_expected_rainfall'])
             ? (float) $weather['today_expected_rainfall']
@@ -105,7 +109,6 @@ class FarmAssistantService
                 'humidity' => $context['humidity'] ?? null,
             ],
             'official_risk_snapshot' => [
-                'estimated_crop_loss' => data_get($context, 'risk_snapshot.estimated_crop_loss', 'N/A'),
                 'three_day_effect' => data_get($context, 'risk_snapshot.three_day_effect', 'No forecast impact available'),
                 'rain_chance' => data_get($context, 'risk_snapshot.rain_chance_display', '—'),
             ],
@@ -243,14 +246,15 @@ Goals:
 - Mirror the user language and style (English, Tagalog, Taglish, or other language).
 - Keep answers short to medium, practical, and friendly.
 - Quietly use payload.farm_context + payload.weather_context for grounded advice.
-- Treat payload.official_risk_snapshot as the system source of truth for crop-loss %, 3-day effect, and rain chance.
+- Treat payload.official_risk_snapshot as the system source of truth for the short outlook summary and rain chance.
 - Avoid robotic formatting, headings, bullet lists, and rigid templates.
 - Use simple words and explain technical ideas in plain language.
 
 Important:
 - Never invent weather or farm facts outside payload.
 - Never recalculate or replace payload.official_risk_snapshot values.
-- If user asks about crop loss, 3-day effect, or rain chance, repeat those exact values and explain them.
+- Do not provide crop-loss percentages, yield reduction estimates, or financial loss figures. If asked, say AgriGuard does not estimate loss amounts and give practical field guidance from weather and crop stage instead.
+- If user asks about the outlook summary or rain chance, use official_risk_snapshot values and explain them.
 - If some context is missing, say it briefly and still give the best safe guidance.
 - Keep continuity with follow-up questions.
 

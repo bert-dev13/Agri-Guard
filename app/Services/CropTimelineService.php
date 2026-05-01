@@ -8,10 +8,14 @@ use Carbon\Carbon;
 class CropTimelineService
 {
     /**
-     * Canonical five growth stages (DB values, snake_case).
-     * Order: Planting → Early Growth → Vegetative → Flowering → Harvest
+     * Growth stages with configured durations (calendar / config). Excludes terminal {@see completed}.
      */
-    public const STAGE_ORDER = ['planting', 'early_growth', 'vegetative', 'flowering', 'harvest'];
+    public const GROWTH_STAGE_ORDER = ['planting', 'early_growth', 'vegetative', 'flowering', 'harvest'];
+
+    /**
+     * Full lifecycle order including terminal completed state (no duration in config).
+     */
+    public const STAGE_ORDER = ['planting', 'early_growth', 'vegetative', 'flowering', 'harvest', 'completed'];
 
     public const STAGE_LABELS = [
         'planting' => 'Planting',
@@ -19,7 +23,21 @@ class CropTimelineService
         'vegetative' => 'Vegetative',
         'flowering' => 'Flowering',
         'harvest' => 'Harvest',
+        'completed' => 'Completed',
     ];
+
+    /**
+     * @return array<string, string> stage_key => label for forms (excludes completed; use “Mark harvested” for that).
+     */
+    public static function growthStageLabels(): array
+    {
+        $out = [];
+        foreach (self::GROWTH_STAGE_ORDER as $key) {
+            $out[$key] = self::STAGE_LABELS[$key] ?? $key;
+        }
+
+        return $out;
+    }
 
     /** @var array<string, string> Legacy / alternate keys → canonical */
     private const LEGACY_TO_CANONICAL = [
@@ -88,7 +106,7 @@ class CropTimelineService
 
         if (is_array($fromConfig) && $fromConfig !== []) {
             $out = [];
-            foreach (self::STAGE_ORDER as $stage) {
+            foreach (self::GROWTH_STAGE_ORDER as $stage) {
                 $out[$stage] = max(1, (int) ($fromConfig[$stage] ?? 14));
             }
 
@@ -157,7 +175,7 @@ class CropTimelineService
         $elapsed = max(0, (int) $planting->diffInDays($today, false));
 
         $cumulative = 0;
-        foreach (self::STAGE_ORDER as $key) {
+        foreach (self::GROWTH_STAGE_ORDER as $key) {
             $dur = max(1, (int) ($durations[$key] ?? 14));
             if ($elapsed < $cumulative + $dur) {
                 return [
@@ -172,8 +190,64 @@ class CropTimelineService
         }
 
         return [
-            'key' => 'harvest',
-            'label' => self::STAGE_LABELS['harvest'] ?? 'Harvest',
+            'key' => 'completed',
+            'label' => self::STAGE_LABELS['completed'] ?? 'Completed',
+            'days_since_planting' => $elapsed,
+            'days_until_planting' => null,
+            'has_planting_date' => true,
+        ];
+    }
+
+    /**
+     * Expected stage using planting date shifted by offset days.
+     *
+     * @return array{key: string, label: string, days_since_planting: int|null, days_until_planting: int|null, has_planting_date: bool}
+     */
+    public function inferExpectedStageFromPlantingWithOffset(User $user, ?array $stageDurations = null, int $offsetDays = 0): array
+    {
+        $durations = $stageDurations ?? $this->stageDurationsForCrop((string) ($user->crop_type ?? ''));
+        $planting = $this->resolvePlantingDate($user);
+        if ($planting === null) {
+            return [
+                'key' => 'planting',
+                'label' => self::STAGE_LABELS['planting'] ?? 'Planting',
+                'days_since_planting' => null,
+                'days_until_planting' => null,
+                'has_planting_date' => false,
+            ];
+        }
+
+        $anchor = $planting->copy()->addDays($offsetDays);
+        $today = now()->startOfDay();
+        if ($anchor->isFuture()) {
+            return [
+                'key' => 'planting',
+                'label' => self::STAGE_LABELS['planting'] ?? 'Planting',
+                'days_since_planting' => 0,
+                'days_until_planting' => (int) $today->diffInDays($anchor, false),
+                'has_planting_date' => true,
+            ];
+        }
+
+        $elapsed = max(0, (int) $anchor->diffInDays($today, false));
+        $cumulative = 0;
+        foreach (self::GROWTH_STAGE_ORDER as $key) {
+            $dur = max(1, (int) ($durations[$key] ?? 14));
+            if ($elapsed < $cumulative + $dur) {
+                return [
+                    'key' => $key,
+                    'label' => self::STAGE_LABELS[$key] ?? 'Unknown',
+                    'days_since_planting' => $elapsed,
+                    'days_until_planting' => null,
+                    'has_planting_date' => true,
+                ];
+            }
+            $cumulative += $dur;
+        }
+
+        return [
+            'key' => 'completed',
+            'label' => self::STAGE_LABELS['completed'] ?? 'Completed',
             'days_since_planting' => $elapsed,
             'days_until_planting' => null,
             'has_planting_date' => true,
@@ -195,7 +269,6 @@ class CropTimelineService
                 return $key;
             }
         }
-
         $legacyLabels = [
             'Land Preparation' => 'planting',
             'Growing' => 'vegetative',
@@ -360,6 +433,9 @@ class CropTimelineService
         }
 
         $stageKey = $this->timelineStageRowToKey($stageLabel);
+        if ($stageKey === 'completed') {
+            return 'Cycle completed';
+        }
         $durations = $this->stageDurationsForCrop($cropType);
         $duration = max(1, (int) ($durations[$stageKey] ?? 14));
         $end = $start->copy()->addDays(max(0, $duration - 1));
@@ -395,6 +471,253 @@ class CropTimelineService
         }
 
         return max(0, now()->startOfDay()->diffInDays($target, false));
+    }
+
+    /**
+     * True when calendar elapsed time has reached or passed the end of the harvest stage
+     * (first day of terminal "completed" / cycle wrap-up).
+     */
+    public function shouldAutoCompleteCropCycle(User $user, ?array $stageDurations = null, int $offsetDays = 0): bool
+    {
+        $durations = $stageDurations ?? $this->stageDurationsForCrop((string) ($user->crop_type ?? ''));
+        $planting = $this->resolvePlantingDate($user);
+        if ($planting === null) {
+            return false;
+        }
+
+        $anchor = $planting->copy()->addDays($offsetDays);
+        if ($anchor->isFuture()) {
+            return false;
+        }
+
+        $totalGrowthDays = 0;
+        foreach (self::GROWTH_STAGE_ORDER as $key) {
+            $totalGrowthDays += max(1, (int) ($durations[$key] ?? 14));
+        }
+
+        $elapsed = max(0, (int) $anchor->diffInDays(now()->startOfDay(), false));
+
+        return $elapsed >= $totalGrowthDays;
+    }
+
+    /**
+     * Progress within the active growth stage (user-selected when provided).
+     *
+     * When the user selects a stage ahead of the calendar-from-planting estimate, raw day-within-stage
+     * would stay near zero; progress is then mapped using elapsed days through the stage's calendar
+     * window (start of stage through end of stage) so the bar reflects real time since planting.
+     *
+     * @param  array<string, int>|null  $stageDurations
+     * @return array{
+     *   progress_percent: int,
+     *   days_elapsed_in_stage: int,
+     *   stage_duration_days: int,
+     *   days_remaining_to_next_stage: int|null,
+     *   next_stage_start_date: string|null
+     * }
+     */
+    public function computeStageProgressFromPlanting(User $user, ?array $stageDurations = null, int $offsetDays = 0, ?string $activeStageKey = null): array
+    {
+        $durations = $stageDurations ?? $this->stageDurationsForCrop((string) ($user->crop_type ?? ''));
+        $expected = $this->inferExpectedStageFromPlantingWithOffset($user, $durations, $offsetDays);
+        $currentStageKey = $activeStageKey !== null && trim($activeStageKey) !== ''
+            ? $this->normalizeStageKey($activeStageKey)
+            : $expected['key'];
+
+        if ($currentStageKey === 'completed') {
+            return [
+                'progress_percent' => 100,
+                'days_elapsed_in_stage' => 0,
+                'stage_duration_days' => 0,
+                'days_remaining_to_next_stage' => null,
+                'next_stage_start_date' => null,
+            ];
+        }
+
+        $currentDuration = max(1, (int) ($durations[$currentStageKey] ?? 14));
+
+        $planting = $this->resolvePlantingDate($user);
+        if ($planting === null) {
+            return [
+                'progress_percent' => 0,
+                'days_elapsed_in_stage' => 0,
+                'stage_duration_days' => $currentDuration,
+                'days_remaining_to_next_stage' => null,
+                'next_stage_start_date' => null,
+            ];
+        }
+        $planting = $planting->addDays($offsetDays);
+        $today = now()->startOfDay();
+        if ($planting->isFuture()) {
+            return [
+                'progress_percent' => 0,
+                'days_elapsed_in_stage' => 0,
+                'stage_duration_days' => $currentDuration,
+                'days_remaining_to_next_stage' => (int) $today->diffInDays($planting, false),
+                'next_stage_start_date' => $planting->format('Y-m-d'),
+            ];
+        }
+
+        $elapsedSincePlanting = max(0, (int) $planting->diffInDays($today, false));
+        $currentIndex = $this->stageIndex($currentStageKey);
+
+        $daysBeforeCurrent = 0;
+        for ($i = 0; $i < $currentIndex; $i++) {
+            $sk = self::STAGE_ORDER[$i];
+            if ($sk === 'completed') {
+                break;
+            }
+            $daysBeforeCurrent += max(1, (int) ($durations[$sk] ?? 14));
+        }
+
+        $expectedIndex = $this->stageIndex($expected['key']);
+        $daysElapsedInStage = max(0, $elapsedSincePlanting - $daysBeforeCurrent);
+        $isManualOverride = $activeStageKey !== null && trim($activeStageKey) !== '' && $currentStageKey !== $expected['key'];
+
+        [$bandMin, $bandMax] = $this->stageProgressBand($currentStageKey);
+        $bandSpan = max(1, $bandMax - $bandMin);
+        $stageFraction = min(1.0, max(0.0, ($daysElapsedInStage + 1) / $currentDuration));
+        $progressPercent = $bandMin + (int) floor($stageFraction * $bandSpan);
+
+        if ($isManualOverride) {
+            // Manual stage updates must immediately move the progress into the selected stage range.
+            $progressPercent = max($progressPercent, $this->manualStageBaseProgress($currentStageKey));
+
+            // If user selected a stage ahead of calendar, avoid low percentages from planting-date lag.
+            if ($currentIndex > $expectedIndex) {
+                $progressPercent = max($progressPercent, min($bandMax, $bandMin + 1));
+            }
+        }
+
+        $progressPercent = max($bandMin, min($bandMax, $progressPercent));
+        if ($currentStageKey === 'harvest') {
+            $progressPercent = min(99, $progressPercent);
+        }
+
+        $relativeWithinBand = ($progressPercent - $bandMin) / max(1, $bandSpan);
+        $daysElapsedInStage = min(
+            $currentDuration,
+            max(0, (int) round($relativeWithinBand * $currentDuration))
+        );
+
+        $daysRemainingToNext = null;
+        $nextStageStart = null;
+
+        $nextStageStartDate = $planting->copy()->addDays($daysBeforeCurrent + $currentDuration);
+        $nextStageStart = $nextStageStartDate->format('Y-m-d');
+        $daysRemainingToNext = max(0, (int) $today->diffInDays($nextStageStartDate, false));
+
+        return [
+            'progress_percent' => $progressPercent,
+            'days_elapsed_in_stage' => $daysElapsedInStage,
+            'stage_duration_days' => $currentDuration,
+            'days_remaining_to_next_stage' => $daysRemainingToNext,
+            'next_stage_start_date' => $nextStageStart,
+        ];
+    }
+
+    /**
+     * Build a deterministic, sequential timeline from one canonical source.
+     *
+     * @param  array<string, int>|null  $stageDurations
+     * @return array<int, array<string, mixed>>
+     */
+    public function buildSequentialTimelineFromPlanting(User $user, ?array $stageDurations = null, int $offsetDays = 0, ?string $activeStageKey = null): array
+    {
+        $durations = $stageDurations ?? $this->stageDurationsForCrop((string) ($user->crop_type ?? ''));
+        $expected = $this->inferExpectedStageFromPlantingWithOffset($user, $durations, $offsetDays);
+        $currentIndex = $activeStageKey !== null && trim($activeStageKey) !== ''
+            ? $this->stageIndex($activeStageKey)
+            : $this->stageIndex($expected['key']);
+        $planting = $this->resolvePlantingDate($user);
+        $anchor = ($planting ?? now()->startOfDay())->addDays($offsetDays);
+
+        $timeline = [];
+        $dayCursor = 0;
+        foreach (self::GROWTH_STAGE_ORDER as $index => $stageKey) {
+            $start = $anchor->copy()->addDays($dayCursor);
+            $status = $index < $currentIndex
+                ? 'completed'
+                : ($index === $currentIndex ? 'current' : 'upcoming');
+
+            $timeline[] = [
+                'stage' => self::STAGE_LABELS[$stageKey] ?? ucfirst(str_replace('_', ' ', $stageKey)),
+                'target_date' => $start->format('Y-m-d'),
+                'estimated_day_count' => $dayCursor,
+                'status' => $status,
+                'date_range_line' => $this->formatStageTypicalWindow(
+                    self::STAGE_LABELS[$stageKey] ?? ucfirst(str_replace('_', ' ', $stageKey)),
+                    $start->format('Y-m-d'),
+                    (string) ($user->crop_type ?? '')
+                ),
+            ];
+
+            $dayCursor += max(1, (int) ($durations[$stageKey] ?? 14));
+        }
+
+        $completedIndex = count(self::GROWTH_STAGE_ORDER);
+        $startCompleted = $anchor->copy()->addDays($dayCursor);
+        $timeline[] = [
+            'stage' => self::STAGE_LABELS['completed'],
+            'target_date' => $startCompleted->format('Y-m-d'),
+            'estimated_day_count' => $dayCursor,
+            'status' => $currentIndex === $completedIndex ? 'current' : 'upcoming',
+            'date_range_line' => $this->formatStageTypicalWindow(
+                'Completed',
+                $startCompleted->format('Y-m-d'),
+                (string) ($user->crop_type ?? '')
+            ),
+        ];
+
+        return $timeline;
+    }
+
+    private function resolvePlantingDate(User $user): ?Carbon
+    {
+        $attrs = $user->getAttributes();
+        $rawPlanting = $attrs['planting_date'] ?? null;
+        if (($rawPlanting === null || $rawPlanting === '') && $user->planting_date === null) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($rawPlanting ?? $user->planting_date)->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return array{0:int,1:int}
+     */
+    private function stageProgressBand(string $stageKey): array
+    {
+        $key = $this->normalizeStageKey($stageKey);
+
+        return match ($key) {
+            'planting' => [0, 5],
+            'early_growth' => [5, 25],
+            'vegetative' => [25, 60],
+            'flowering' => [60, 85],
+            'harvest' => [85, 99],
+            'completed' => [100, 100],
+            default => [0, 100],
+        };
+    }
+
+    private function manualStageBaseProgress(string $stageKey): int
+    {
+        $key = $this->normalizeStageKey($stageKey);
+
+        return match ($key) {
+            'planting' => 2,
+            'early_growth' => 12,
+            'vegetative' => 40,
+            'flowering' => 70,
+            'harvest' => 92,
+            'completed' => 100,
+            default => 10,
+        };
     }
 
     public function humanAdjustmentLabel(string $rawReason, string $legacyLabel): string

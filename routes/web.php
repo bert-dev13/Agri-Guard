@@ -86,6 +86,7 @@ Route::middleware(['auth', 'verified.email'])->group(function () {
     Route::get('/crop-progress', [CropProgressController::class, 'index'])->name('crop-progress.index');
     Route::post('/crop-progress/reality-check', [CropProgressController::class, 'realityCheck'])->name('crop-progress.reality-check');
     Route::post('/crop-progress/reality-check/reopen', [CropProgressController::class, 'reopenRealityCheck'])->name('crop-progress.reality-check-reopen');
+    Route::post('/crop-progress/complete-cycle', [CropProgressController::class, 'markCycleComplete'])->name('crop-progress.complete-cycle');
     Route::put('/crop-progress/current-stage', [CropProgressController::class, 'updateCurrentStage'])->name('crop-progress.update-current-stage');
     Route::put('/crop-progress/stage', [CropProgressController::class, 'updateStage'])->name('crop-progress.update-stage');
 

@@ -37,6 +37,7 @@ class User extends Authenticatable
         'reality_check_answered',
         'reality_check_status',
         'stage_confirmed_at',
+        'crop_cycle_completed_at',
         'farm_area',
         'field_condition',
         'role',
@@ -86,6 +87,7 @@ class User extends Authenticatable
             'password_reset_attempts' => 'integer',
             'reality_check_answered' => 'boolean',
             'stage_confirmed_at' => 'datetime',
+            'crop_cycle_completed_at' => 'datetime',
         ];
     }
 

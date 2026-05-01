@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AiAdvisory\AiAdvisoryService;
-use App\Services\CropImpactService;
-use App\Services\FarmRiskSnapshotService;
+use App\Services\ThreeDayWeatherOutlookService;
 use App\Services\WeatherAdvisoryService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -17,8 +16,7 @@ class WeatherDetailsController extends Controller
     public function show(
         WeatherAdvisoryService $weatherService,
         AiAdvisoryService $aiAdvisory,
-        CropImpactService $cropImpactService,
-        FarmRiskSnapshotService $riskSnapshotService
+        ThreeDayWeatherOutlookService $threeDayOutlook
     ): View
     {
         $user = Auth::user();
@@ -48,51 +46,13 @@ class WeatherDetailsController extends Controller
             $weather['simple_icon'] = self::simpleWeatherIcon($weather['condition']['id'] ?? 800);
         }
 
-        $summaryMessage = self::weatherSummaryMessage($forecast);
-
-        $chartLabels = array_map(fn ($d) => $d['day_name'], $forecast);
-        $chartTempMin = array_column($forecast, 'temp_min');
-        $chartTempMax = array_column($forecast, 'temp_max');
-        $chartPop = array_column($forecast, 'pop');
-        $chartWind = array_map(fn ($d) => $d['wind_speed'] ?? 0, $forecast);
-
         $farmLocationDisplay = $user->farm_location_display;
 
-        $charts = $data['charts'] ?? [];
         $smartAdvisory = $data['smart_advisory'] ?? [];
         $forecastRainProb = $data['forecast_rain_probability'] ?? null;
         $rainProbDisplay = $data['rain_probability_display'] ?? $forecastRainProb ?? (empty($forecast) ? null : (int) max(array_column($forecast, 'pop')));
 
-        $farmImpactMessage = self::buildFarmImpactMessage(
-            $weather,
-            $forecast,
-            $rainProbDisplay ?? $forecastRainProb,
-            $user->crop_type,
-            $user->farming_stage
-        );
-
-        $riskSnapshot = $riskSnapshotService->buildFromWeather($user, $weather ?? [], $forecast);
-        $rainfallSeverity = $this->rainfallSeverity($rainProbDisplay ?? $forecastRainProb);
-
-        $impactAdvisory = $cropImpactService->buildForecastImpactPayload(
-            $user,
-            is_array($weather) ? $weather : [],
-            $forecast,
-            $rainfallSeverity
-        );
-
-        $dewPoint = self::estimateDewPoint(
-            isset($weather['temp']) ? (float) $weather['temp'] : null,
-            isset($weather['humidity']) ? (float) $weather['humidity'] : null
-        );
-        $cloudCover = self::estimateCloudCover($weather, $forecast);
-        $agriInsights = self::buildAgricultureInsights(
-            $weather,
-            $forecast,
-            $rainProbDisplay,
-            $user->crop_type,
-            $user->farming_stage
-        );
+        $weatherOutlook = $threeDayOutlook->build($weather, $forecast);
 
         $todayRainfallMm = is_array($weather) ? ($weather['today_expected_rainfall'] ?? null) : null;
         $weekRainfallMm = is_numeric($todayRainfallMm) ? ((float) $todayRainfallMm * 7) : null;
@@ -126,24 +86,11 @@ class WeatherDetailsController extends Controller
             'smart_advisory' => $smartAdvisory,
             'forecast_rain_probability' => $forecastRainProb,
             'rain_probability_display' => $rainProbDisplay,
-            'farm_impact_message' => $farmImpactMessage,
-            'chart_labels' => $chartLabels,
-            'chart_temp_min' => $chartTempMin,
-            'chart_temp_max' => $chartTempMax,
-            'chart_pop' => $chartPop,
-            'chart_wind' => $chartWind,
-            'summary_message' => $summaryMessage,
-            'charts' => $charts,
-            'crop_type' => $user->crop_type,
             'weatherData' => $data['weather_data'] ?? [],
             'last_updated' => $data['last_updated'] ?? null,
-            'dew_point' => $dewPoint,
-            'cloud_cover' => $cloudCover,
-            'agri_insights' => $agriInsights,
-            'impact_advisory' => $impactAdvisory,
             'recommendation' => $smartRecommendation['recommendation'],
             'recommendation_failed' => $smartRecommendation['failed'],
-            'risk_snapshot' => $riskSnapshot,
+            'weather_outlook' => $weatherOutlook,
         ]);
     }
 
@@ -421,18 +368,5 @@ class WeatherDetailsController extends Controller
             'crop_safety' => $cropSafety,
             'alert' => $alert,
         ];
-    }
-
-    private function rainfallSeverity(?int $rainProbability): string
-    {
-        if ($rainProbability === null) {
-            return 'low';
-        }
-
-        return match (true) {
-            $rainProbability >= 70 => 'high',
-            $rainProbability >= 40 => 'moderate',
-            default => 'low',
-        };
     }
 }

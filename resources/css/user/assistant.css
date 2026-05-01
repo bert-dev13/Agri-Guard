@@ -32,7 +32,7 @@
 
 .assistant-cards {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
 }
 
@@ -531,7 +531,7 @@
 }
 
 @media (max-width: 980px) {
-    .assistant-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .assistant-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
@@ -1657,7 +1657,7 @@
 
 .assistant-cards {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
     animation: assistant-fade-in 0.5s ease;
 }
@@ -2087,7 +2087,7 @@
 
 @media (max-width: 980px) {
     .assistant-cards {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -3619,7 +3619,7 @@ body.dashboard-page.assistant-page {
 
 @media (min-width: 900px) {
     .dashboard-page.assistant-page .assistant-cards {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 0.65rem 0.6rem;
     }
 }
@@ -3638,10 +3638,16 @@ body.dashboard-page.assistant-page {
 
 .dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.4rem;
     overflow: visible;
     padding-bottom: 0;
+}
+
+@media (min-width: 640px) {
+    .dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
 }
 
 .dashboard-page.assistant-page .assistant-cards.assistant-cards--single-row .assistant-card {

@@ -66,7 +66,7 @@
     $weatherAriaTemp = $weather && isset($weather['temp']) ? (string) round($weather['temp']) . ' degrees Celsius' : 'temperature unavailable';
     $weatherAriaLabel = 'Weather: ' . ($weatherLabel ?: 'conditions') . ', ' . $weatherAriaTemp . '. Tap for full weather details';
 
-    $riskSnap = is_array($risk_snapshot ?? null) ? $risk_snapshot : [];
+    $weatherOutlookCard = is_array($weather_outlook ?? null) ? $weather_outlook : [];
 @endphp
 
 @extends('layouts.user')
@@ -192,12 +192,11 @@
             </section>
 
             @include('partials.farm-advisory-card', [
-                'risk_snapshot' => $riskSnap,
+                'weather_outlook' => $weatherOutlookCard,
                 'wrapperClass' => 'rounded-2xl',
                 'detailsLinkHref' => route('weather-details'),
                 'detailsLinkAria' => 'Open full weather details',
                 'detailsLinkSr' => 'Weather details',
-                'showRecommended' => false,
             ])
 
             <div class="ag-advisory-toggle-row">

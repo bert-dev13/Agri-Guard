@@ -26,30 +26,22 @@ class CropProgressController extends Controller
     ): View {
         /** @var User $user */
         $user = Auth::user();
+        $offsetDays = (int) ($user->crop_timeline_offset_days ?? 0);
+        $durations = $timelineService->stageDurationsForCrop((string) ($user->crop_type ?? ''));
+        $this->autoFinalizeCropCycleIfDue($user, $timelineService, $durations, $offsetDays);
+        $user->refresh();
+
         $advisoryData = $this->loadAdvisoryData($user, $weatherAdvisoryService);
         $weatherContext = $this->mapAdvisoryToWeatherContext($advisoryData);
         $stageInsights = $this->generateStageAdvice($user, $weatherContext, $aiAdvisoryService);
 
         $rec = $stageInsights['recommendation'];
-        $offsetDays = (int) ($user->crop_timeline_offset_days ?? 0);
 
-        $durations = $timelineService->stageDurationsForCrop((string) ($user->crop_type ?? ''));
-        $expected = $timelineService->inferExpectedStageFromPlanting($user, $durations);
-
-        if (! empty($rec['timeline']) && is_array($rec['timeline'])) {
-            $rec['timeline'] = $timelineService->applyOffsetToTimeline($rec['timeline'], $offsetDays);
-            foreach ($rec['timeline'] as &$row) {
-                if (is_array($row)) {
-                    $row['date_range_line'] = $timelineService->formatStageTypicalWindow(
-                        (string) ($row['stage'] ?? ''),
-                        (string) ($row['target_date'] ?? ''),
-                        (string) ($user->crop_type ?? '')
-                    );
-                }
-            }
-            unset($row);
-            $rec['timeline'] = $timelineService->applyCalendarStatusToTimeline($rec['timeline'], $expected['key']);
-        }
+        $calendarExpectedRaw = $timelineService->inferExpectedStageFromPlanting($user, $durations);
+        $expected = $timelineService->inferExpectedStageFromPlantingWithOffset($user, $durations, $offsetDays);
+        $actualKey = $timelineService->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
+        $stageProgress = $timelineService->computeStageProgressFromPlanting($user, $durations, $offsetDays, $actualKey);
+        $rec['timeline'] = $timelineService->buildSequentialTimelineFromPlanting($user, $durations, $offsetDays, $actualKey);
 
         $nextItem = $this->resolveNextStage($rec['timeline'] ?? []);
         if ($nextItem !== null) {
@@ -57,9 +49,17 @@ class CropProgressController extends Controller
             $rec['next_stage_target_date'] = $nextItem['target_date'] ?? ($rec['next_stage_target_date'] ?? null);
         }
 
-        $rec['days_remaining'] = $timelineService->nextStageDaysRemaining($rec['next_stage_target_date'] ?? null)
+        $rec['days_remaining'] = $stageProgress['days_remaining_to_next_stage']
+            ?? $timelineService->nextStageDaysRemaining($rec['next_stage_target_date'] ?? null)
             ?? (is_numeric($rec['days_remaining'] ?? null) ? (int) $rec['days_remaining'] : null);
-        $actualKey = $timelineService->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
+        if (($stageProgress['next_stage_start_date'] ?? null) !== null) {
+            $rec['next_stage_target_date'] = $stageProgress['next_stage_start_date'];
+        }
+        if ($actualKey === 'completed') {
+            $rec['next_stage'] = null;
+            $rec['next_stage_target_date'] = null;
+            $rec['days_remaining'] = null;
+        }
         $comparison = $timelineService->compareActualToExpected($actualKey, $expected['key']);
 
         $humanAdjustment = $timelineService->humanAdjustmentLabel(
@@ -85,7 +85,7 @@ class CropProgressController extends Controller
         $realityQuestionStage = $this->resolveRealityQuestionStageLabel($user, $rec);
         $questionStageKey = $this->normalizeStageLabelToKey($realityQuestionStage);
 
-        $nextStageDateRange = ! empty($rec['next_stage_target_date'])
+        $nextStageDateRange = $actualKey !== 'completed' && ! empty($rec['next_stage_target_date'])
             ? $timelineService->formatStageTypicalWindow(
                 (string) ($rec['next_stage'] ?? ''),
                 (string) $rec['next_stage_target_date'],
@@ -108,20 +108,25 @@ class CropProgressController extends Controller
         $plantingDateFormatted = $user->planting_date
             ? $user->planting_date->timezone(config('app.timezone'))->format('M j, Y')
             : null;
-        $plantingDayLine = ! $expected['has_planting_date']
+        $plantingDayLine = ! $calendarExpectedRaw['has_planting_date']
             ? 'No planting date set — add one in Farm Settings.'
-            : (($expected['days_until_planting'] ?? null) !== null && (int) $expected['days_until_planting'] > 0
-                ? 'Planting in '.(int) $expected['days_until_planting'].' day'.(((int) $expected['days_until_planting'] === 1) ? '' : 's').' ('.$plantingDateFormatted.').'
-                : (($expected['days_since_planting'] ?? null) !== null
-                    ? (int) $expected['days_since_planting'].' day'.(((int) $expected['days_since_planting'] === 1) ? '' : 's').' since planting ('.$plantingDateFormatted.').'
+            : (($calendarExpectedRaw['days_until_planting'] ?? null) !== null && (int) $calendarExpectedRaw['days_until_planting'] > 0
+                ? 'Planting in '.(int) $calendarExpectedRaw['days_until_planting'].' day'.(((int) $calendarExpectedRaw['days_until_planting'] === 1) ? '' : 's').' ('.$plantingDateFormatted.').'
+                : (($calendarExpectedRaw['days_since_planting'] ?? null) !== null
+                    ? (int) $calendarExpectedRaw['days_since_planting'].' day'.(((int) $calendarExpectedRaw['days_since_planting'] === 1) ? '' : 's').' since planting ('.$plantingDateFormatted.').'
                     : 'Planted '.$plantingDateFormatted.'.'));
+
+        $cycleCompleted = $actualKey === 'completed';
+        $canMarkCycleComplete = $actualKey === 'harvest';
 
         return view('user.crop-progress.index', [
             'user' => $user,
-            'stages' => self::TIMELINE_STAGES,
+            'stages' => CropTimelineService::growthStageLabels(),
             'farm_name' => trim((string) $user->name).' Farm',
-            'current_stage' => $expected['key'],
-            'current_stage_label' => $expected['label'],
+            'current_stage' => $actualKey,
+            'current_stage_label' => $this->stageLabel($user->farming_stage),
+            'expected_stage_key' => $expected['key'],
+            'expected_stage_label' => $expected['label'],
             'manual_stage_label' => $this->stageLabel($user->farming_stage),
             'weather_context' => $weatherContext,
             'recommendation' => $rec,
@@ -134,18 +139,70 @@ class CropProgressController extends Controller
             'timeline_adjustment_label' => $humanAdjustment,
             'planting_date_formatted' => $plantingDateFormatted,
             'planting_day_line' => $plantingDayLine,
-            'days_since_planting' => $expected['days_since_planting'],
-            'days_until_planting' => $expected['days_until_planting'],
-            'has_planting_date' => $expected['has_planting_date'],
+            'days_since_planting' => $calendarExpectedRaw['days_since_planting'],
+            'days_until_planting' => $calendarExpectedRaw['days_until_planting'],
+            'has_planting_date' => $calendarExpectedRaw['has_planting_date'],
             'growth_speed' => $growthSpeed,
             'stage_confidence' => $confidence,
+            'progress_percent' => $cycleCompleted ? 100 : $stageProgress['progress_percent'],
             'reality_question_stage' => $realityQuestionStage,
             'crop_timeline_offset_days' => $offsetDays,
             'next_stage_date_range' => $nextStageDateRange,
             'confidence_is_low' => $confidenceIsLow,
-            'show_reality_check_form' => $realityUi['show_form'],
-            'show_reality_check_card' => $realityUi['show_form'],
+            'show_reality_check_form' => $realityUi['show_form'] && ! $cycleCompleted,
+            'show_reality_check_card' => $realityUi['show_form'] && ! $cycleCompleted,
+            'cycle_completed' => $cycleCompleted,
+            'can_mark_cycle_complete' => $canMarkCycleComplete,
+            'crop_cycle_completed_at' => $user->crop_cycle_completed_at,
         ]);
+    }
+
+    public function markCycleComplete(): RedirectResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        if ($user->farming_stage === 'completed') {
+            return redirect()
+                ->route('crop-progress.index')
+                ->with('success', 'This crop cycle is already marked as completed.');
+        }
+
+        $currentStage = app(CropTimelineService::class)->normalizeStageKey((string) ($user->farming_stage ?? ''));
+        if ($currentStage !== 'harvest') {
+            return redirect()
+                ->route('crop-progress.index')
+                ->with('error', 'You can only mark the cycle as fully harvested during the Harvest stage.');
+        }
+
+        if ($user->planting_date === null) {
+            return redirect()
+                ->route('crop-progress.index')
+                ->with('error', 'Set a planting date before marking the cycle as fully harvested.');
+        }
+
+        $user->farming_stage = 'completed';
+        $user->crop_cycle_completed_at = now();
+        $user->save();
+
+        return redirect()
+            ->route('crop-progress.index')
+            ->with('success', 'Harvest successfully completed. Your crop cycle is now finished (100%).');
+    }
+
+    private function autoFinalizeCropCycleIfDue(User $user, CropTimelineService $timelineService, array $durations, int $offsetDays): void
+    {
+        if ($user->farming_stage === 'completed') {
+            return;
+        }
+
+        if (! $timelineService->shouldAutoCompleteCropCycle($user, $durations, $offsetDays)) {
+            return;
+        }
+
+        $user->farming_stage = 'completed';
+        $user->crop_cycle_completed_at = now();
+        $user->save();
     }
 
     public function realityCheck(
@@ -156,6 +213,16 @@ class CropProgressController extends Controller
     ): RedirectResponse|JsonResponse {
         /** @var User $user */
         $user = Auth::user();
+
+        if ($user->farming_stage === 'completed') {
+            if ($this->wantsJsonRealityResponse($request)) {
+                return response()->json(['ok' => true, 'show_form' => false]);
+            }
+
+            return redirect()
+                ->route('crop-progress.index')
+                ->with('success', 'This crop cycle is already completed.');
+        }
 
         $validated = $request->validate([
             'response' => ['required', 'string', 'in:yes,not_yet'],
@@ -185,15 +252,12 @@ class CropProgressController extends Controller
         $rec = $stageInsights['recommendation'];
         $offsetDays = (int) ($user->crop_timeline_offset_days ?? 0);
         $durations = $timelineService->stageDurationsForCrop((string) ($user->crop_type ?? ''));
-        $expected = $timelineService->inferExpectedStageFromPlanting($user, $durations);
-        if (! empty($rec['timeline']) && is_array($rec['timeline'])) {
-            $rec['timeline'] = $timelineService->applyOffsetToTimeline($rec['timeline'], $offsetDays);
-            $rec['timeline'] = $timelineService->applyCalendarStatusToTimeline($rec['timeline'], $expected['key']);
-        }
+        $expected = $timelineService->inferExpectedStageFromPlantingWithOffset($user, $durations, $offsetDays);
+        $actualKey = $timelineService->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
+        $rec['timeline'] = $timelineService->buildSequentialTimelineFromPlanting($user, $durations, $offsetDays, $actualKey);
 
         $confidence = $timelineService->confidenceDisplay($weatherContext);
         $confidenceIsLow = ($confidence['level'] ?? 'medium') === 'low';
-        $actualKey = $timelineService->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
         $comparison = $timelineService->compareActualToExpected($actualKey, $expected['key']);
         $growthSpeed = $timelineService->growthSpeed($comparison, $user->crop_stage_reality_check, $offsetDays);
         $realityQuestionStage = $this->resolveRealityQuestionStageLabel($user, $rec);
@@ -253,8 +317,14 @@ class CropProgressController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
+        if ($user->farming_stage === 'completed') {
+            return redirect()
+                ->route('crop-progress.index')
+                ->with('error', 'This crop cycle is completed. Stage updates are locked at 100%.');
+        }
+
         $validated = $request->validate([
-            'farming_stage' => ['required', 'string', 'in:'.implode(',', CropTimelineService::STAGE_ORDER)],
+            'farming_stage' => ['required', 'string', 'in:'.implode(',', CropTimelineService::GROWTH_STAGE_ORDER)],
         ]);
 
         $user->farming_stage = $validated['farming_stage'];
@@ -271,8 +341,14 @@ class CropProgressController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
+        if ($user->farming_stage === 'completed') {
+            return redirect()
+                ->back()
+                ->with('error', 'This crop cycle is completed. Start a new cycle before changing growth stage.');
+        }
+
         $validated = $request->validate([
-            'farming_stage' => ['required', 'string', 'in:'.implode(',', CropTimelineService::STAGE_ORDER)],
+            'farming_stage' => ['required', 'string', 'in:'.implode(',', CropTimelineService::GROWTH_STAGE_ORDER)],
             'planting_date' => ['nullable', 'date'],
         ], [
             'farming_stage.required' => 'Please select your current growth stage.',
@@ -454,9 +530,13 @@ class CropProgressController extends Controller
     {
         $durations = $this->cropStageDurations($cropType);
         $adjustment = $this->weatherDayAdjustment($weatherContext);
-        $stageOrder = array_keys(self::TIMELINE_STAGES);
-        $currentIndex = array_search($currentStage, $stageOrder, true);
-        $currentIndex = $currentIndex === false ? 0 : $currentIndex;
+        $stageOrder = CropTimelineService::GROWTH_STAGE_ORDER;
+        if ($currentStage === 'completed') {
+            $currentIndex = count($stageOrder);
+        } else {
+            $currentIndex = array_search($currentStage, $stageOrder, true);
+            $currentIndex = $currentIndex === false ? 0 : (int) $currentIndex;
+        }
 
         $timeline = [];
         $dayCursor = 0;
@@ -470,7 +550,7 @@ class CropProgressController extends Controller
             $target = $plantingDate->copy()->addDays($dayCursor);
             $status = $index < $currentIndex ? 'completed' : ($index === $currentIndex ? 'current' : 'upcoming');
             $timeline[] = [
-                'stage' => self::TIMELINE_STAGES[$stageKey],
+                'stage' => CropTimelineService::STAGE_LABELS[$stageKey] ?? $stageKey,
                 'target_date' => $target->format('Y-m-d'),
                 'estimated_day_count' => $dayCursor,
                 'status' => $status,
@@ -478,6 +558,15 @@ class CropProgressController extends Controller
 
             $dayCursor += $duration;
         }
+
+        $completedIndex = count($stageOrder);
+        $startCompleted = $plantingDate->copy()->addDays($dayCursor);
+        $timeline[] = [
+            'stage' => CropTimelineService::STAGE_LABELS['completed'],
+            'target_date' => $startCompleted->format('Y-m-d'),
+            'estimated_day_count' => $dayCursor,
+            'status' => $currentIndex === $completedIndex ? 'current' : 'upcoming',
+        ];
 
         return $timeline;
     }

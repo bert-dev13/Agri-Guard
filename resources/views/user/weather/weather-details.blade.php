@@ -5,49 +5,11 @@
     $rainProbDisplay = $rain_probability_display ?? $forecast_rain_probability ?? ($weatherData['today_rain_probability'] ?? null);
     $rainfallMm = $weather['today_expected_rainfall'] ?? ($weatherData['today_expected_rainfall'] ?? null);
     $rainStatIsChance = is_numeric($rainProbDisplay);
-    $rainStatLabel = $rainStatIsChance ? 'Rain' : 'Rainfall';
     $rainStatValue = $rainStatIsChance
         ? ((int) round((float) $rainProbDisplay)) . '%'
         : (is_numeric($rainfallMm) ? round((float) $rainfallMm, 1) . ' mm' : '—');
 
-    $stageLabel = filled(Auth::user()->farming_stage)
-        ? app(\App\Services\CropTimelineService::class)->displayLabel(Auth::user()->farming_stage)
-        : null;
-    $farmName = $crop_type ? ($crop_type . ' Farm') : 'Rice Farm';
-    $farmStage = $stageLabel ?: 'Planting';
     $headerLocation = $farm_location_display ?: 'Barangay Calamagui, Amulung, Cagayan';
-    $insights = $agri_insights ?? [];
-    $recoForRisk = is_array($recommendation ?? null) ? $recommendation : [];
-    $riskForBadge = strtolower((string) ($recoForRisk['risk'] ?? $recoForRisk['risk_level'] ?? ''));
-    $weatherRiskTone = $riskForBadge !== '' ? $riskForBadge : 'moderate';
-    $weatherRiskBadgeClass = $weatherRiskTone === 'low'
-        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-        : ($weatherRiskTone === 'high'
-            ? 'bg-rose-100 text-rose-800 border border-rose-200'
-            : 'bg-amber-100 text-amber-800 border border-amber-200');
-    $impactReco = is_array($recommendation ?? null) ? $recommendation : [];
-    $impactAiStatus = strtolower(trim((string) ($impactReco['ai_status'] ?? 'failed')));
-    $impactAiReady = $impactAiStatus === 'success';
-    $impactAiError = trim((string) ($impactReco['ai_error'] ?? ''));
-    $impactDetails = $impactAiReady
-        ? array_values(array_filter(array_unique([
-            trim((string) ($impactReco['why'] ?? '')),
-            trim((string) ($impactReco['today_plan']['afternoon'] ?? '')),
-            trim((string) ($impactReco['today_plan']['evening'] ?? '')),
-        ]), fn ($item) => $item !== ''))
-        : [];
-    $impactAdvice = $impactAiReady
-        ? array_values(array_filter(array_unique([
-            trim((string) ($impactReco['today_plan']['morning'] ?? '')),
-            trim((string) ($impactReco['avoid'] ?? '')),
-            trim((string) ($impactReco['water_strategy'] ?? '')),
-        ]), fn ($item) => $item !== ''))
-        : [];
-    if (! $impactAiReady) {
-        $impactDetails = [($impactAiError !== '' ? $impactAiError : 'Together AI advisory is currently unavailable.')];
-        $impactAdvice = ['Refresh in a few minutes after weather data updates.'];
-    }
-    $riskSnapshot = is_array($risk_snapshot ?? null) ? $risk_snapshot : [];
 
     $clayDataUri = static function (string $svg): string {
         return 'data:image/svg+xml;base64,' . base64_encode($svg);
@@ -393,40 +355,11 @@
                 </section>
             @endif
 
-            <section class="space-y-4" aria-label="Farm advisory and AI guidance">
+            <section class="space-y-4" aria-label="Three-day weather outlook">
                 @include('partials.farm-advisory-card', [
-                    'risk_snapshot' => $riskSnapshot,
-                    'wrapperClass' => 'weather-impact-card weather-impact-card--compact rounded-3xl',
-                    'showRecommended' => true,
+                    'weather_outlook' => is_array($weather_outlook ?? null) ? $weather_outlook : [],
+                    'wrapperClass' => 'weather-outlook-card--page rounded-3xl',
                 ])
-
-                <div class="weather-impact-min__grid weather-impact-min__grid--minimal ag-card border border-slate-200 bg-white p-3 shadow-sm sm:p-3.5 rounded-3xl">
-                    <article class="weather-impact-min__block weather-impact-min__block--effect">
-                        <h3 class="weather-impact-min__block-title">Situation notes</h3>
-                        @if (!empty($impactDetails))
-                            <ul class="weather-impact-min__list">
-                                @foreach ($impactDetails as $effect)
-                                    <li>{{ $effect }}</li>
-                                @endforeach
-                            </ul>
-                        @else
-                            <p class="weather-impact-min__fallback">No effect data</p>
-                        @endif
-                    </article>
-
-                    <article class="weather-impact-min__block weather-impact-min__block--advice">
-                        <h3 class="weather-impact-min__block-title">Additional guidance</h3>
-                        @if (!empty($impactAdvice))
-                            <ul class="weather-impact-min__list">
-                                @foreach ($impactAdvice as $adviceItem)
-                                    <li>{{ $adviceItem }}</li>
-                                @endforeach
-                            </ul>
-                        @else
-                            <p class="weather-impact-min__fallback">No advice yet</p>
-                        @endif
-                    </article>
-                </div>
             </section>
 
             @if (!empty($hourly_forecast))

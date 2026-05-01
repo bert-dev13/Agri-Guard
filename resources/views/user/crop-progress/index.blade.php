@@ -69,7 +69,9 @@
             break;
         }
     }
-    $progressPercent = $timelineCount > 1 ? (int) round(($currentIndex / ($timelineCount - 1)) * 100) : ($timelineCount === 1 ? 100 : 0);
+    $progressPercent = isset($progress_percent)
+        ? max(0, min(100, (int) $progress_percent))
+        : ($timelineCount > 1 ? (int) round(($currentIndex / ($timelineCount - 1)) * 100) : 0);
 
     $cpTimelineCurrentItem = null;
     $cpTimelineNextItem = null;
@@ -126,6 +128,7 @@
         'vegetative' => ['emoji' => '🌾', 'label' => 'Vegetative'],
         'flowering' => ['emoji' => '🌼', 'label' => 'Flowering'],
         'harvest' => ['emoji' => '🧺', 'label' => 'Harvest'],
+        'completed' => ['emoji' => '✅', 'label' => 'Completed'],
     ];
     $userStageKey = app(\App\Services\CropTimelineService::class)->normalizeStageKey((string) ($current_stage ?? 'planting'));
 
@@ -148,6 +151,9 @@
         }
         if (str_contains($n, 'harvest')) {
             return '🧺';
+        }
+        if (str_contains($n, 'complete')) {
+            return '✅';
         }
 
         return '🌱';
@@ -177,6 +183,21 @@
                 <div class="cp-flash-success flex items-center gap-3" role="alert">
                     <img src="{{ $cpImg('check') }}" alt="" class="weather-clay-ic weather-clay-ic--inline shrink-0" width="20" height="20" decoding="async">
                     <span class="cp-flash-success__text">{{ session('success') }}</span>
+                </div>
+            @endif
+            @if (session('error'))
+                <div class="rounded-2xl border border-rose-200 bg-rose-50/95 px-4 py-3 text-sm text-rose-950" role="alert">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @if (! empty($cycle_completed))
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 text-sm text-emerald-950" role="status">
+                    <p class="font-extrabold">🎉 Cycle completed</p>
+                    <p class="mt-1 text-emerald-900/90">Harvest successfully completed. This crop cycle is finished at 100% progress.</p>
+                    @if (! empty($crop_cycle_completed_at))
+                        <p class="mt-1 text-xs text-emerald-800/80">Completed: <time datetime="{{ $crop_cycle_completed_at->toIso8601String() }}">{{ $crop_cycle_completed_at->timezone(config('app.timezone'))->format('M j, Y g:i A') }}</time></p>
+                    @endif
                 </div>
             @endif
 
@@ -243,12 +264,6 @@
                     </div>
                 </div>
             </header>
-
-            @if (($has_planting_date ?? false) && ($manual_stage_label ?? '') !== '' && ($manual_stage_label ?? '') !== ($current_stage_label ?? ''))
-                <div class="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-amber-950" role="status">
-                    <strong>Field note:</strong> Your profile stage is <strong>{{ $manual_stage_label }}</strong>; the calendar from your planting date suggests <strong>{{ $current_stage_label }}</strong>. Update the stage on this page if the field matches your profile.
-                </div>
-            @endif
 
             {{-- Stage snapshot — same section footprint as weather Field snapshot (hero row + stat strip only) --}}
             <section
@@ -516,22 +531,33 @@
             <section class="ag-card cp-growth-timeline" aria-labelledby="cp-stage-update-heading cp-growth-timeline-heading">
                 <div class="cp-growth-timeline__update">
                     <h2 id="cp-stage-update-heading" class="cp-section-title">Update stage</h2>
-                    <form class="cp-override-form cp-growth-timeline__override-form" method="post" action="{{ route('crop-progress.update-current-stage') }}" id="cp-stage-override-form">
-                        @csrf
-                        @method('PUT')
-                        <div class="cp-growth-timeline__field-group">
-                            <label for="cp-stage-select" class="cp-growth-timeline__field-label">Current growth stage</label>
-                            <select name="farming_stage" id="cp-stage-select" class="cp-stage-select">
-                                @php
-                                    $cpNormalizedStage = app(\App\Services\CropTimelineService::class)->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
-                                @endphp
-                                @foreach ($stages as $key => $label)
-                                    <option value="{{ $key }}" @selected($cpNormalizedStage === $key)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <button type="submit" class="cp-btn cp-btn--secondary">Apply</button>
-                    </form>
+                    @if (! empty($cycle_completed))
+                        <p class="cp-section-lead text-slate-600">This cycle is complete. Stage updates are locked.</p>
+                    @else
+                        <form class="cp-override-form cp-growth-timeline__override-form" method="post" action="{{ route('crop-progress.update-current-stage') }}" id="cp-stage-override-form">
+                            @csrf
+                            @method('PUT')
+                            <div class="cp-growth-timeline__field-group">
+                                <label for="cp-stage-select" class="cp-growth-timeline__field-label">Current growth stage</label>
+                                <select name="farming_stage" id="cp-stage-select" class="cp-stage-select">
+                                    @php
+                                        $cpNormalizedStage = app(\App\Services\CropTimelineService::class)->normalizeStageKey((string) ($user->farming_stage ?? 'planting'));
+                                    @endphp
+                                    @foreach ($stages as $key => $label)
+                                        <option value="{{ $key }}" @selected($cpNormalizedStage === $key)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="submit" class="cp-btn cp-btn--secondary">Apply</button>
+                        </form>
+                        @if (! empty($can_mark_cycle_complete))
+                            <form class="mt-3" method="post" action="{{ route('crop-progress.complete-cycle') }}" id="cp-mark-complete-form">
+                                @csrf
+                                <button type="submit" class="cp-btn cp-btn--primary w-full sm:w-auto">✅ Mark as fully harvested</button>
+                                <p class="mt-2 text-xs text-slate-500">Sets the cycle to <strong>Completed</strong> and locks progress at 100%.</p>
+                            </form>
+                        @endif
+                    @endif
                 </div>
 
                 <h2 id="cp-growth-timeline-heading" class="cp-growth-timeline__title cp-growth-timeline__title--timeline">Crop Growth Timeline</h2>
@@ -609,7 +635,7 @@
                             $nextDates = null;
                         }
                     }
-                    $showNextBlock = trim($nextTitle) !== '';
+                    $showNextBlock = trim($nextTitle) !== '' && empty($cycle_completed);
                 @endphp
 
                 <div class="cp-growth-timeline__details">

@@ -1,6 +1,6 @@
 @extends('layouts.user')
 
-@section('title', 'Structures – AGRIGUARD')
+@section('title', 'Smart Site & Structure Advisor – AGRIGUARD')
 
 @push('head')
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -46,7 +46,7 @@
                                     <span class="dashboard-hero__subtitle-ic" aria-hidden="true">
                                         <i data-lucide="sparkles" class="dashboard-hero__lucide dashboard-hero__lucide--xs"></i>
                                     </span>
-                                    <span>GIS + AI farm structure advisor</span>
+                                    <span>Smart Site &amp; Structure Advisor</span>
                                 </p>
                             </div>
                         </div>
