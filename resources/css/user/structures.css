@@ -79,14 +79,64 @@
     color: rgb(224 242 254 / 0.95);
 }
 
+/* Leaflet uses z-index up to 1000 on .leaflet-top / controls; isolate so it cannot stack above the fixed user navbar (z-index 50). */
 .structures-map-card {
     padding: 0;
     overflow: hidden;
+    min-width: 0;
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
+}
+
+.structures-map-frame {
+    padding: 6px 8px 8px;
+    background: #e2e8f0;
+}
+
+.structures-map-inner {
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgb(226 232 240 / 0.9);
+    box-shadow:
+        inset 0 1px 2px rgb(15 23 42 / 0.06),
+        0 4px 20px rgb(15 23 42 / 0.08);
 }
 
 .structures-map {
     width: 100%;
-    height: 380px;
+    min-width: 0;
+    height: clamp(240px, 42vh, 380px);
+    position: relative;
+    z-index: 0;
+}
+
+.structures-map-frame:fullscreen,
+.structures-map-frame:-webkit-full-screen {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    background: #e2e8f0;
+}
+
+.structures-map-frame:fullscreen .structures-map-inner,
+.structures-map-frame:-webkit-full-screen .structures-map-inner {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.structures-map-frame:fullscreen .structures-map,
+.structures-map-frame:-webkit-full-screen .structures-map {
+    flex: 1 1 auto;
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: none !important;
 }
 
 .structures-grid {
@@ -165,6 +215,8 @@
     font-size: 0.87rem;
     font-weight: 700;
     color: #0f172a;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .structures-info-list--ready .structures-info-row {
@@ -552,8 +604,10 @@
     cursor: pointer;
     padding: 12px;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     font-weight: 700;
     color: #0f172a;
 }
@@ -665,6 +719,36 @@
     .structures-rec-group__title {
         font-size: 0.79rem;
         padding: 6px 8px;
+    }
+}
+
+@media (max-width: 520px) {
+    .structures-info-row {
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto auto;
+    }
+
+    .structures-info-row__icon {
+        grid-row: 1 / span 2;
+    }
+
+    .structures-info-row__label {
+        align-self: end;
+    }
+
+    .structures-info-row__value {
+        grid-column: 2;
+        justify-self: start;
+        text-align: left;
+    }
+
+    .structures-rec-specs li {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .structures-rec-specs li strong {
+        margin-bottom: 2px;
     }
 }
 

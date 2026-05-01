@@ -1839,11 +1839,115 @@
     line-height: 1.15;
 }
 
-.farm-map-geofence-badge {
+/* Geofence + flood legend: stacked on narrow map; row + wrap on wider viewports */
+.farm-map-map-overlays-top {
     position: absolute;
-    top: 10px;
+    left: 10px;
     right: 64px;
-    z-index: 620;
+    top: 10px;
+    z-index: 710;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    max-width: none;
+    pointer-events: none;
+}
+
+.farm-map-map-overlays-top .farm-map-geofence-badge,
+.farm-map-map-overlays-top .farm-map-flood-legend {
+    pointer-events: auto;
+    max-width: 100%;
+    min-width: 0;
+}
+
+@media (min-width: 640px) {
+    .farm-map-map-overlays-top {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        column-gap: 10px;
+        row-gap: 8px;
+    }
+
+    .farm-map-map-overlays-top .farm-map-flood-legend {
+        flex: 1 1 12rem;
+        min-width: 0;
+    }
+}
+
+.farm-map-flood-legend {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: rgb(255 255 255 / 0.95);
+    box-shadow: 0 4px 14px rgb(15 23 42 / 0.1);
+    backdrop-filter: blur(6px);
+    font-size: 0.6875rem;
+    line-height: 1.35;
+    font-weight: 600;
+    color: #475569;
+}
+
+.farm-map-flood-legend__title {
+    margin: 0 0 6px;
+    font-size: 0.625rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #334155;
+}
+
+.farm-map-flood-legend__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.farm-map-flood-legend__list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+}
+
+.farm-map-flood-legend__list li span:last-child {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow-wrap: break-word;
+}
+
+.farm-map-flood-legend__swatch {
+    flex-shrink: 0;
+    margin-top: 0.2em;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    border: 1px solid rgb(15 23 42 / 0.12);
+}
+
+.farm-map-flood-legend__swatch--high {
+    background: #ff0000;
+}
+
+.farm-map-flood-legend__swatch--moderate {
+    background: #ffd700;
+}
+
+.farm-map-flood-legend__swatch--low {
+    background: #00aa00;
+}
+
+.farm-map-geofence-badge {
+    position: relative;
+    z-index: 1;
+    align-self: flex-start;
+    width: fit-content;
+    max-width: 100%;
     padding: 6px 10px;
     border-radius: 999px;
     font-size: 0.7rem;
@@ -1853,6 +1957,7 @@
     background: rgba(255, 255, 255, 0.96);
     backdrop-filter: blur(4px);
     box-shadow: 0 4px 14px rgb(15 23 42 / 0.12);
+    overflow-wrap: break-word;
 }
 
 .farm-map-geofence-badge--inside {

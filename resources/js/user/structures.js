@@ -49,11 +49,88 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
         const analyzeTextEl = document.getElementById('structures-analyze-text');
         const analyzeSpinnerEl = document.getElementById('structures-analyze-spinner');
 
-        const map = L.map(mapEl, { zoomControl: true, attributionControl: true }).setView([17.65, 121.72], 11);
+        const DEFAULT_CENTER = [17.65, 121.72];
+        const DEFAULT_ZOOM = 11;
+        const mapFrameEl = document.getElementById('structures-map-frame');
+        let geofenceBounds = null;
+
+        const map = L.map(mapEl, { zoomControl: false, attributionControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap',
         }).addTo(map);
+
+        function recenterStructuresMap() {
+            if (!map) {
+                return;
+            }
+            if (pin) {
+                map.flyTo(pin.getLatLng(), Math.max(map.getZoom(), 13), { duration: 0.35 });
+            } else if (geofenceBounds && typeof geofenceBounds.isValid === 'function' && geofenceBounds.isValid()) {
+                map.fitBounds(geofenceBounds, { padding: [20, 20] });
+            } else {
+                map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.35 });
+            }
+        }
+
+        function wireStructuresMapControls() {
+            const zi = document.getElementById('structures-map-zoom-in');
+            const zo = document.getElementById('structures-map-zoom-out');
+            const rc = document.getElementById('structures-map-recenter');
+            const fs = document.getElementById('structures-map-fullscreen');
+            if (zi) {
+                zi.addEventListener('click', function () {
+                    map.zoomIn();
+                });
+            }
+            if (zo) {
+                zo.addEventListener('click', function () {
+                    map.zoomOut();
+                });
+            }
+            if (rc) {
+                rc.addEventListener('click', recenterStructuresMap);
+            }
+            if (fs && mapFrameEl) {
+                const requestFs =
+                    mapFrameEl.requestFullscreen
+                    || mapFrameEl.webkitRequestFullscreen
+                    || mapFrameEl.msRequestFullscreen;
+                fs.addEventListener('click', function () {
+                    const active =
+                        document.fullscreenElement
+                        || document.webkitFullscreenElement
+                        || document.msFullscreenElement;
+                    if (!active) {
+                        if (requestFs) {
+                            Promise.resolve(requestFs.call(mapFrameEl)).catch(function () {});
+                        }
+                    } else if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                });
+            }
+        }
+
+        wireStructuresMapControls();
+
+        if (mapFrameEl) {
+            function onStructuresFullscreenResize() {
+                setTimeout(function () {
+                    try {
+                        map.invalidateSize({ animate: false });
+                    } catch (e) {
+                        /* ignore */
+                    }
+                }, 120);
+            }
+            document.addEventListener('fullscreenchange', onStructuresFullscreenResize);
+            document.addEventListener('webkitfullscreenchange', onStructuresFullscreenResize);
+        }
 
         const FIXED_FLOOD_RISK_MAP = (function () {
             function canonical(name) {
@@ -725,7 +802,8 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
                     },
                 }).addTo(map);
                 if (layer.getBounds && layer.getBounds().isValid()) {
-                    map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+                    geofenceBounds = layer.getBounds();
+                    map.fitBounds(geofenceBounds, { padding: [20, 20] });
                 }
             })
             .catch(() => {});
@@ -733,6 +811,24 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
         map.on('click', function (event) {
             const { lat, lng } = event.latlng;
             detectSelection(lat, lng);
+        });
+
+        function invalidateMapSize() {
+            try {
+                map.invalidateSize({ animate: false });
+            } catch (e) {
+                /* ignore */
+            }
+        }
+
+        requestAnimationFrame(invalidateMapSize);
+        setTimeout(invalidateMapSize, 200);
+        setTimeout(invalidateMapSize, 600);
+
+        let structuresMapResizeTimer;
+        window.addEventListener('resize', function () {
+            clearTimeout(structuresMapResizeTimer);
+            structuresMapResizeTimer = setTimeout(invalidateMapSize, 120);
         });
 
         if (analyzeBtn) {

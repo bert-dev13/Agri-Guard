@@ -119,7 +119,6 @@
     $whatToDoRest = count($whatToDo) > 1 ? array_slice($whatToDo, 1) : [];
 
     $growthSpeed = $growth_speed ?? 'normal';
-    $stageConfidence = $stage_confidence ?? ['label' => 'Medium', 'level' => 'medium', 'tooltip' => 'Based on weather data and standard growth patterns for your crop.'];
     $showRealityCheckCard = $show_reality_check_card ?? ($show_reality_check_form ?? true);
     $realityQuestionStage = $reality_question_stage ?? $current_stage_label;
     $trackerStages = [
@@ -289,10 +288,6 @@
                     <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Growth speed</p>
                         <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ ucfirst($growthSpeed) }}</p>
-                    </article>
-                    <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Confidence</p>
-                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ $stageConfidence['label'] ?? 'Medium' }}</p>
                     </article>
                     <article class="min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Timeline</p>

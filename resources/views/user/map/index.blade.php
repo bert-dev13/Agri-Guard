@@ -292,12 +292,25 @@
                         </div>
                         <div class="farm-map-stack__frame">
                             <div class="farm-map-stack__map-inner farm-map-stack__map-inner--tall farm-map-main-canvas">
-                                <div id="farm-map-geofence-badge" class="farm-map-geofence-badge farm-map-geofence-badge--outside" aria-live="polite">Outside Geofence</div>
-                                <div class="absolute left-3 top-3 z-[710] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 text-[11px] text-slate-700 shadow-sm backdrop-blur">
-                                    <p class="font-bold uppercase tracking-wide text-slate-800">Flood Risk Legend</p>
-                                    <p class="mt-1"><span class="inline-block h-2.5 w-2.5 rounded-sm align-middle mr-1" style="background:#ff0000;"></span>Red = High Risk</p>
-                                    <p><span class="inline-block h-2.5 w-2.5 rounded-sm align-middle mr-1" style="background:#ffd700;"></span>Yellow = Moderate Risk</p>
-                                    <p><span class="inline-block h-2.5 w-2.5 rounded-sm align-middle mr-1" style="background:#00aa00;"></span>Green = Low Risk</p>
+                                <div class="farm-map-map-overlays-top" aria-label="Geofence status and flood risk legend">
+                                    <div id="farm-map-geofence-badge" class="farm-map-geofence-badge farm-map-geofence-badge--outside" aria-live="polite">Outside Geofence</div>
+                                    <div class="farm-map-flood-legend" role="note">
+                                        <p class="farm-map-flood-legend__title">Flood risk legend</p>
+                                        <ul class="farm-map-flood-legend__list">
+                                            <li>
+                                                <span class="farm-map-flood-legend__swatch farm-map-flood-legend__swatch--high" aria-hidden="true"></span>
+                                                <span>Red — high risk</span>
+                                            </li>
+                                            <li>
+                                                <span class="farm-map-flood-legend__swatch farm-map-flood-legend__swatch--moderate" aria-hidden="true"></span>
+                                                <span>Yellow — moderate risk</span>
+                                            </li>
+                                            <li>
+                                                <span class="farm-map-flood-legend__swatch farm-map-flood-legend__swatch--low" aria-hidden="true"></span>
+                                                <span>Green — low risk</span>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
 
                                 <div id="farm-map-container" class="farm-map-leaflet w-full h-full min-h-0"></div>

@@ -11,10 +11,10 @@
 @section('main-class', 'pt-20')
 
 @section('content')
-    <section class="dashboard-shell py-5 pb-20">
+    <section class="dashboard-shell dashboard-shell--dashboard-home min-w-0 py-4 sm:py-6 pb-24">
         <div
             id="structures-page"
-            class="dashboard-container max-w-3xl mx-auto px-4 sm:px-5 space-y-4"
+            class="dashboard-container w-full min-w-0 max-w-3xl mx-auto px-4 sm:px-5 space-y-4 sm:space-y-5"
             data-analysis-url="{{ route('structures.analysis') }}"
             data-location-url="{{ route('structures.location') }}"
             data-geofence-url="{{ asset('amulung.json') }}"
@@ -79,7 +79,19 @@
             </header>
 
             <section class="ag-card structures-map-card" aria-label="Structures map">
-                <div id="structures-map" class="structures-map"></div>
+                <div id="structures-map-frame" class="structures-map-frame">
+                    <div class="structures-map-inner">
+                        <div id="structures-map" class="structures-map"></div>
+                        <div class="farm-map-float-controls" aria-label="Map controls">
+                            <div class="farm-map-float-controls__card">
+                                <button type="button" id="structures-map-zoom-in" class="farm-map-zoom-btn" title="Zoom in" aria-label="Zoom in">+</button>
+                                <button type="button" id="structures-map-zoom-out" class="farm-map-zoom-btn" title="Zoom out" aria-label="Zoom out">−</button>
+                                <button type="button" id="structures-map-recenter" class="farm-map-zoom-btn farm-map-zoom-btn--pin" title="Recenter map" aria-label="Recenter map">⌖</button>
+                                <button type="button" id="structures-map-fullscreen" class="farm-map-zoom-btn farm-map-zoom-btn--wide" title="View fullscreen map" aria-label="Fullscreen map">⛶</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section class="structures-grid">

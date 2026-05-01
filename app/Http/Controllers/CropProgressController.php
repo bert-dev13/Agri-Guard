@@ -143,7 +143,6 @@ class CropProgressController extends Controller
             'days_until_planting' => $calendarExpectedRaw['days_until_planting'],
             'has_planting_date' => $calendarExpectedRaw['has_planting_date'],
             'growth_speed' => $growthSpeed,
-            'stage_confidence' => $confidence,
             'progress_percent' => $cycleCompleted ? 100 : $stageProgress['progress_percent'],
             'reality_question_stage' => $realityQuestionStage,
             'crop_timeline_offset_days' => $offsetDays,

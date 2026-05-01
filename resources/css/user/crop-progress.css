@@ -1622,35 +1622,61 @@
     }
 }
 
+/* Stepper: scroll on phones / small tablets so stage names stay readable */
 .crop-progress-page .cp-growth-timeline__stepper-scroll {
     margin: 0;
     padding: 4px 0 10px;
-    overflow-x: visible;
-    overflow-y: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    margin-inline: -6px;
+    padding-inline: 6px;
+}
+
+.crop-progress-page .cp-growth-timeline__stepper-scroll::-webkit-scrollbar {
+    height: 5px;
+}
+
+.crop-progress-page .cp-growth-timeline__stepper-scroll::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgb(203 213 225 / 0.95);
 }
 
 .crop-progress-page .cp-growth-timeline .cp-tracker {
     flex-wrap: nowrap;
-    justify-content: stretch;
+    justify-content: flex-start;
     align-items: stretch;
     gap: 0;
-    width: 100%;
-    min-width: 0;
+    width: max-content;
+    min-width: 100%;
     margin-top: 10px;
 }
 
 .crop-progress-page .cp-growth-timeline .cp-tracker-node {
-    flex: 1 1 0;
-    min-width: 0;
-    max-width: none;
-    padding-inline: 4px;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: 6rem;
+    min-width: 6rem;
+    max-width: 6rem;
+    padding: 8px 6px 10px;
+}
+
+.crop-progress-page .cp-growth-timeline .cp-tracker-label {
+    font-size: 0.625rem;
+    line-height: 1.25;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
 }
 
 .crop-progress-page .cp-growth-timeline .cp-tracker-connector {
     display: block;
-    flex: 1 1 6px;
-    min-width: 6px;
-    max-width: 24px;
+    flex: 0 0 10px;
+    width: 10px;
+    min-width: 10px;
+    max-width: 10px;
     align-self: center;
     height: 2px;
     margin-top: 18px;
@@ -1658,39 +1684,41 @@
     border-radius: 2px;
 }
 
-@media (max-width: 380px) {
+@media (min-width: 768px) {
     .crop-progress-page .cp-growth-timeline__stepper-scroll {
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: thin;
-        padding-bottom: 8px;
-        margin: 0 -2px;
-        padding-inline: 2px;
-    }
-
-    .crop-progress-page .cp-growth-timeline__stepper-scroll::-webkit-scrollbar {
-        height: 4px;
-    }
-
-    .crop-progress-page .cp-growth-timeline__stepper-scroll::-webkit-scrollbar-thumb {
-        border-radius: 999px;
-        background: rgb(203 213 225 / 0.9);
+        overflow-x: visible;
+        overflow-y: visible;
+        margin-inline: 0;
+        padding-inline: 0;
     }
 
     .crop-progress-page .cp-growth-timeline .cp-tracker {
-        min-width: min-content;
+        justify-content: stretch;
+        width: 100%;
+        min-width: 0;
     }
 
     .crop-progress-page .cp-growth-timeline .cp-tracker-node {
-        flex: 0 0 auto;
-        min-width: 68px;
+        flex: 1 1 0;
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        padding: 8px 4px;
+    }
+
+    .crop-progress-page .cp-growth-timeline .cp-tracker-label {
+        font-size: 0.5625rem;
+        line-height: 1.2;
+        overflow-wrap: normal;
+        word-break: normal;
+        hyphens: none;
     }
 
     .crop-progress-page .cp-growth-timeline .cp-tracker-connector {
-        flex: 0 0 8px;
-        min-width: 8px;
-        max-width: 8px;
+        flex: 1 1 6px;
+        width: auto;
+        min-width: 6px;
+        max-width: 24px;
     }
 }
 
