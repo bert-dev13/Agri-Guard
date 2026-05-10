@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\HistoricalWeather;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -12,11 +13,58 @@ use Illuminate\Support\Facades\Log;
  */
 class WeatherAdvisoryService
 {
+    /**
+     * Historical aggregates (monthly average, yearly totals, heavy rainfall counts) only
+     * change when new historical_weather rows are imported. Cache for hours, invalidated
+     * automatically by the cache key version (max(updated_at)+row count).
+     * The bust is also forced from `HistoricalWeatherCsvImporter` after a successful import.
+     */
+    private const HISTORICAL_AGGREGATE_CACHE_TTL_HOURS = 6;
+
     public function __construct(
         private readonly FarmWeatherService $farmWeather,
         private readonly RuleBasedAdvisoryService $ruleBasedAdvisory,
         private readonly SmartAdvisoryEngine $smartAdvisory
     ) {}
+
+    /**
+     * Per-request memo of the full advisory payload by user id.
+     * Pages like the dashboard call `getAdvisoryData()` from several layers.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    private array $advisoryDataMemo = [];
+
+    /**
+     * Cached versioned key prefix shared by all historical aggregate readers.
+     * Bumps automatically after CSV imports / row inserts so callers stay in sync.
+     */
+    public static function historicalAggregateCacheVersion(): string
+    {
+        $maxUpdated = (string) (HistoricalWeather::query()->max('updated_at') ?? '0');
+        $rowCount = (string) HistoricalWeather::query()->count();
+
+        return md5($maxUpdated.'|'.$rowCount);
+    }
+
+    /**
+     * Forget every cached historical aggregate (called by the CSV importer).
+     */
+    public static function forgetHistoricalAggregateCaches(): void
+    {
+        $version = self::historicalAggregateCacheVersion();
+        foreach ([
+            'wadv:monthly_trend:v1:'.$version,
+            'wadv:yearly_totals:v1:'.$version,
+            'wadv:heavy_rain_stats:v1:'.$version,
+        ] as $key) {
+            Cache::forget($key);
+        }
+
+        for ($month = 1; $month <= 12; $month++) {
+            Cache::forget('wadv:month_avg:v1:'.$version.':'.$month);
+        }
+    }
 
     /**
      * Convert wind direction degrees to compass label (N, NE, E, SE, S, SW, W, NW).
@@ -37,6 +85,10 @@ class WeatherAdvisoryService
      */
     public function getAdvisoryData(User $user): array
     {
+        if (isset($this->advisoryDataMemo[$user->id])) {
+            return $this->advisoryDataMemo[$user->id];
+        }
+
         $normalized = $this->farmWeather->getNormalizedWeatherForUser($user);
 
         $weather = $this->mapNormalizedToWeatherBlock($normalized);
@@ -62,7 +114,7 @@ class WeatherAdvisoryService
         ];
 
         $currentMonth = (int) now()->format('n');
-        $currentMonthHistoricalAvg = HistoricalWeather::averageRainfallForMonth($currentMonth);
+        $currentMonthHistoricalAvg = $this->cachedAverageRainfallForMonth($currentMonth);
         $monthlyTrend = $this->getMonthlyRainfallTrend();
         $yearlyTotals = $this->getTotalRainfallByYear();
         $heavyRainfallStats = $this->getHeavyRainfallStats();
@@ -78,7 +130,7 @@ class WeatherAdvisoryService
 
         $rainfallInsight = $this->buildRainfallInsight($monthlyTrend, $user->crop_type, $user->farm_municipality);
 
-        return [
+        return $this->advisoryDataMemo[$user->id] = [
             'weather' => $weather,
             'forecast' => $forecast,
             'hourly_forecast' => $hourlyForecast,
@@ -151,48 +203,92 @@ class WeatherAdvisoryService
 
     /**
      * Monthly rainfall trend for chart: month => average rainfall.
+     * Cached because the underlying historical aggregate only changes on CSV import.
      */
     public function getMonthlyRainfallTrend(): array
     {
-        $rows = HistoricalWeather::monthlyRainfallTrend();
-        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        $data = [];
-        foreach ($rows as $row) {
-            $m = (int) $row->month;
-            $data[] = [
-                'month' => $months[$m - 1] ?? (string) $m,
-                'avg_rain' => round((float) $row->avg_rain, 2),
-            ];
-        }
-        return $data;
+        $key = 'wadv:monthly_trend:v1:'.self::historicalAggregateCacheVersion();
+
+        return Cache::remember(
+            $key,
+            now()->addHours(self::HISTORICAL_AGGREGATE_CACHE_TTL_HOURS),
+            static function (): array {
+                $rows = HistoricalWeather::monthlyRainfallTrend();
+                $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                $data = [];
+                foreach ($rows as $row) {
+                    $m = (int) $row->month;
+                    $data[] = [
+                        'month' => $months[$m - 1] ?? (string) $m,
+                        'avg_rain' => round((float) $row->avg_rain, 2),
+                    ];
+                }
+
+                return $data;
+            }
+        );
     }
 
     /**
-     * Total rainfall by year for chart.
+     * Total rainfall by year for chart. Cached (heavy aggregate, low write rate).
      */
     public function getTotalRainfallByYear(): array
     {
-        $rows = HistoricalWeather::totalRainfallByYear();
-        return $rows->map(fn ($row) => [
-            'year' => (string) $row->year,
-            'total_rainfall' => round((float) $row->total_rainfall, 2),
-        ])->all();
+        $key = 'wadv:yearly_totals:v1:'.self::historicalAggregateCacheVersion();
+
+        return Cache::remember(
+            $key,
+            now()->addHours(self::HISTORICAL_AGGREGATE_CACHE_TTL_HOURS),
+            static function (): array {
+                $rows = HistoricalWeather::totalRainfallByYear();
+
+                return $rows->map(fn ($row) => [
+                    'year' => (string) $row->year,
+                    'total_rainfall' => round((float) $row->total_rainfall, 2),
+                ])->all();
+            }
+        );
     }
 
     /**
-     * Heavy rainfall frequency: total count and by year for chart.
+     * Heavy rainfall frequency: total count and by year for chart. Cached aggregate.
+     *
+     * @return array{total_count: int, by_year: list<array{year: string, count: int}>}
      */
     public function getHeavyRainfallStats(): array
     {
-        $total = HistoricalWeather::heavyRainfallCount();
-        $byYear = HistoricalWeather::heavyRainfallByYear();
-        return [
-            'total_count' => $total,
-            'by_year' => $byYear->map(fn ($row) => [
-                'year' => (string) $row->year,
-                'count' => (int) $row->count,
-            ])->values()->all(),
-        ];
+        $key = 'wadv:heavy_rain_stats:v1:'.self::historicalAggregateCacheVersion();
+
+        return Cache::remember(
+            $key,
+            now()->addHours(self::HISTORICAL_AGGREGATE_CACHE_TTL_HOURS),
+            static function (): array {
+                $total = HistoricalWeather::heavyRainfallCount();
+                $byYear = HistoricalWeather::heavyRainfallByYear();
+
+                return [
+                    'total_count' => $total,
+                    'by_year' => $byYear->map(fn ($row) => [
+                        'year' => (string) $row->year,
+                        'count' => (int) $row->count,
+                    ])->values()->all(),
+                ];
+            }
+        );
+    }
+
+    /**
+     * Cached wrapper around `HistoricalWeather::averageRainfallForMonth()`.
+     */
+    private function cachedAverageRainfallForMonth(int $month): ?float
+    {
+        $key = 'wadv:month_avg:v1:'.self::historicalAggregateCacheVersion().':'.$month;
+
+        return Cache::remember(
+            $key,
+            now()->addHours(self::HISTORICAL_AGGREGATE_CACHE_TTL_HOURS),
+            static fn (): ?float => HistoricalWeather::averageRainfallForMonth($month)
+        );
     }
 
     /**

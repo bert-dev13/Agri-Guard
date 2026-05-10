@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\HistoricalWeather;
+use App\Services\WeatherAdvisoryService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
@@ -113,6 +115,10 @@ class HistoricalWeatherCsvImporter
             }
 
             HistoricalWeather::clearRainfallUnitMultiplierCache();
+
+            // Bust derived caches so the next request rebuilds them with the new rows.
+            Cache::forget('barangay_flood_hist_agg:v1');
+            WeatherAdvisoryService::forgetHistoricalAggregateCaches();
 
             return [
                 'imported' => $imported,

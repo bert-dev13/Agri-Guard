@@ -15,7 +15,7 @@
     <div class="user-navbar-inner">
         <div class="user-navbar-start">
             <a href="{{ route('dashboard') }}" class="user-navbar-logo" aria-label="AGRIGUARD — Home">
-                <img src="{{ asset('images/agriguard-logo.png') }}" alt="" width="36" height="36" class="user-navbar-logo-img" />
+                <img src="{{ asset('images/agriguard-logo.png') }}" alt="" width="36" height="36" class="user-navbar-logo-img" decoding="async" fetchpriority="high" />
                 <span class="user-navbar-logo-text">AGRIGUARD</span>
             </a>
         </div>

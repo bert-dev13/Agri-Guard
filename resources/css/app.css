@@ -8,6 +8,7 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
+@import './common/skeleton.css';
 @import './public/navbar.css';
 @import './public/footer.css';
 @import './public/landing.css';

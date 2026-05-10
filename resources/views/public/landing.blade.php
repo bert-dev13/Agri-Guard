@@ -20,7 +20,15 @@
                 <div class="order-2 lg:order-1 max-w-xl">
                     <div class="hero-headline hero-brand mb-6 lg:mb-8">
                         <div class="hero-brand-logo">
-                            <img src="{{ asset('images/agriguard-logo.png') }}" alt="AGRIGUARD" class="hero-brand-logo-img" />
+                            <img
+                                src="{{ asset('images/agriguard-logo.png') }}"
+                                alt="AGRIGUARD"
+                                class="hero-brand-logo-img"
+                                width="64"
+                                height="64"
+                                fetchpriority="high"
+                                decoding="async"
+                            />
                         </div>
                         <span class="hero-brand-wordmark text-[#00809D]">AGRIGUARD</span>
                     </div>
@@ -42,7 +50,15 @@
                 </div>
                 <div class="order-1 lg:order-2 flex items-center justify-center lg:justify-end min-w-0">
                     <div class="hero-image-focal hero-image-reveal">
-                        <img src="{{ asset('images/hero_image.png') }}" alt="AGRIGUARD smart agriculture system" class="hero-image-main" />
+                        <img
+                            src="{{ asset('images/hero_image.png') }}"
+                            alt="AGRIGUARD smart agriculture system"
+                            class="hero-image-main"
+                            width="960"
+                            height="720"
+                            fetchpriority="high"
+                            decoding="async"
+                        />
                     </div>
                 </div>
             </div>
@@ -345,6 +361,13 @@
 @endpush
 
 @push('scripts')
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script>document.addEventListener('DOMContentLoaded', function() { if (typeof lucide !== 'undefined') lucide.createIcons(); }); </script>
+    {{-- Lucide is loaded with `defer` so it never blocks the LCP hero render. --}}
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script defer>
+        window.addEventListener('load', function () {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        });
+    </script>
 @endpush

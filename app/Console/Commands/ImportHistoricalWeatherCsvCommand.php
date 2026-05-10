@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\HistoricalWeatherCsvImporter;
+use App\Services\WeatherAdvisoryService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
@@ -39,6 +40,7 @@ class ImportHistoricalWeatherCsvCommand extends Command
         $this->info("Imported {$result['imported']} row(s). Skipped {$result['skipped']}.");
 
         Cache::forget('barangay_flood_hist_agg:v1');
+        WeatherAdvisoryService::forgetHistoricalAggregateCaches();
 
         return self::SUCCESS;
     }

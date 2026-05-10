@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { createIcons, icons } from 'lucide';
 
 window.axios = axios;
 
@@ -22,7 +21,14 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
     }
 })();
 
-window.lucide = {
-    icons,
-    createIcons: (options) => createIcons(options ?? { icons }),
-};
+/*
+ * Lucide is loaded from the deferred CDN <script> in each layout
+ * (resources/views/layouts/*.blade.php). It exposes `window.lucide` after
+ * `load`, and re-renders icons whenever the page calls
+ * `window.refreshLucideIcons()`. We deliberately do NOT bundle the lucide
+ * package here: doing so adds ~375 kB to every page's initial JS payload
+ * and duplicates what the CDN script already provides.
+ *
+ * If a feature module needs to render icons it just inserted dynamically,
+ * call `window.refreshLucideIcons?.()` after DOM insertion.
+ */

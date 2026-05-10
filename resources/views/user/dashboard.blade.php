@@ -212,15 +212,21 @@
                     </article>
                     <article class="rounded-2xl border border-indigo-100 bg-white/80 px-3 py-2 transition hover:-translate-y-0.5 hover:shadow-sm">
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500"><i data-lucide="cloud-rain" class="mr-1 inline h-3.5 w-3.5 text-blue-500"></i>Rainfall</p>
-                        <p id="dash-ai-rain" class="mt-0.5 text-sm font-bold text-slate-900">Loading...</p>
+                        <p id="dash-ai-rain" class="mt-0.5 text-sm font-bold text-slate-900" data-skeleton aria-busy="true">
+                            <span class="ag-skeleton ag-skeleton--text" aria-hidden="true"></span>
+                        </p>
                     </article>
                     <article class="rounded-2xl border border-indigo-100 bg-white/80 px-3 py-2 transition hover:-translate-y-0.5 hover:shadow-sm">
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500"><i data-lucide="wind" class="mr-1 inline h-3.5 w-3.5 text-cyan-600"></i>Wind Speed</p>
-                        <p id="dash-ai-wind" class="mt-0.5 text-sm font-bold text-slate-900">Loading...</p>
+                        <p id="dash-ai-wind" class="mt-0.5 text-sm font-bold text-slate-900" data-skeleton aria-busy="true">
+                            <span class="ag-skeleton ag-skeleton--text" aria-hidden="true"></span>
+                        </p>
                     </article>
                     <article class="rounded-2xl border border-indigo-100 bg-white/80 px-3 py-2 transition hover:-translate-y-0.5 hover:shadow-sm">
                         <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500"><i data-lucide="shield-check" class="mr-1 inline h-3.5 w-3.5 text-emerald-600"></i>Status</p>
-                        <p id="dash-ai-status" class="mt-0.5 text-sm font-bold text-slate-900">Loading...</p>
+                        <p id="dash-ai-status" class="mt-0.5 text-sm font-bold text-slate-900" data-skeleton aria-busy="true">
+                            <span class="ag-skeleton ag-skeleton--text" aria-hidden="true"></span>
+                        </p>
                     </article>
                 </div>
 
@@ -435,8 +441,11 @@
 @endsection
 
 @push('scripts')
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    {{-- Defer the ML prediction fetch until after the page has settled so the
+         dashboard structure paints first and the user sees a skeleton state
+         instead of a blocking spinner. --}}
+    <script defer>
+        (function () {
             const rainEl = document.getElementById('dash-ai-rain');
             const windEl = document.getElementById('dash-ai-wind');
             const statusEl = document.getElementById('dash-ai-status');
@@ -444,59 +453,70 @@
                 return;
             }
 
-            const rainfallStatus = (rainfall) => {
-                if (rainfall >= 20) {
-                    return 'Heavy Rain';
-                }
-                if (rainfall >= 8) {
-                    return 'Moderate';
-                }
+            function rainfallStatus(rainfall) {
+                if (rainfall >= 20) return 'Heavy Rain';
+                if (rainfall >= 8) return 'Moderate';
                 return 'Normal';
-            };
+            }
 
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 100000);
+            function settle(el, value) {
+                el.removeAttribute('data-skeleton');
+                el.removeAttribute('aria-busy');
+                el.innerText = value;
+            }
 
-            fetch("{{ route('api.weather-prediction', [], false) }}", {
-                signal: controller.signal,
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            })
-                .then(async (response) => {
-                    const data = await response.json().catch(() => ({}));
-                    if (!response.ok) {
-                        const parts = [data.error, data.detail].filter(Boolean);
-                        throw new Error(parts.length ? parts.join(' — ') : `HTTP ${response.status}`);
-                    }
-                    return data;
+            function fetchPrediction() {
+                const controller = new AbortController();
+                // 30s is plenty for a Python subprocess invocation; the previous 100s
+                // value left users waiting on the spinner long after the request had stalled.
+                const timer = setTimeout(() => controller.abort(), 30000);
+
+                fetch("{{ route('api.weather-prediction', [], false) }}", {
+                    signal: controller.signal,
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
                 })
-                .then((data) => {
-                    if (!Array.isArray(data.forecast) || data.forecast.length === 0) {
-                        throw new Error('Invalid AI payload');
-                    }
+                    .then(async (response) => {
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            const parts = [data.error, data.detail].filter(Boolean);
+                            throw new Error(parts.length ? parts.join(' — ') : `HTTP ${response.status}`);
+                        }
+                        return data;
+                    })
+                    .then((data) => {
+                        if (!Array.isArray(data.forecast) || data.forecast.length === 0) {
+                            throw new Error('Invalid AI payload');
+                        }
+                        const today = data.forecast[0];
+                        const r = Number(today.rainfall);
+                        const w = Number(today.wind_speed);
+                        if (!Number.isFinite(r) || !Number.isFinite(w)) {
+                            throw new Error('Non-numeric AI payload');
+                        }
+                        settle(rainEl, `${r.toFixed(3)} mm`);
+                        settle(windEl, `${w.toFixed(3)} km/h`);
+                        settle(statusEl, rainfallStatus(r));
+                    })
+                    .catch(() => {
+                        settle(rainEl, 'Not available');
+                        settle(windEl, 'Not available');
+                        settle(statusEl, 'Unavailable');
+                    })
+                    .finally(() => {
+                        clearTimeout(timer);
+                    });
+            }
 
-                    const today = data.forecast[0];
-                    const r = Number(today.rainfall);
-                    const w = Number(today.wind_speed);
-                    if (!Number.isFinite(r) || !Number.isFinite(w)) {
-                        throw new Error('Non-numeric AI payload');
-                    }
-
-                    rainEl.innerText = `${r.toFixed(3)} mm`;
-                    windEl.innerText = `${w.toFixed(3)} km/h`;
-                    statusEl.innerText = rainfallStatus(r);
-                })
-                .catch((err) => {
-                    rainEl.innerText = 'Not available';
-                    windEl.innerText = 'Not available';
-                    statusEl.innerText = 'Unavailable';
-                })
-                .finally(() => {
-                    clearTimeout(timeout);
-                });
-        });
+            // requestIdleCallback gives the rest of the page a moment to mount first.
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(fetchPrediction, { timeout: 1200 });
+            } else {
+                setTimeout(fetchPrediction, 200);
+            }
+        })();
     </script>
 @endpush

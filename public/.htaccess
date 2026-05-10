@@ -23,3 +23,60 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# ---------------------------------------------------------------------------
+# Static asset caching — browsers can keep these files for a long time.
+#
+# Vite-built bundles in /build/ have content-hashed filenames (app-xxxxxx.js),
+# so they're effectively immutable. We send `immutable` + a 1-year max-age so
+# repeat visits skip the network entirely.
+#
+# Other static assets (images / fonts / CSS / JS outside /build/) are cached
+# for 30 days and revalidated.
+# ---------------------------------------------------------------------------
+<IfModule mod_headers.c>
+    # Hashed Vite bundles are content-addressed and never change after build.
+    <FilesMatch "^build/.*\.(js|css|map|svg|png|jpg|jpeg|webp|avif|gif|ico|woff2?|ttf)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+
+    # Standalone assets (logo, hero image, fonts) — long cache, but revalidated.
+    <FilesMatch "\.(png|jpg|jpeg|gif|webp|avif|svg|ico|woff2?|ttf|eot)$">
+        Header set Cache-Control "public, max-age=2592000"
+    </FilesMatch>
+
+    # Hand-authored CSS/JS (outside /build/) — 7 days, revalidated.
+    <FilesMatch "^(?!build/).*\.(css|js)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+
+    # Static JSON data (e.g. amulung.json polygons) — 1 day.
+    <FilesMatch "\.(json)$">
+        Header set Cache-Control "public, max-age=86400"
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/png                   "access plus 30 days"
+    ExpiresByType image/jpeg                  "access plus 30 days"
+    ExpiresByType image/webp                  "access plus 30 days"
+    ExpiresByType image/avif                  "access plus 30 days"
+    ExpiresByType image/svg+xml               "access plus 30 days"
+    ExpiresByType image/x-icon                "access plus 30 days"
+    ExpiresByType font/woff                   "access plus 1 year"
+    ExpiresByType font/woff2                  "access plus 1 year"
+    ExpiresByType application/font-woff       "access plus 1 year"
+    ExpiresByType application/font-woff2      "access plus 1 year"
+    ExpiresByType text/css                    "access plus 7 days"
+    ExpiresByType application/javascript      "access plus 7 days"
+    ExpiresByType application/json            "access plus 1 day"
+</IfModule>
+
+# Enable on-the-fly gzip for text resources when mod_deflate is available.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript
+    AddOutputFilterByType DEFLATE application/javascript application/json
+    AddOutputFilterByType DEFLATE application/xml application/xhtml+xml
+    AddOutputFilterByType DEFLATE image/svg+xml font/woff font/woff2
+</IfModule>

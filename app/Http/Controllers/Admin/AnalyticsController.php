@@ -10,17 +10,48 @@ use App\Services\CropTimelineService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class AnalyticsController extends Controller
 {
+    /**
+     * Cache TTL for the heavy analytics aggregates (per filter combination).
+     * Filters are part of the cache key so each unique URL is cached separately.
+     */
+    private const ANALYTICS_CACHE_TTL_SECONDS = 300;
+
     public function index(Request $request): View
     {
         $filters = $this->filtersFromRequest($request);
 
+        // Heavy work (multiple aggregate queries + chart series formatting) is cached
+        // per filter combination so repeat visits don't re-run every aggregation.
+        $payload = Cache::remember(
+            $this->analyticsCacheKey($filters),
+            now()->addSeconds(self::ANALYTICS_CACHE_TTL_SECONDS),
+            fn (): array => $this->buildAnalyticsPayload($filters)
+        );
+
+        return view('admin.analytics.index', $payload + [
+            'filters' => $filters,
+            'filterOptions' => $this->filterOptions(),
+        ]);
+    }
+
+    /**
+     * Build the heavy analytics payload (chart series + summary + insights).
+     * Pure function of `$filters`; safe to cache.
+     *
+     * @param  array{barangay: string, crop_type: string, farming_stage: string, start_date: string, end_date: string}  $filters
+     * @return array{summaryCards: list<array<string,mixed>>, charts: array<string,array<string,mixed>>, insights: array<string,mixed>}
+     */
+    private function buildAnalyticsPayload(array $filters): array
+    {
         $farmersQuery = $this->filteredFarmersQuery($filters);
         $rainfallRows = $this->rainfallTrendRows($filters);
 
+        // Single aggregate per chart series — only the columns we actually use are SELECTed.
         $farmersPerBarangay = $farmersQuery->clone()
             ->selectRaw('farm_barangay_code as barangay_code, COUNT(*) as total')
             ->whereNotNull('farm_barangay_code')
@@ -59,10 +90,15 @@ class AnalyticsController extends Controller
         $averageMonthlyRainfall = collect($rainfallRows)->avg('total_rainfall');
         $distinctCropTypes = (int) $cropDistribution->count();
 
+        // Single hash lookup vs N+1 queries (one DB query per row before this fix).
+        $barangayNameMap = Barangay::idToNameMap();
+        $cropTimeline = app(CropTimelineService::class);
+
         $farmersBarangayLabels = [];
         $farmersBarangayValues = [];
         foreach ($farmersPerBarangay as $row) {
-            $farmersBarangayLabels[] = Barangay::nameForId((string) $row->barangay_code) ?? 'Unknown';
+            $code = (string) $row->barangay_code;
+            $farmersBarangayLabels[] = $barangayNameMap[$code] ?? 'Unknown';
             $farmersBarangayValues[] = (int) $row->total;
         }
 
@@ -76,7 +112,7 @@ class AnalyticsController extends Controller
         $stageLabels = [];
         $stageValues = [];
         foreach ($stageDistribution as $row) {
-            $stageLabels[] = app(CropTimelineService::class)->displayLabel((string) $row->farming_stage);
+            $stageLabels[] = $cropTimeline->displayLabel((string) $row->farming_stage);
             $stageValues[] = (int) $row->total;
         }
 
@@ -94,20 +130,19 @@ class AnalyticsController extends Controller
             }
         }
 
+        $topBarangayRow = $farmersPerBarangay->first();
+        $topStageRow = $stageDistribution->first();
+
         $insights = [
-            'top_barangay' => $farmersPerBarangay->first()
-                ? (Barangay::nameForId((string) $farmersPerBarangay->first()->barangay_code) ?? 'Unknown')
+            'top_barangay' => $topBarangayRow
+                ? ($barangayNameMap[(string) $topBarangayRow->barangay_code] ?? 'Unknown')
                 : null,
             'top_crop' => $cropDistribution->first()?->crop_type,
-            'top_stage' => $stageDistribution->first()
-                ? app(CropTimelineService::class)->displayLabel((string) $stageDistribution->first()->farming_stage)
-                : null,
+            'top_stage' => $topStageRow ? $cropTimeline->displayLabel((string) $topStageRow->farming_stage) : null,
             'peak_rainfall_month' => $peakRainfall['label'] ?? null,
         ];
 
-        return view('admin.analytics.index', [
-            'filters' => $filters,
-            'filterOptions' => $this->filterOptions(),
+        return [
             'summaryCards' => [
                 [
                     'label' => 'Total Farmers',
@@ -159,7 +194,20 @@ class AnalyticsController extends Controller
                 ],
             ],
             'insights' => $insights,
-        ]);
+        ];
+    }
+
+    /**
+     * @param  array{barangay: string, crop_type: string, farming_stage: string, start_date: string, end_date: string}  $filters
+     */
+    private function analyticsCacheKey(array $filters): string
+    {
+        // Embed user-row freshness so the cache invalidates naturally as farmers register / update.
+        $userVersion = (string) (User::query()->max('updated_at') ?? '0');
+        $userCount = (string) User::query()->count();
+        $hwVersion = (string) (HistoricalWeather::query()->max('updated_at') ?? '0');
+
+        return 'admin_analytics:v1:'.md5(json_encode($filters).'|'.$userVersion.'|'.$userCount.'|'.$hwVersion);
     }
 
     /**

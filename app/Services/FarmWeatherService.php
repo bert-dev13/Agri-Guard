@@ -24,18 +24,34 @@ class FarmWeatherService
     private const CACHE_TTL_MINUTES = 15;
 
     /**
+     * Per-request memoization. A single dashboard render touches this service from
+     * 4–5 different layers (advisory, AI recommendation, three-day outlook, …).
+     * Without this, each call still pays the cost of a cache lookup + array deserialization.
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    private array $requestMemo = [];
+
+    /**
      * Get normalized weather data for the user's farm location.
-     * Uses cache; all pages share the same cached record for the same user.
+     * Uses an in-process memo + the shared cache so all pages share the same record per user.
      *
      * @return array{location_name: string, current_temperature: int|float|null, condition: string|null, feels_like: int|float|null, humidity: int|null, wind_speed: float|null, pressure: int|null, visibility_km: float|null, uv_index: float|null, today_rain_probability: int|null, today_expected_rainfall: float|null, sunrise: string|null, sunset: string|null, hourly_forecast: array, daily_forecast: array, last_updated: string|null, condition_id: int|null, wind_direction: float|null, raw_current: array|null, raw_daily_for_advisory: array}
      */
     public function getNormalizedWeatherForUser(User $user): array
     {
+        $memoKey = 'user:'.$user->id;
+        if (isset($this->requestMemo[$memoKey])) {
+            return $this->requestMemo[$memoKey];
+        }
+
         $cacheKey = self::CACHE_KEY_PREFIX . $user->id;
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_MINUTES * 60, function () use ($user) {
-            return $this->fetchAndNormalize($user);
-        });
+        return $this->requestMemo[$memoKey] = Cache::remember(
+            $cacheKey,
+            self::CACHE_TTL_MINUTES * 60,
+            fn (): array => $this->fetchAndNormalize($user)
+        );
     }
 
     /**
@@ -54,6 +70,7 @@ class FarmWeatherService
     {
         Cache::forget(self::CACHE_KEY_PREFIX . $user->id);
         Cache::forget(self::CACHE_COORDS_PREFIX . $user->id);
+        unset($this->requestMemo['user:'.$user->id]);
     }
 
     /**
@@ -404,11 +421,18 @@ class FarmWeatherService
     {
         $latRounded = round($lat, 3);
         $lonRounded = round($lon, 3);
+        $memoKey = 'coords:'.$latRounded.'_'.$lonRounded;
+        if (isset($this->requestMemo[$memoKey])) {
+            return $this->requestMemo[$memoKey];
+        }
+
         $cacheKey = self::CACHE_COORDS_WEATHER_PREFIX . $latRounded . '_' . $lonRounded;
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_MINUTES * 60, function () use ($lat, $lon) {
-            return $this->fetchAndNormalizeByCoordinates($lat, $lon);
-        });
+        return $this->requestMemo[$memoKey] = Cache::remember(
+            $cacheKey,
+            self::CACHE_TTL_MINUTES * 60,
+            fn (): array => $this->fetchAndNormalizeByCoordinates($lat, $lon)
+        );
     }
 
     /**

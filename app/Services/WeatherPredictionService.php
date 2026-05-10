@@ -10,6 +10,16 @@ use Symfony\Component\Process\Process;
 class WeatherPredictionService
 {
     /**
+     * Per-request memo so a single dashboard / map / weather page render only
+     * computes / fetches the prediction once even if called from multiple
+     * services. Combined with the long-lived cache below, repeat user requests
+     * almost always hit warm data (and never re-train the model).
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    private array $requestMemo = [];
+
+    /**
      * @return array{
      *   status: string,
      *   rainfall: float,
@@ -26,6 +36,10 @@ class WeatherPredictionService
         $input = $this->buildInputFeatures();
         $jsonInput = json_encode($input, JSON_THROW_ON_ERROR);
 
+        if (isset($this->requestMemo[$jsonInput])) {
+            return $this->requestMemo[$jsonInput];
+        }
+
         $cacheMinutes = (int) config('agriweather.prediction.cache_minutes', 15);
         $cacheKey = $this->buildCacheKey($jsonInput);
 
@@ -35,7 +49,7 @@ class WeatherPredictionService
             fn (): array => $this->invokePythonPredictor($jsonInput)
         );
 
-        return array_merge($prediction, [
+        return $this->requestMemo[$jsonInput] = array_merge($prediction, [
             'source' => 'model',
             'features' => $input,
             'computed_at' => now()->toIso8601String(),

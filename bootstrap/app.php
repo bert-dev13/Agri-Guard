@@ -25,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified.email' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         ]);
+        // Measure every request and log the slow ones (controllers, queries, external APIs).
+        $middleware->append(\App\Http\Middleware\LogSlowRequests::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
