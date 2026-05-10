@@ -1,0 +1,8 @@
+{
+  "overall_accuracy": 94.58,
+  "rainfall_r2": 0.94,
+  "wind_r2": 0.9517,
+  "rainfall_mae": 0.004,
+  "wind_mae": 0.002,
+  "dataset": "2014-2024 historical weather"
+}

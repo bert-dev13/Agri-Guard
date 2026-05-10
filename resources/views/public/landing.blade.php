@@ -1,6 +1,6 @@
 @extends('layouts.public')
 
-@section('title', 'AGRIGUARD – Farm Decisions Powered by Weather, Crop Data, and AI')
+@section('title', 'AGRIGUARD — An AI-Driven Smart Agriculture System Utilizing Predictive Weather Analytics and Machine Learning')
 
 @section('body-class', 'min-h-screen flex flex-col bg-[#F8FAFC]')
 
@@ -24,11 +24,11 @@
                         </div>
                         <span class="hero-brand-wordmark text-[#00809D]">AGRIGUARD</span>
                     </div>
-                    <h1 class="hero-subheadline text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] tracking-tight mt-2">
-                        Smarter Farm Decisions with <span class="text-[#00809D]">Weather, Crop Insights, and AI</span>
+                    <h1 class="hero-subheadline text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 leading-[1.15] tracking-tight mt-2">
+                        AGRIGUARD: An AI-Driven Smart Agriculture System Utilizing Predictive Weather Analytics and Machine Learning
                     </h1>
                     <p class="hero-description mt-6 text-lg text-slate-600 leading-relaxed">
-                        A weather-informed decision support system that helps farmers use real-time weather, crop conditions, map insights, and AI recommendations for smarter daily farm decisions.
+                        A smart agricultural decision support system that leverages machine learning and predictive weather analytics to help farmers make accurate, data-driven farming decisions.
                     </p>
                     <div class="hero-buttons mt-10 flex flex-wrap gap-4">
                         <a href="{{ url('/register') }}" class="hero-get-started-btn inline-flex items-center justify-center px-7 py-3.5 rounded-xl font-semibold">
@@ -42,7 +42,7 @@
                 </div>
                 <div class="order-1 lg:order-2 flex items-center justify-center lg:justify-end min-w-0">
                     <div class="hero-image-focal hero-image-reveal">
-                        <img src="{{ asset('images/hero_image.png') }}" alt="Farm Decisions Powered by Weather, Crop Data, and AI" class="hero-image-main" />
+                        <img src="{{ asset('images/hero_image.png') }}" alt="AGRIGUARD smart agriculture system" class="hero-image-main" />
                     </div>
                 </div>
             </div>
@@ -52,33 +52,35 @@
     {{-- About --}}
     <section id="about" class="landing-section py-24 lg:py-32 bg-[#F8FAFC] relative border-t border-slate-100/80">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center max-w-2xl mx-auto scroll-reveal mb-14 lg:mb-16">
-                <h2 class="text-3xl sm:text-4xl font-bold text-slate-900">See AGRIGUARD in Action</h2>
-                <p class="mt-4 text-lg text-slate-600">Dashboard, Weather, Rainfall Trends, Crop, Map, and Assistant in one place.</p>
+            <div class="text-center max-w-3xl mx-auto scroll-reveal mb-14 lg:mb-16">
+                <h2 class="text-3xl sm:text-4xl font-bold text-slate-900">About</h2>
+                <div class="mt-6 space-y-5 text-lg text-slate-600 leading-relaxed text-left sm:text-center">
+                    <p>
+                        AGRIGUARD is an AI-powered smart agriculture system designed to support farmers through predictive weather analytics, machine learning models, and real-time farm data integration. The system helps improve agricultural productivity by providing data-driven insights for better decision-making.
+                    </p>
+                    <p>
+                        AGRIGUARD integrates weather forecasting, rainfall prediction, crop monitoring, mapping tools, and AI assistance into a unified agricultural intelligence platform. It enables farmers to monitor farm conditions and receive intelligent recommendations based on predictive analytics.
+                    </p>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
                 <div class="scroll-reveal space-y-6 order-2 lg:order-1">
-                    <p class="text-slate-600 leading-relaxed">
-                        AGRIGUARD brings weather, rainfall, crop, map, and AI assistance into one simple interface. View farm conditions, monitor crop progress, and get smart recommendations tailored to your location.
-                    </p>
                     <ul class="space-y-4">
                         <li class="flex items-start gap-3">
                             <span class="flex items-center justify-center w-10 h-10 rounded-lg bg-[#00809D]/10 text-[#00809D] shrink-0">
                                 <i data-lucide="cloud-rain" class="w-5 h-5"></i>
                             </span>
                             <div>
-                                <span class="font-semibold text-slate-900">Weather and rainfall at a glance</span>
-                                <p class="text-sm text-slate-600 mt-0.5">Access real-time weather conditions and rainfall trends in one view.</p>
+                                <span class="font-semibold text-slate-900">Real-time weather and predictive rainfall analytics</span>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
                             <span class="flex items-center justify-center w-10 h-10 rounded-lg bg-[#10B981]/10 text-[#10B981] shrink-0">
-                                <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                                <i data-lucide="brain" class="w-5 h-5"></i>
                             </span>
                             <div>
-                                <span class="font-semibold text-slate-900">AI farm guidance</span>
-                                <p class="text-sm text-slate-600 mt-0.5">Ask questions and receive AI-powered, farm-specific recommendations.</p>
+                                <span class="font-semibold text-slate-900">AI-powered agricultural decision support</span>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
@@ -86,8 +88,15 @@
                                 <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
                             </span>
                             <div>
-                                <span class="font-semibold text-slate-900">One dashboard</span>
-                                <p class="text-sm text-slate-600 mt-0.5">Dashboard, Weather, Rainfall Trends, Crop Monitoring, Map, and AI Assistant in one integrated system.</p>
+                                <span class="font-semibold text-slate-900">Unified farm monitoring dashboard</span>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="flex items-center justify-center w-10 h-10 rounded-lg bg-[#10B981]/10 text-[#10B981] shrink-0">
+                                <i data-lucide="map-pinned" class="w-5 h-5"></i>
+                            </span>
+                            <div>
+                                <span class="font-semibold text-slate-900">Location-based risk and crop insights</span>
                             </div>
                         </li>
                     </ul>
@@ -95,13 +104,13 @@
 
                 <div class="scroll-reveal order-1 lg:order-2">
                     <div class="dashboard-preview rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/50 overflow-hidden hover:shadow-2xl hover:shadow-[#00809D]/10 transition-all duration-300">
-                        <div class="flex items-center gap-1 px-4 py-3 bg-slate-50 border-b border-slate-200">
-                            <span class="px-3 py-1.5 rounded-lg bg-[#00809D] text-white text-xs font-medium">Dashboard</span>
-                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Weather</span>
-                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Rainfall Trends</span>
-                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Crop</span>
-                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Map</span>
-                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Assistant</span>
+                        <div class="flex flex-wrap items-center gap-1 px-4 py-3 bg-slate-50 border-b border-slate-200">
+                            <span class="px-3 py-1.5 rounded-lg bg-[#00809D] text-white text-xs font-medium">Dashboard Overview</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Weather Forecasting Module</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Rainfall Prediction Trends</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Crop Monitoring System</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">Geographic Mapping System</span>
+                            <span class="px-3 py-1.5 rounded-lg text-slate-500 text-xs font-medium">AI Agricultural Assistant</span>
                         </div>
                         <div class="p-5 space-y-4 min-h-[280px]">
                             <div class="rounded-xl border border-slate-200 bg-white p-4 flex items-center justify-between gap-3">
@@ -111,15 +120,14 @@
                                     </span>
                                     <div class="min-w-0">
                                         <p class="font-semibold text-slate-900 text-sm">Rainfall Forecast</p>
-                                        <p class="text-xs text-slate-500 mt-0.5">Next 48 hours · Moderate risk</p>
+                                        <p class="text-xs text-slate-500 mt-0.5">Next 48 Hours Prediction: Moderate Agricultural Risk</p>
                                     </div>
                                 </div>
-                                <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-medium shrink-0">Advisory active</span>
+                                <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-medium shrink-0">AI Advisory Status: Active</span>
                             </div>
                             <div class="rounded-xl border border-[#10B981]/30 bg-[#10B981]/5 p-4">
-                                <p class="text-xs font-semibold text-[#10B981] uppercase tracking-wide">Advisory Active</p>
-                                <p class="text-sm font-medium text-slate-900 mt-1">AI Smart Advisory (Based on Weather, Crop Stage, and Location)</p>
-                                <p class="text-xs text-slate-600 mt-2 leading-relaxed">Consider draining excess water from low-lying areas. Secure stored harvest. Monitor livestock locations.</p>
+                                <p class="text-xs font-semibold text-[#10B981] uppercase tracking-wide">AI Recommendation</p>
+                                <p class="text-sm text-slate-700 mt-2 leading-relaxed">Implement proper drainage in flood-prone areas, secure harvested crops, and monitor farm equipment and livestock conditions based on predicted rainfall patterns.</p>
                             </div>
                         </div>
                     </div>
@@ -133,15 +141,15 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <header class="how-it-works__header text-center max-w-2xl mx-auto mb-14 lg:mb-16 scroll-reveal">
                 <h2 class="how-it-works__title text-3xl sm:text-4xl font-bold text-slate-900">How It Works</h2>
-                <p class="how-it-works__subtitle mt-4 text-lg text-slate-600">Four simple steps from sign-up to smart farm guidance.</p>
+                <p class="how-it-works__subtitle mt-4 text-lg text-slate-600">End-to-end workflow from user registration through machine learning inference and recommendation generation.</p>
             </header>
 
             <ol class="how-it-works__grid relative z-10">
                 @foreach([
-                    ['num' => '01', 'icon' => 'user-plus', 'title' => 'Register Account', 'desc' => 'Create your account in minutes. No complex setup.'],
-                    ['num' => '02', 'icon' => 'map-pinned', 'title' => 'Enter Farm Details', 'desc' => 'Add your farm location and key details for accurate risk analysis.'],
-                    ['num' => '03', 'icon' => 'cloud-sun', 'title' => 'Analyze Weather, Rainfall Patterns, and Farm Conditions', 'desc' => 'We combine weather data, rainfall trends, and your farm conditions to support better decisions.'],
-                    ['num' => '04', 'icon' => 'bell', 'title' => 'Receive Smart Actions and AI-Powered Recommendations', 'desc' => 'Get clear actions and AI recommendations based on your farm location, weather, and crop stage.'],
+                    ['num' => '01', 'icon' => 'user-plus', 'title' => 'User Registration', 'desc' => 'Create an account to access the AGRIGUARD system.'],
+                    ['num' => '02', 'icon' => 'map-pinned', 'title' => 'Farm Data Input', 'desc' => 'Input farm location and relevant agricultural data.'],
+                    ['num' => '03', 'icon' => 'cloud-sun', 'title' => 'AI Processing & Prediction', 'desc' => 'Machine learning models analyze weather patterns, rainfall history, and farm conditions.'],
+                    ['num' => '04', 'icon' => 'bell', 'title' => 'Smart Recommendations', 'desc' => 'The system generates predictive insights and actionable farming recommendations.'],
                 ] as $step)
                     <li class="scroll-reveal">
                         <article class="how-step-card h-full">
@@ -165,16 +173,16 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center max-w-2xl mx-auto mb-16 lg:mb-20 scroll-reveal">
                 <h2 class="text-3xl sm:text-4xl font-bold text-slate-900">Features</h2>
-                <p class="mt-4 text-lg text-slate-600">Tools that match your daily workflow across Dashboard, Weather, Rainfall, Crop, Map, and Assistant.</p>
+                <p class="mt-4 text-lg text-slate-600">The same capabilities as modular tools—deep dives into weather, crops, mapping, and the AI assistant.</p>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                 @foreach([
-                    ['icon' => 'layout-dashboard', 'title' => 'Dashboard', 'desc' => 'View your farm\'s daily snapshot, weather summary, and smart actions in one place.'],
-                    ['icon' => 'cloud', 'title' => 'Weather', 'desc' => 'Access real-time weather conditions and short-term forecasts for your farm.'],
-                    ['icon' => 'cloud-rain', 'title' => 'Rainfall Trends', 'desc' => 'Analyze historical rainfall patterns to support better planning.'],
-                    ['icon' => 'sprout', 'title' => 'Crop Stage Monitoring', 'desc' => 'Track crop growth stages and receive stage-based recommendations.'],
-                    ['icon' => 'map-pinned', 'title' => 'Map-Based Farm Insights', 'desc' => 'Visualize your farm location with GPS, rainfall, and flood risk insights.'],
-                    ['icon' => 'bot', 'title' => 'AI Farm Assistant', 'desc' => 'Ask questions and get AI-powered, farm-specific recommendations.'],
+                    ['icon' => 'cloud', 'title' => 'Predictive Weather Analytics', 'desc' => 'AI-based forecasting for agricultural planning.'],
+                    ['icon' => 'sprout', 'title' => 'Machine Learning Crop Insights', 'desc' => 'Data-driven crop analysis and recommendations.'],
+                    ['icon' => 'layout-dashboard', 'title' => 'Farm Monitoring Dashboard', 'desc' => 'Centralized farm data visualization.'],
+                    ['icon' => 'map-pinned', 'title' => 'Geospatial Risk Mapping', 'desc' => 'Flood and weather risk analysis by location.'],
+                    ['icon' => 'bot', 'title' => 'AI Farming Assistant', 'desc' => 'Intelligent query-based agricultural support.'],
+                    ['icon' => 'building-2', 'title' => 'Smart Site & Structure Advisory', 'desc' => 'AI-driven guidance for siting and reinforcing farm structures based on terrain and weather risk.'],
                 ] as $feature)
                     <div class="scroll-reveal features-card group h-full">
                         <div class="h-full flex flex-col p-6 lg:p-8 rounded-2xl bg-[#F8FAFC] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-[#00809D]/8 hover:-translate-y-1.5 hover:border-[#00809D]/20 transition-all duration-300">
@@ -338,5 +346,5 @@
 
 @push('scripts')
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script>document.addEventListener('DOMContentLoaded', function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });</script>
+    <script>document.addEventListener('DOMContentLoaded', function() { if (typeof lucide !== 'undefined') lucide.createIcons(); }); </script>
 @endpush

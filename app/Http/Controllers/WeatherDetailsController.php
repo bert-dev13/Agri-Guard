@@ -79,7 +79,6 @@ class WeatherDetailsController extends Controller
         return view('user.weather.weather-details', [
             'weather' => $weather,
             'forecast' => $forecast,
-            'hourly_forecast' => $data['hourly_forecast'] ?? [],
             'location_display' => $locationDisplay,
             'farm_location_display' => $farmLocationDisplay,
             'advisory' => $advisory,

@@ -130,6 +130,14 @@
                 </div>
             </header>
 
+            <div class="farm-map-flood-section-intro" aria-labelledby="farm-map-flood-section-heading">
+                <div class="farm-map-flood-section-intro__panel">
+                    <h2 id="farm-map-flood-section-heading" class="farm-map-flood-section-intro__title">
+                        Barangay Flood Risk Map (Historical Data Overview)
+                    </h2>
+                </div>
+            </div>
+
             {{-- Location status + last updated + map actions (single card) --}}
             <section class="ag-card farm-map-control-strip" aria-label="Map location and controls">
                 <div class="farm-map-control-strip__top">
@@ -142,13 +150,6 @@
                             <span class="farm-map-status-chip__text">
                                 <span class="farm-map-status-chip__label">GPS</span><span class="farm-map-status-chip__colon">:</span>
                                 <span id="farm-map-status-gps" class="farm-map-status-chip__value">Not connected</span>
-                            </span>
-                        </div>
-                        <div class="farm-map-status-chip farm-map-status-chip--muted">
-                            <span class="farm-map-status-chip__ic" aria-hidden="true">🌧</span>
-                            <span class="farm-map-status-chip__text">
-                                <span class="farm-map-status-chip__label">Rain chance</span><span class="farm-map-status-chip__colon">:</span>
-                                <span id="farm-map-status-rain" class="farm-map-status-chip__value">—</span>
                             </span>
                         </div>
                     </div>
@@ -180,116 +181,9 @@
                 <div id="farm-map-boundary-slot" class="farm-map-boundary-slot hidden" aria-hidden="true"></div>
             </section>
 
-            {{-- AI Smart Advisory (Rainfall-trends style, map-specific implementation) --}}
             <div class="farm-map-map-advisory-row">
-                <div>
-                    <div class="ag-advisory-toggle-row">
-                        <button
-                            type="button"
-                            class="ag-advisory-toggle-btn"
-                            data-ai-advisory-toggle
-                            data-target="advisory-map-section"
-                            data-storage-key="advisory_visibility_map"
-                            aria-pressed="true"
-                        >
-                            Hide AI Smart Advisory
-                        </button>
-                    </div>
-                    <aside id="advisory-map-section" class="farm-map-advisory-column space-y-3 sm:space-y-4" aria-label="Map smart advisory" data-ai-smart-advisory-section>
-                    <article
-                        id="farm-map-smart-advisory"
-                        class="ag-card dash-smart weather-page__smart farm-map-page__smart rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 sm:p-5"
-                        aria-label="AI smart advisory"
-                    >
-                        <div class="dash-smart__debug">
-                            <p class="text-xs font-semibold text-slate-700">
-                                <span id="farm-map-advisory-status-line">AI Smart Advisory: Syncing</span>
-                            </p>
-                        </div>
-                        <div class="dash-smart__head">
-                            <div class="dash-smart__title-wrap">
-                                <span class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-extrabold uppercase tracking-[0.1em] text-slate-700">
-                                    <i data-lucide="sparkles" class="h-3.5 w-3.5 text-emerald-600"></i>
-                                    Smart action
-                                </span>
-                            </div>
-                        </div>
-                        <div class="dash-smart__body">
-                            <p id="farm-map-advisory-main-action" class="dash-smart__action">Loading advisory…</p>
-                        </div>
-                    </article>
-
-                    <section
-                        id="farm-map-field-day-plan"
-                        class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5 shadow-sm farm-map-page__timeline"
-                        aria-label="Field day plan"
-                    >
-                        <h2 class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800">
-                            <i data-lucide="calendar-check-2" class="h-4 w-4 text-amber-600"></i>
-                            Field Day Plan
-                        </h2>
-                        <div class="farm-map-page__timeline-list mt-3">
-                            <article class="farm-map-page__timeline-item farm-map-page__timeline-item--morning">
-                                <span class="farm-map-page__timeline-dot">☀️</span>
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-800">Early day</p>
-                                    <p id="farm-map-plan-early" class="text-sm text-slate-600">Loading…</p>
-                                </div>
-                            </article>
-                            <article class="farm-map-page__timeline-item farm-map-page__timeline-item--midday">
-                                <span class="farm-map-page__timeline-dot">⛅</span>
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-800">Midday</p>
-                                    <p id="farm-map-plan-midday" class="text-sm text-slate-600">Loading…</p>
-                                </div>
-                            </article>
-                            <article class="farm-map-page__timeline-item farm-map-page__timeline-item--late">
-                                <span class="farm-map-page__timeline-dot">🌙</span>
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-800">Late day</p>
-                                    <p id="farm-map-plan-late" class="text-sm text-slate-600">Loading…</p>
-                                </div>
-                            </article>
-                        </div>
-                    </section>
-
-                    <section class="grid gap-3 sm:grid-cols-2" aria-label="Water, drainage, and avoid">
-                        <div class="ag-card rounded-3xl border border-cyan-100 bg-cyan-50/70 p-4">
-                            <div class="dash-split__card dash-split__card--water farm-map-page__split-water">
-                                <div class="dash-split__head inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700">
-                                    <i data-lucide="droplets" class="h-3.5 w-3.5 text-cyan-600"></i>
-                                    Water & Drainage
-                                </div>
-                                <p id="farm-map-plan-water" class="dash-split__body">Loading…</p>
-                            </div>
-                        </div>
-                        <div class="ag-card rounded-3xl border border-rose-100 bg-rose-50/70 p-4">
-                            <div class="dash-split__card dash-split__card--avoid farm-map-page__split-avoid">
-                                <div class="dash-split__head inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-700">
-                                    <i data-lucide="triangle-alert" class="h-3.5 w-3.5 text-rose-600"></i>
-                                    Avoid Today
-                                </div>
-                                <p id="farm-map-plan-avoid" class="dash-split__body">Loading…</p>
-                            </div>
-                        </div>
-                    </section>
-
-                    <div class="flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-                        <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600" aria-hidden="true">
-                            <i data-lucide="info" class="h-3.5 w-3.5"></i>
-                        </span>
-                        <p class="pt-0.5 text-xs leading-relaxed text-slate-600">
-                            AI-generated recommendations only. Based on system data including weather, rainfall, crop, and field conditions. For farm decision support.
-                        </p>
-                    </div>
-                    </aside>
-                </div>
-
                 <div class="farm-map-map-column">
                     <section class="ag-card farm-map-stack farm-map-stack--focus" aria-label="Farm map">
-                        <div class="farm-map-map-head">
-                            <h2 class="farm-map-map-head__title">Farm Map</h2>
-                        </div>
                         <div class="farm-map-stack__frame">
                             <div class="farm-map-stack__map-inner farm-map-stack__map-inner--tall farm-map-main-canvas">
                                 <div class="farm-map-map-overlays-top" aria-label="Geofence status and flood risk legend">
@@ -322,11 +216,6 @@
                                     </div>
                                 </div>
 
-                                <div id="farm-map-weather-float" class="farm-map-weather-float hidden" aria-hidden="true">
-                                    <div class="farm-map-weather-float-inner">
-                                        <span id="farm-map-weather-float-text">—</span>
-                                    </div>
-                                </div>
 
                                 <div class="farm-map-float-controls" aria-label="Map controls">
                                     <div class="farm-map-float-controls__card">
@@ -344,40 +233,65 @@
                 </div>
             </div>
 
-            {{-- Section 3: Info cards below map — compact snapshot UI --}}
             <div class="farm-map-below space-y-3 sm:space-y-4">
-                <section
-                    id="farm-map-today-one"
-                    class="ag-card farm-map-today-strip overflow-hidden rounded-2xl border border-teal-200/70 bg-gradient-to-br from-teal-50/95 via-white to-emerald-50/60 p-3 shadow-md shadow-teal-500/5 ring-1 ring-teal-100/90 sm:p-3.5"
-                    aria-labelledby="farm-map-today-one-label"
-                >
-                    <div class="farm-map-today-strip__sheen" aria-hidden="true"></div>
-                    <div class="farm-map-today-strip__inner relative z-[1]">
-                        <span class="farm-map-today-strip__glyph" aria-hidden="true">
-                            <i data-lucide="sun-medium" class="farm-map-today-strip__lucide"></i>
-                        </span>
-                        <div class="farm-map-today-strip__copy">
-                            <p id="farm-map-today-one-label" class="farm-map-today-strip__eyebrow">Today</p>
-                            <p id="farm-map-today-summary" class="farm-map-today-strip__text">Loading…</p>
+                <div id="farm-map-no-gps-hint" class="farm-map-no-gps-inline text-center text-xs text-slate-500 {{ $initialHasDeviceGps ? 'hidden' : '' }}">Save GPS to load map details.</div>
+
+                @php
+                    $floodOverview = $barangayFloodRiskOverview ?? [
+                        'municipality' => 'Amulung',
+                        'high' => [],
+                        'moderate' => [],
+                        'low' => [],
+                    ];
+                    $floodTiers = [
+                        ['key' => 'high', 'modifier' => 'high', 'icon' => '🔴', 'title' => 'High risk'],
+                        ['key' => 'moderate', 'modifier' => 'moderate', 'icon' => '🟡', 'title' => 'Moderate risk'],
+                        ['key' => 'low', 'modifier' => 'low', 'icon' => '🟢', 'title' => 'Low risk'],
+                    ];
+                @endphp
+                <section class="ag-card farm-map-flood-overview" aria-labelledby="farm-map-flood-overview-heading">
+                    <header class="farm-map-flood-overview__header">
+                        <div class="farm-map-flood-overview__header-main">
+                            <h2 id="farm-map-flood-overview-heading" class="farm-map-flood-overview__title">
+                                📊 Barangay Flood Risk Overview
+                            </h2>
+                            <p class="farm-map-flood-overview__lede">
+                                Barangays in your municipality grouped by historical–model flood exposure tier.
+                            </p>
                         </div>
+                        <span class="farm-map-flood-overview__muni-chip">
+                            <span class="farm-map-flood-overview__muni-label">{{ $floodOverview['municipality'] }}</span>
+                            <span class="farm-map-flood-overview__muni-suffix">Cagayan</span>
+                        </span>
+                    </header>
+
+                    <div class="farm-map-flood-overview__tiers">
+                        @foreach ($floodTiers as $tier)
+                            @php
+                                $names = $floodOverview[$tier['key']] ?? [];
+                                $count = is_countable($names) ? count($names) : 0;
+                            @endphp
+                            <article class="farm-map-flood-overview__tier-strip farm-map-flood-overview__tier-strip--{{ $tier['modifier'] }}">
+                                <div class="farm-map-flood-overview__tier-head">
+                                    <h3 class="farm-map-flood-overview__tier-title">
+                                        <span class="farm-map-flood-overview__tier-ic" aria-hidden="true">{{ $tier['icon'] }}</span>
+                                        <span class="farm-map-flood-overview__tier-text">{{ $tier['title'] }}</span>
+                                    </h3>
+                                    <span class="farm-map-flood-overview__tier-count" aria-label="{{ $count }} barangays">{{ $count }} barangay{{ $count === 1 ? '' : 's' }}</span>
+                                </div>
+                                @if (! empty($names))
+                                    <ul class="farm-map-flood-overview__list farm-map-flood-overview__list--columns">
+                                        @foreach ($names as $name)
+                                            <li>{{ $name }}</li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    <p class="farm-map-flood-overview__empty">None listed for this area.</p>
+                                @endif
+                            </article>
+                        @endforeach
                     </div>
                 </section>
-
-                <section
-                    class="ag-card farm-map-info-panel farm-map-snapshot-shell overflow-hidden rounded-2xl border border-sky-200/65 bg-gradient-to-br from-sky-50/90 via-white to-indigo-50/45 p-3 shadow-md shadow-sky-500/10 ring-1 ring-sky-100/80 sm:p-3.5"
-                    aria-labelledby="farm-map-snapshot-heading"
-                >
-                    <div class="farm-map-snapshot-shell__sheen" aria-hidden="true"></div>
-                    <header class="farm-map-snapshot-shell__head relative z-[1]">
-                        <span class="farm-map-snapshot-shell__glyph" aria-hidden="true">
-                            <i data-lucide="layout-dashboard" class="farm-map-snapshot-shell__lucide"></i>
-                        </span>
-                        <h2 id="farm-map-snapshot-heading" class="farm-map-snapshot-shell__title">Field snapshot</h2>
-                    </header>
-                    <div id="farm-map-summary-grid" class="farm-map-snapshot-grid relative z-[1]"></div>
-                </section>
-
-                <div id="farm-map-no-gps-hint" class="farm-map-no-gps-inline text-center text-xs text-slate-500 {{ $initialHasDeviceGps ? 'hidden' : '' }}">Save GPS to load map details.</div>
             </div>
         </div>
     </section>

@@ -60,6 +60,8 @@
             ? trim((string) $recommendation['ai_error'])
             : 'AI advisory temporarily unavailable.');
     $cpAiError = trim((string) ($recommendation['ai_error'] ?? ''));
+    $cpSources = is_array($weather_context['source_links'] ?? null) ? $weather_context['source_links'] : [];
+    $cpFeedsConnected = (bool) ($cpSources['weather_api_connected'] ?? false) && (bool) ($cpSources['ml_model_connected'] ?? false);
     $timelineItems = is_array($timeline ?? null) ? $timeline : [];
     $timelineCount = count($timelineItems);
     $currentIndex = 0;
@@ -359,7 +361,7 @@
                 <div class="dash-smart__debug">
                     <p class="text-xs font-semibold text-slate-700">
                         @if ($cpAiOk)
-                            <span class="text-emerald-700">AI Smart Advisory: Active</span>
+                            <span class="{{ $cpFeedsConnected ? 'text-emerald-700' : 'text-amber-800' }}">AI Smart Advisory: {{ $cpFeedsConnected ? 'Active (Weather API + ML Model)' : 'Partially connected' }}</span>
                         @elseif ($cpAiStatus === 'missing_context')
                             <span class="text-amber-800">AI Smart Advisory: Profile incomplete</span>
                         @else

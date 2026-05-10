@@ -138,6 +138,13 @@ class User extends Authenticatable
 
     public function getFarmBarangayNameAttribute(): string
     {
+        if ($this->relationLoaded('barangay') && $this->barangay !== null) {
+            $name = trim((string) ($this->barangay->name ?? ''));
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
         $code = trim((string) ($this->attributes['farm_barangay_code'] ?? ''));
         if ($code !== '' && ctype_digit($code)) {
             $fromDb = Barangay::nameForId($code);
@@ -167,7 +174,9 @@ class User extends Authenticatable
         $barangayRow = null;
         $code = trim((string) ($this->attributes['farm_barangay_code'] ?? ''));
         if ($code !== '' && ctype_digit($code)) {
-            $barangayRow = Barangay::query()->find($code);
+            $barangayRow = $this->relationLoaded('barangay')
+                ? $this->barangay
+                : Barangay::query()->find($code);
         }
         if ($barangayRow !== null) {
             $mun = trim($mun) !== '' ? $mun : $barangayRow->municipality;

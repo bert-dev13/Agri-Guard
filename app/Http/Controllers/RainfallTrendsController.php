@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\HistoricalWeather;
 use App\Services\AiAdvisory\AiAdvisoryService;
 use App\Services\WeatherAdvisoryService;
+use App\Services\WeatherPredictionService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -20,8 +21,8 @@ class RainfallTrendsController extends Controller
     public function show(
         WeatherAdvisoryService $weatherAdvisoryService,
         AiAdvisoryService $aiAdvisory,
-    ): View
-    {
+        WeatherPredictionService $weatherPredictionService,
+    ): View {
         $user = Auth::user();
         $farmLocationDisplay = $this->farmLocationDisplay($user);
 
@@ -60,6 +61,7 @@ class RainfallTrendsController extends Controller
         $weekMm = is_numeric($todayRainMm) ? ((float) $todayRainMm * 7) : null;
         $monthMm = $avgMonthlyRainfall;
         $trend = $this->deriveRainTrend($monthlyTrend);
+        $rainfallSnapshot = $this->buildModelRainfallSnapshot($weatherPredictionService);
 
         $rainInput = $aiAdvisory->buildRainfallInput(
             $user,
@@ -103,7 +105,91 @@ class RainfallTrendsController extends Controller
             'recommendation' => $rainfallRecommendation['recommendation'],
             'recommendation_failed' => $rainfallRecommendation['failed'],
             'today_rainfall_mm' => $todayRainMm,
+            'today_api_temp_c' => is_numeric($weather['temp'] ?? null) ? round((float) $weather['temp'], 1) : null,
+            'rainfall_snapshot' => $rainfallSnapshot,
         ]);
+    }
+
+    /**
+     * Build rainfall snapshot values from ML forecast output.
+     *
+     * @return array{today_mm:float|null,week_mm:float|null,month_mm:float|null,trend:string|null,status:string|null,wind_kmh:float|null,source:string}
+     */
+    private function buildModelRainfallSnapshot(WeatherPredictionService $weatherPredictionService): array
+    {
+        try {
+            $prediction = $weatherPredictionService->predict();
+            $forecast = is_array($prediction['forecast'] ?? null) ? $prediction['forecast'] : [];
+            if ($forecast === []) {
+                return [
+                    'today_mm' => null,
+                    'week_mm' => null,
+                    'month_mm' => null,
+                    'trend' => null,
+                    'status' => null,
+                    'wind_kmh' => null,
+                    'source' => 'fallback',
+                ];
+            }
+
+            $rainSeries = array_values(array_filter(array_map(
+                static fn ($day): ?float => is_numeric($day['rainfall'] ?? null) ? (float) $day['rainfall'] : null,
+                $forecast
+            ), static fn ($v): bool => $v !== null));
+
+            if ($rainSeries === []) {
+                return [
+                    'today_mm' => null,
+                    'week_mm' => null,
+                    'month_mm' => null,
+                    'trend' => null,
+                    'status' => null,
+                    'wind_kmh' => null,
+                    'source' => 'fallback',
+                ];
+            }
+
+            $todayMm = round($rainSeries[0], 3);
+            $sumForecast = array_sum($rainSeries);
+            $forecastDays = count($rainSeries);
+            $weeklyMm = round(($sumForecast / max($forecastDays, 1)) * 7, 1);
+            $monthlyMm = round(($weeklyMm / 7) * 30, 1);
+
+            $first = $rainSeries[0];
+            $tailAvg = count($rainSeries) > 1
+                ? (array_sum(array_slice($rainSeries, 1)) / (count($rainSeries) - 1))
+                : $first;
+            $trend = $tailAvg > ($first * 1.1)
+                ? 'More rain expected'
+                : ($tailAvg < ($first * 0.9) ? 'Less rain expected' : 'No major change');
+
+            $status = $monthlyMm >= 220
+                ? 'Heavy rain'
+                : ($monthlyMm >= 120 ? 'Moderate rain' : 'Light rain');
+            $todayWindKmh = is_numeric($forecast[0]['wind_speed'] ?? null)
+                ? round((float) $forecast[0]['wind_speed'], 3)
+                : null;
+
+            return [
+                'today_mm' => $todayMm,
+                'week_mm' => $weeklyMm,
+                'month_mm' => $monthlyMm,
+                'trend' => $trend,
+                'status' => $status,
+                'wind_kmh' => $todayWindKmh,
+                'source' => 'ml_model',
+            ];
+        } catch (\Throwable) {
+            return [
+                'today_mm' => null,
+                'week_mm' => null,
+                'month_mm' => null,
+                'trend' => null,
+                'status' => null,
+                'wind_kmh' => null,
+                'source' => 'fallback',
+            ];
+        }
     }
 
     private function deriveRainTrend(array $monthlyTrend): string

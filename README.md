@@ -1,66 +1,80 @@
 # AGRIGUARD
 
-Farm monitoring on **Laravel** + **MySQL**. You need **PHP 8.2+**, **Composer**, **Node + npm**, **MySQL**.
+Laravel + MySQL farm app. Install **PHP 8.2+**, **Composer**, **Node/npm**, **MySQL**. For weather ML, add **Python 3.10+** (64-bit on Windows).
 
----
+## Setup
 
-## **Run the app (follow this order)**
+1. **Clone and PHP/JS deps**
 
-**A — Clone & install**
+   ```bash
+   git clone <repo-url> && cd agriguard
+   composer install && npm install
+   cp .env.example .env
+   php artisan key:generate
+   ```
 
-```bash
-git clone <repo-url>
-cd agriguard
-composer install
-npm install
-cp .env.example .env
-php artisan key:generate
-```
+   Windows: `Copy-Item .env.example .env` instead of `cp`.
 
-Windows: use `Copy-Item .env.example .env` instead of `cp`.  
-If your folder is not `agriguard`, `cd` into the name Git created.
+2. **MySQL** — create database `agriguard`, then in `.env` set `DB_*`, `APP_URL=http://127.0.0.1:8000`, and `MAIL_MAILER=log` for local mail. API keys in `.env` are optional.
 
-**B — Database**
+3. **Python** (weather predictions use `python/predict.py` + `python/model/xgboost_weather_model.pkl`)
 
-In MySQL:
+   From the project root, create `.venv` and install packages:
 
-```sql
-CREATE DATABASE agriguard;
-```
+   ```bash
+   python3 -m venv .venv               # Windows: py -3 -m venv .venv
+   source .venv/bin/activate           # Windows: .\.venv\Scripts\Activate.ps1
+   pip install -r python/requirements.txt
+   ```
 
-**C — `.env`**
+   Copy model files into `python/model/` if they are missing.
 
-Set **`DB_*`** to match MySQL. Set **`APP_URL`** to `http://127.0.0.1:8000`.  
-For mail locally: **`MAIL_MAILER=log`**.  
-API keys (`OPENWEATHERMAP_API_KEY`, `TOGETHER_API_KEY`) are optional.
+   **macOS/Linux:** add one line to `.env` (the app defaults to a Windows Python path):
 
-**D — Finish**
+   ```env
+   AGRIWEATHER_PYTHON_BIN=/absolute/path/to/agriguard/.venv/bin/python
+   ```
 
-```bash
-php artisan migrate --seed
-php artisan storage:link
-npm run build
-php artisan serve
-```
+   Check it loads: `./.venv/bin/python python/verify_model_load.py` → should print `MODEL_LOAD_OK`.  
+   Windows: `.\.venv\Scripts\python.exe python\verify_model_load.py`
 
-Open **http://127.0.0.1:8000**
+4. **Database and front-end**
 
----
+   ```bash
+   php artisan migrate --seed
+   php artisan storage:link
+   npm run build
+   php artisan serve
+   ```
 
-## **Default login** *(only works after `migrate --seed`)*
+   Open **http://127.0.0.1:8000**
 
-| | |
-|--|--|
-| Email | `admin@agriguard.com` |
-| Password | `admin123` |
+5. **Historical weather** — after `migrate`, load rows from the CSV in the repo (run from project root):
 
-You can also **Register** a new user on the site.
+   ```bash
+   php artisan historical-weather:import storage/app/public/historical_weather.csv
+   ```
 
----
+   To replace all existing rows first: add `--truncate`.
 
-## **Quick fixes**
+   ```bash
+   php artisan historical-weather:import storage/app/public/historical_weather.csv --truncate
+   ```
 
-- Key error → `php artisan key:generate`
-- No images → `php artisan storage:link`
-- Broken CSS/JS → `npm run build` (or `npm run dev` while coding)
-- DB errors → MySQL running + `.env` `DB_*` correct
+   Use another file by passing its path instead.
+
+## Default login (after seed)
+
+| Email | Password |
+|-------|----------|
+| `admin@agriguard.com` | `admin123` |
+
+## If something breaks
+
+| Problem | Try |
+|---------|-----|
+| App key | `php artisan key:generate` |
+| Missing uploads | `php artisan storage:link` |
+| Blank styles/scripts | `npm run build` |
+| Database | MySQL running; fix `DB_*` in `.env` |
+| Python / predictions | `.venv` at repo root, `pip install -r python/requirements.txt`, model in `python/model/`, set `AGRIWEATHER_PYTHON_BIN` on Mac/Linux, run `verify_model_load.py` |

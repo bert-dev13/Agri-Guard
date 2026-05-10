@@ -71,17 +71,7 @@ import { point as turfPoint } from '@turf/helpers';
         var gpsLastEl = document.getElementById('farm-map-gps-last');
         var errEl = document.getElementById('farm-map-gps-error');
         var statusGpsEl = document.getElementById('farm-map-status-gps');
-        var statusRainEl = document.getElementById('farm-map-status-rain'); // reused for geofence state text
         var layerEl = document.getElementById('farm-map-layer-toggles');
-        var todaySummaryEl = document.getElementById('farm-map-today-summary');
-        var advisoryStatusEl = document.getElementById('farm-map-advisory-status-line');
-        var advisoryMainActionEl = document.getElementById('farm-map-advisory-main-action');
-        var advisoryPlanEarlyEl = document.getElementById('farm-map-plan-early');
-        var advisoryPlanMiddayEl = document.getElementById('farm-map-plan-midday');
-        var advisoryPlanLateEl = document.getElementById('farm-map-plan-late');
-        var advisoryPlanWaterEl = document.getElementById('farm-map-plan-water');
-        var advisoryPlanAvoidEl = document.getElementById('farm-map-plan-avoid');
-        var snapshotGridEl = document.getElementById('farm-map-summary-grid');
         var btnUse = document.getElementById('farm-map-btn-use-gps');
         var btnRefresh = document.getElementById('farm-map-btn-refresh-gps');
         var btnRetry = document.getElementById('farm-map-gps-retry');
@@ -557,108 +547,9 @@ import { point as turfPoint } from '@turf/helpers';
             return d.innerHTML;
         }
 
-        function renderSnapshotCards(ctx) {
-            if (!snapshotGridEl) return;
-            if (!ctx || !ctx.map_ready) {
-                snapshotGridEl.innerHTML =
-                    '<article class="farm-map-snap-card farm-map-snap-card--loc"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Location</p><p class="farm-map-snap-card__value">GPS connected, syncing farm data…</p><p class="farm-map-snap-card__sub">Snapshot will appear once context is available.</p></div></div></article>' +
-                    '<article class="farm-map-snap-card farm-map-snap-card--rain"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Rain Chance</p><p class="farm-map-snap-card__value">Waiting for weather data</p><p class="farm-map-snap-card__sub">Forecast probability will populate automatically.</p></div></div></article>';
-                return;
-            }
-
-            var weather = ctx.weather || {};
-            var snapshot = ctx.risk_snapshot || {};
-            var location = esc(ctx.location_display || 'Saved farm location');
-            var rainChance = esc(snapshot.rain_chance_display || '—');
-            var temp = weather.current_temperature != null ? Math.round(Number(weather.current_temperature)) + '°C' : '—';
-            var cond = esc(weather.condition || 'No condition data');
-            var effect = esc(snapshot.three_day_effect || 'No forecast impact available');
-            snapshotGridEl.innerHTML =
-                '<article class="farm-map-snap-card farm-map-snap-card--loc"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Location</p><p class="farm-map-snap-card__value">' + location + '</p><p class="farm-map-snap-card__sub">Saved farm location</p></div></div></article>' +
-                '<article class="farm-map-snap-card farm-map-snap-card--wx"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Weather</p><p class="farm-map-snap-card__value">' + esc(temp) + '</p><p class="farm-map-snap-card__sub">' + cond + '</p></div></div></article>' +
-                '<article class="farm-map-snap-card farm-map-snap-card--rain"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">Rain Chance</p><p class="farm-map-snap-card__value">' + rainChance + '</p><p class="farm-map-snap-card__sub">Forecast probability</p></div></div></article>' +
-                '<article class="farm-map-snap-card farm-map-snap-card--effect"><div class="farm-map-snap-card__row"><div class="farm-map-snap-card__main"><p class="farm-map-snap-card__label">3-Day Effect</p><p class="farm-map-snap-card__value">' + effect + '</p><p class="farm-map-snap-card__sub">Forecast trend near your farm</p></div></div></article>';
-        }
-
-        function renderTodaySummary(ctx) {
-            if (!todaySummaryEl) return;
-            if (!ctx || !ctx.map_ready) {
-                todaySummaryEl.textContent = 'GPS connected, syncing farm insights…';
-                return;
-            }
-            var weather = ctx.weather || {};
-            var rainProb = weather.today_rain_probability;
-            var chance = Number.isFinite(Number(rainProb)) ? Math.round(Number(rainProb)) + '% rain chance' : 'rain chance unavailable';
-            var effect = (ctx.risk_snapshot || {}).three_day_effect || 'No forecast impact available';
-            todaySummaryEl.textContent = 'Today: ' + chance + '. ' + effect + '.';
-        }
-
-        function renderAdvisory(ctx) {
-            if (!advisoryStatusEl || !advisoryMainActionEl) return;
-            function setAdviceBodies(main, early, midday, late, water, avoid) {
-                advisoryMainActionEl.textContent = main;
-                if (advisoryPlanEarlyEl) advisoryPlanEarlyEl.textContent = early;
-                if (advisoryPlanMiddayEl) advisoryPlanMiddayEl.textContent = midday;
-                if (advisoryPlanLateEl) advisoryPlanLateEl.textContent = late;
-                if (advisoryPlanWaterEl) advisoryPlanWaterEl.textContent = water;
-                if (advisoryPlanAvoidEl) advisoryPlanAvoidEl.textContent = avoid;
-            }
-
-            if (!ctx || !ctx.map_ready) {
-                advisoryStatusEl.innerHTML = '<span class="text-slate-600">AI Smart Advisory: Waiting for GPS</span>';
-                setAdviceBodies(
-                    'GPS connected, syncing advisory data…',
-                    'Waiting for weather data.',
-                    'Waiting for weather data.',
-                    'Waiting for weather data.',
-                    'Waiting for weather data.',
-                    'Waiting for weather data.'
-                );
-                return;
-            }
-
-            var m = ctx.map_smart_advisory || null;
-            if (!m || m.status !== 'active') {
-                advisoryStatusEl.innerHTML = '<span class="text-slate-600">AI Smart Advisory: Ready</span>';
-                setAdviceBodies(
-                    'No advisory available yet.',
-                    'No early-day guidance available yet.',
-                    'No midday guidance available yet.',
-                    'No late-day guidance available yet.',
-                    'No water and drainage guidance available yet.',
-                    'No avoid-today guidance available yet.'
-                );
-                return;
-            }
-
-            var doList = Array.isArray(m.what_to_do) ? m.what_to_do : [];
-            var watchList = Array.isArray(m.what_to_watch) ? m.what_to_watch : [];
-            var avoidList = Array.isArray(m.what_to_avoid) ? m.what_to_avoid : [];
-            var smartAction = String(m.smart_action || '').trim() || 'No smart action provided.';
-            var earlyDay = String(m.early_day || doList[0] || watchList[0] || 'No early-day guidance.').trim();
-            var midday = String(m.midday || doList[1] || watchList[1] || doList[0] || 'No midday guidance.').trim();
-            var lateDay = String(m.late_day || doList[2] || watchList[2] || watchList[0] || 'No late-day guidance.').trim();
-            var waterDrainage = String(
-                m.water_drainage || m.drainage_irrigation_advice || watchList[0] || doList[0] || 'No water and drainage guidance.'
-            ).trim();
-            var avoidToday = String(
-                m.what_to_avoid_today || avoidList[0] || m.avoid || 'No avoid-today guidance.'
-            ).trim();
-
-            advisoryStatusEl.innerHTML = '<span class="text-emerald-700">AI Smart Advisory: Active</span>';
-            setAdviceBodies(smartAction, earlyDay, midday, lateDay, waterDrainage, avoidToday);
-        }
-
         function applyContextToUI(ctx) {
-            renderTodaySummary(ctx);
-            renderSnapshotCards(ctx);
-            renderAdvisory(ctx);
             if (statusGpsEl) {
                 statusGpsEl.textContent = ctx && ctx.map_ready ? 'Connected' : 'Syncing';
-            }
-            if (statusRainEl) {
-                var rainProb = Number((ctx && ctx.weather ? ctx.weather.today_rain_probability : NaN));
-                statusRainEl.textContent = Number.isFinite(rainProb) ? Math.round(rainProb) + '%' : '—';
             }
         }
 
@@ -862,9 +753,6 @@ import { point as turfPoint } from '@turf/helpers';
         }
         if (statusGpsEl) {
             statusGpsEl.textContent = 'Ready';
-        }
-        if (statusRainEl) {
-            statusRainEl.textContent = '—';
         }
         applyContextToUI(null);
         initMap();

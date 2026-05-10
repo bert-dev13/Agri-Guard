@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\RainChance;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -128,21 +130,28 @@ class FarmWeatherService
         }
 
         try {
-            $geoRes = Http::timeout(10)->get('https://api.openweathermap.org/geo/1.0/direct', [
-                'q' => $locationQuery,
-                'limit' => 1,
-                'appid' => $apiKey,
-            ]);
+            $coords = $this->getCoordinatesForUser($user);
+            if ($coords !== null) {
+                $lat = $coords['lat'];
+                $lon = $coords['lon'];
+                $locationName = $coords['location_name'];
+            } else {
+                $geoRes = Http::timeout(10)->get('https://api.openweathermap.org/geo/1.0/direct', [
+                    'q' => $locationQuery,
+                    'limit' => 1,
+                    'appid' => $apiKey,
+                ]);
 
-            if (! $geoRes->successful() || empty($geoRes->json())) {
-                Log::warning('FarmWeatherService: geocoding failed', ['query' => $locationQuery]);
-                return $this->emptyNormalizedPayload($user);
+                if (! $geoRes->successful() || empty($geoRes->json())) {
+                    Log::warning('FarmWeatherService: geocoding failed', ['query' => $locationQuery]);
+                    return $this->emptyNormalizedPayload($user);
+                }
+
+                $geo = $geoRes->json()[0];
+                $lat = $geo['lat'];
+                $lon = $geo['lon'];
+                $locationName = $geo['name'] ?? ($user->farm_municipality ?: '—');
             }
-
-            $geo = $geoRes->json()[0];
-            $lat = $geo['lat'];
-            $lon = $geo['lon'];
-            $locationName = $geo['name'] ?? ($user->farm_municipality ?: '—');
 
             $baseParams = [
                 'lat' => $lat,
@@ -151,8 +160,7 @@ class FarmWeatherService
                 'units' => 'metric',
             ];
 
-            $currentRes = Http::timeout(10)->get('https://api.openweathermap.org/data/2.5/weather', $baseParams);
-            $forecastRes = Http::timeout(10)->get('https://api.openweathermap.org/data/2.5/forecast', array_merge($baseParams, ['cnt' => 40]));
+            [$currentRes, $forecastRes] = $this->poolOpenWeatherRequests($baseParams);
 
             if (! $currentRes->successful()) {
                 Log::warning('FarmWeatherService: current weather request failed');
@@ -252,6 +260,26 @@ class FarmWeatherService
         }
     }
 
+    /**
+     * Parallel OpenWeatherMap current + forecast requests to reduce wall-clock latency.
+     *
+     * @param  array<string, mixed>  $baseParams
+     * @return array{0: \Illuminate\Http\Client\Response, 1: \Illuminate\Http\Client\Response}
+     */
+    private function poolOpenWeatherRequests(array $baseParams): array
+    {
+        /** @var array<string, \Illuminate\Http\Client\Response> $responses */
+        $responses = Http::pool(fn (Pool $pool) => [
+            $pool->as('current')->timeout(10)->get('https://api.openweathermap.org/data/2.5/weather', $baseParams),
+            $pool->as('forecast')->timeout(10)->get(
+                'https://api.openweathermap.org/data/2.5/forecast',
+                array_merge($baseParams, ['cnt' => 40])
+            ),
+        ]);
+
+        return [$responses['current'], $responses['forecast']];
+    }
+
     private function emptyNormalizedPayload(User $user): array
     {
         $locationName = implode(', ', array_filter([$user->farm_municipality, 'Cagayan', 'Philippines'])) ?: '—';
@@ -289,10 +317,13 @@ class FarmWeatherService
         foreach ($slots as $item) {
             $dt = (new \DateTimeImmutable)->setTimestamp($item['dt'])->setTimezone($tz);
             $weather = $item['weather'][0] ?? ['id' => 800];
+            $rainMm = (float) ($item['rain']['3h'] ?? $item['rain']['1h'] ?? 0);
+            $popPercent = isset($item['pop']) ? (int) round((float) $item['pop'] * 100) : null;
             $result[] = [
                 'time' => $dt->format('g A'),
                 'temp' => (int) round($item['main']['temp'] ?? 0),
-                'pop' => isset($item['pop']) ? (int) round((float) $item['pop'] * 100) : null,
+                'pop' => $popPercent,
+                'rain_chance' => RainChance::resolve($popPercent, $rainMm),
                 'condition_id' => $weather['id'] ?? 800,
             ];
         }
@@ -348,6 +379,7 @@ class FarmWeatherService
                 'temp_max' => (int) round(max($tempsMax)),
                 'pop' => $maxPop,
                 'rain_mm' => round($rainMm, 1),
+                'rain_chance' => RainChance::resolve($maxPop, (float) $rainMm),
                 'wind_speed' => $windSpeed,
                 'wind_deg' => $windDeg,
                 'condition' => [
@@ -398,8 +430,7 @@ class FarmWeatherService
                 'units' => 'metric',
             ];
 
-            $currentRes = Http::timeout(10)->get('https://api.openweathermap.org/data/2.5/weather', $baseParams);
-            $forecastRes = Http::timeout(10)->get('https://api.openweathermap.org/data/2.5/forecast', array_merge($baseParams, ['cnt' => 40]));
+            [$currentRes, $forecastRes] = $this->poolOpenWeatherRequests($baseParams);
 
             if (! $currentRes->successful()) {
                 Log::warning('FarmWeatherService: current weather by coordinates failed');

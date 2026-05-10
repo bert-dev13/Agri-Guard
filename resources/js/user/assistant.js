@@ -89,7 +89,6 @@
         var messagesEl = document.getElementById('assistant-messages');
         var typingEl = document.getElementById('assistant-typing');
         var fallbackBadge = document.getElementById('assistant-fallback-badge');
-        var introEl = document.getElementById('assistant-intro-text');
         var quickButtons = Array.prototype.slice.call(document.querySelectorAll('.assistant-quick-chip'));
 
         var state = { isLoading: false, messages: [], requestController: null };
@@ -198,7 +197,7 @@
                     messagesEl.appendChild(messageBubble('user', String(m.text || '')));
                 } else {
                     var data = normalizePayload(m.payload || {});
-                    messagesEl.appendChild(messageBubble('assistant', data.message || 'I can help with your farm decisions.'));
+                    messagesEl.appendChild(messageBubble('assistant', data.message || 'I can help with farming, weather, and preparedness questions.'));
                 }
             });
             messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -224,19 +223,6 @@
             if (!inputEl) return;
             inputEl.style.height = 'auto';
             inputEl.style.height = Math.min(inputEl.scrollHeight, 110) + 'px';
-        }
-
-        function typeIntroText() {
-            if (!introEl) return;
-            var full = introEl.textContent || '';
-            if (!full) return;
-            introEl.textContent = '';
-            var i = 0;
-            var timer = setInterval(function () {
-                introEl.textContent += full.charAt(i);
-                i += 1;
-                if (i >= full.length) clearInterval(timer);
-            }, 12);
         }
 
         function sendMessage(text) {
@@ -411,7 +397,6 @@
         setFallbackBadge(state.messages[state.messages.length - 1] ? state.messages[state.messages.length - 1].payload : {});
         setLoading(false);
         resizeInput();
-        typeIntroText();
         if (typeof window.lucide !== 'undefined') window.lucide.createIcons();
     });
 })();

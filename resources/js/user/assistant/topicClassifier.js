@@ -143,6 +143,36 @@ const TOPIC_KEYWORDS = {
         'best time',
         'oras',
     ],
+    disaster_risk: [
+        'typhoon',
+        'bagyo',
+        'tropical storm',
+        'storm surge',
+        'flood',
+        'flooding',
+        'flash flood',
+        'baha',
+        'drought',
+        'tagtuyot',
+        'tuyo',
+        'earthquake',
+        'lindol',
+        'landslide',
+        'guho',
+        'mudslide',
+        'heatwave',
+        'heat wave',
+        'init',
+        'disaster',
+        'evacuation',
+        'evacuate',
+        'pagasa',
+        'ndrrmc',
+        'emergency',
+        'paghahanda',
+        'sakuna',
+        'hurricane',
+    ],
     harvest: [
         'harvest',
         'harvesting',
@@ -232,6 +262,9 @@ function getDepthLevel(topic, text) {
     } else if (topic === 'weather_timing') {
         if (hasAny(['this morning', 'this afternoon', 'this evening', 'afternoon', 'morning', 'best time'])) lvl = Math.max(lvl, 1);
         if (hasAny(['schedule', 'two short sessions', 'heavy tasks after rain ends', 'reduce weather-related delays'])) lvl = Math.max(lvl, 2);
+    } else if (topic === 'disaster_risk') {
+        if (hasAny(['drain', 'drainage', 'canal', 'harvest', 'secure', 'livestock', 'typhoon', 'bagyo', 'flood', 'baha'])) lvl = Math.max(lvl, 1);
+        if (hasAny(['recovery', 'replant', 'erosion', 'heatwave', 'after flooding', 'pagbangon'])) lvl = Math.max(lvl, 2);
     } else if (topic === 'harvest') {
         if (hasAny(['harvesting', 'harvest quality', 'field too wet', 'prepare after'])) lvl = Math.max(lvl, 1);
         if (hasAny(['protect', 'delay harvesting', 'post-harvest', 'reduce post-harvest losses', 'safe timing for cutting'])) lvl = Math.max(lvl, 2);
@@ -272,6 +305,11 @@ export function detectAssistantTopic(opts) {
             bestTopic = topic;
         }
     });
+
+    // If timing and disaster keywords tie, prefer disaster-aware chips.
+    if (bestTopic === 'weather_timing' && (scores.disaster_risk || 0) === bestScore && (scores.disaster_risk || 0) > 0) {
+        bestTopic = 'disaster_risk';
+    }
 
     // If no topic keywords found, use continuity only when it looks like follow-up.
     var continuation = TIME_CONTINUATION.some(function (k) { return combined.indexOf(k) !== -1; });

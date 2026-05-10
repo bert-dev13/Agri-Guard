@@ -314,6 +314,8 @@ class AuthController extends Controller
             abort(403);
         }
 
+        $user->loadMissing('barangay');
+
         if ($user->isAdmin()) {
             return redirect()->route('admin.dashboard');
         }
@@ -392,10 +394,11 @@ class AuthController extends Controller
         $maxPopFive = $popsFive !== [] ? (int) round((float) max($popsFive)) : null;
 
         $cropTimeline = app(CropTimelineService::class);
-        $calendarStageLabel = $cropTimeline->inferExpectedStageFromPlanting(
-            $user,
-            $cropTimeline->stageDurationsForCrop((string) ($user->crop_type ?? ''))
-        )['label'];
+        $cropTypeStr = (string) ($user->crop_type ?? '');
+        $stageDurations = $cropTimeline->stageDurationsForCrop($cropTypeStr);
+        $calendarStageLabel = $cropTimeline->inferExpectedStageFromPlanting($user, $stageDurations)['label'];
+
+        $cropProgress = $this->buildCropProgressSnapshot($user, $cropTimeline, $stageDurations, $cropTypeStr);
 
         $smartRecommendation = $aiRecommendationService->generateSmartRecommendation($user, [
             'barangay' => trim((string) ($user->farm_barangay_name ?? '')),
@@ -446,8 +449,66 @@ class AuthController extends Controller
             'recommendation_failed' => $smartRecommendation['failed'],
             'disasterSummary' => $disasterSummary,
             'weather_outlook' => $weatherOutlook,
+            'cropProgress' => $cropProgress,
         ]);
     }
+
+
+    /**
+     * Compact crop progress payload for the dashboard snapshot card.
+     *
+     * @param  array<string, int>  $durations
+     * @return array{
+     *     has_planting_date: bool,
+     *     crop_type: string|null,
+     *     stage_key: string,
+     *     stage_label: string,
+     *     progress_percent: int,
+     *     days_since_planting: int|null,
+     *     days_until_next_stage: int|null,
+     *     next_stage_label: string|null,
+     *     comparison: 'behind'|'match'|'ahead'
+     * }
+     */
+    private function buildCropProgressSnapshot(User $user, CropTimelineService $timeline, array $durations, string $cropType): array
+    {
+        $offsetDays = (int) ($user->crop_timeline_offset_days ?? 0);
+        $expected = $timeline->inferExpectedStageFromPlantingWithOffset($user, $durations, $offsetDays);
+        $rawFarmingStage = trim((string) ($user->farming_stage ?? ''));
+        $actualKey = $rawFarmingStage !== ''
+            ? $timeline->normalizeStageKey($rawFarmingStage)
+            : $expected['key'];
+        $progress = $timeline->computeStageProgressFromPlanting($user, $durations, $offsetDays, $actualKey);
+        $comparison = $rawFarmingStage !== ''
+            ? $timeline->compareActualToExpected($actualKey, $expected['key'])
+            : 'match';
+
+        $stageOrder = CropTimelineService::STAGE_ORDER;
+        $idx = array_search($actualKey, $stageOrder, true);
+        $nextStageKey = is_int($idx) && $idx >= 0 && $idx < count($stageOrder) - 1
+            ? $stageOrder[$idx + 1]
+            : null;
+        $nextStageLabel = $nextStageKey !== null
+            ? (CropTimelineService::STAGE_LABELS[$nextStageKey] ?? null)
+            : null;
+
+        return [
+            'has_planting_date' => (bool) ($expected['has_planting_date'] ?? false),
+            'crop_type' => $cropType !== '' ? $cropType : null,
+            'stage_key' => $actualKey,
+            'stage_label' => CropTimelineService::STAGE_LABELS[$actualKey] ?? (string) ($expected['label'] ?? 'Planting'),
+            'progress_percent' => (int) ($progress['progress_percent'] ?? 0),
+            'days_since_planting' => isset($expected['days_since_planting']) && is_numeric($expected['days_since_planting'])
+                ? (int) $expected['days_since_planting']
+                : null,
+            'days_until_next_stage' => isset($progress['days_remaining_to_next_stage']) && is_numeric($progress['days_remaining_to_next_stage'])
+                ? (int) $progress['days_remaining_to_next_stage']
+                : null,
+            'next_stage_label' => $nextStageLabel,
+            'comparison' => in_array($comparison, ['behind', 'match', 'ahead'], true) ? $comparison : 'match',
+        ];
+    }
+
 
     /**
      * Show the verify email (OTP) form. Requires pending_email_verification_user_id in session.

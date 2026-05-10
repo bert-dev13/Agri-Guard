@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\HistoricalWeather;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
@@ -10,7 +11,22 @@ use RuntimeException;
 class HistoricalWeatherCsvImporter
 {
     /**
-     * @param  array{truncate?: bool, has_header?: bool}  $options
+     * CSV schema required by AgriGuard historical weather import.
+     *
+     * @var array<int, string>
+     */
+    private const REQUIRED_COLUMNS = [
+        'date',
+        'year',
+        'month',
+        'day',
+        'rainfall',
+        'wind_speed',
+        'wind_direction',
+    ];
+
+    /**
+     * @param  array{truncate?: bool}  $options
      * @return array{imported:int, skipped:int, errors:array<int, string>}
      */
     public function importFromPath(string $path, array $options = []): array
@@ -37,33 +53,21 @@ class HistoricalWeatherCsvImporter
             }
 
             $delimiter = $this->detectDelimiter($firstLine);
-            $hasHeader = $options['has_header'] ?? true;
-
-            $map = null;
-            $lineNo = 0;
-            if ($hasHeader) {
-                $headerRow = fgetcsv($handle, 0, $delimiter);
-                $lineNo = 1;
-                if ($headerRow === false) {
-                    throw new RuntimeException('Unable to read header row.');
-                }
-
-                $map = $this->columnMapFromHeader($headerRow);
-                if ($map === null) {
-                    throw new RuntimeException(
-                        'Invalid CSV header. Required columns: year, month, day, rainfall, wind_speed, wind_direction.'
-                    );
-                }
-            } else {
-                $map = [
-                    'year' => 0,
-                    'month' => 1,
-                    'day' => 2,
-                    'rainfall' => 3,
-                    'wind_speed' => 4,
-                    'wind_direction' => 5,
-                ];
+            $headerRow = fgetcsv($handle, 0, $delimiter);
+            $lineNo = 1;
+            if ($headerRow === false) {
+                throw new RuntimeException('Unable to read header row.');
             }
+            $headerRow = $this->trimTrailingEmptyColumns($headerRow);
+
+            $map = $this->columnMapFromHeader($headerRow);
+            if ($map === null) {
+                throw new RuntimeException(
+                    'Invalid column count in CSV input. Required headers only: date, year, month, day, rainfall, wind_speed, wind_direction.'
+                );
+            }
+
+            $expectedColumnCount = count($headerRow);
 
             if (($options['truncate'] ?? false) === true) {
                 HistoricalWeather::query()->delete();
@@ -80,10 +84,19 @@ class HistoricalWeatherCsvImporter
                     continue;
                 }
 
+                $row = $this->trimTrailingEmptyColumns($row);
+                if (count($row) !== $expectedColumnCount) {
+                    $skipped++;
+                    $errors[] = "Line {$lineNo}: invalid column count in CSV input (expected {$expectedColumnCount}, got ".count($row).').';
+
+                    continue;
+                }
+
                 $normalized = $this->normalizeRow($row, $map);
                 if ($normalized === null) {
                     $skipped++;
                     $errors[] = "Line {$lineNo}: invalid row format or date.";
+
                     continue;
                 }
 
@@ -98,6 +111,8 @@ class HistoricalWeatherCsvImporter
             if ($batch !== []) {
                 $imported += $this->persistBatch($batch);
             }
+
+            HistoricalWeather::clearRainfallUnitMultiplierCache();
 
             return [
                 'imported' => $imported,
@@ -123,34 +138,26 @@ class HistoricalWeatherCsvImporter
      */
     private function columnMapFromHeader(array $headerRow): ?array
     {
-        $aliases = [
-            'year' => 'year',
-            'month' => 'month',
-            'day' => 'day',
-            'rainfall' => 'rainfall',
-            'wind_speed' => 'wind_speed',
-            'wind_spe' => 'wind_speed',
-            'windspeed' => 'wind_speed',
-            'wind_direction' => 'wind_direction',
-            'winddirection' => 'wind_direction',
-        ];
+        if (count($headerRow) !== count(self::REQUIRED_COLUMNS)) {
+            return null;
+        }
 
         $mapped = [];
         foreach ($headerRow as $index => $cell) {
-            $key = strtolower(trim((string) $cell));
-            $key = preg_replace('/^\xEF\xBB\xBF/', '', $key) ?? $key;
-            $key = str_replace([' ', '-'], '_', $key);
-
-            if (isset($aliases[$key])) {
-                $mapped[$aliases[$key]] = $index;
+            $key = $this->normalizeHeaderKey((string) $cell);
+            if (in_array($key, self::REQUIRED_COLUMNS, true)) {
+                $mapped[$key] = $index;
             }
         }
 
-        $required = ['year', 'month', 'day', 'rainfall', 'wind_speed', 'wind_direction'];
-        foreach ($required as $name) {
+        foreach (self::REQUIRED_COLUMNS as $name) {
             if (! array_key_exists($name, $mapped)) {
                 return null;
             }
+        }
+
+        if (count($mapped) !== count(self::REQUIRED_COLUMNS)) {
+            return null;
         }
 
         return $mapped;
@@ -159,10 +166,20 @@ class HistoricalWeatherCsvImporter
     /**
      * @param  array<int, string|null>  $row
      * @param  array<string, int>  $map
-     * @return array{year:int,month:int,day:int,rainfall:float|null,wind_speed:float|null,wind_direction:int|null}|null
+     * @return array{date:string,year:int,month:int,day:int,rainfall:float|null,wind_speed:float|null,wind_direction:string|null,created_at:string,updated_at:string}|null
      */
     private function normalizeRow(array $row, array $map): ?array
     {
+        $dateText = $this->stringOrNull($row[$map['date']] ?? null);
+        if ($dateText === null) {
+            return null;
+        }
+
+        $parsedDate = $this->parseDate($dateText);
+        if ($parsedDate === null) {
+            return null;
+        }
+
         $year = $this->intOrNull($row[$map['year']] ?? null);
         $month = $this->intOrNull($row[$map['month']] ?? null);
         $day = $this->intOrNull($row[$map['day']] ?? null);
@@ -175,9 +192,17 @@ class HistoricalWeatherCsvImporter
             return null;
         }
 
+        if (
+            $year !== (int) $parsedDate->format('Y')
+            || $month !== (int) $parsedDate->format('m')
+            || $day !== (int) $parsedDate->format('d')
+        ) {
+            return null;
+        }
+
         $rainfall = $this->floatOrNull($row[$map['rainfall']] ?? null);
         $windSpeed = $this->floatOrNull($row[$map['wind_speed']] ?? null);
-        $windDirection = $this->intOrNull($row[$map['wind_direction']] ?? null);
+        $windDirection = $this->stringOrNull($row[$map['wind_direction']] ?? null);
 
         if ($rainfall !== null && $rainfall < 0) {
             $rainfall = null;
@@ -185,30 +210,31 @@ class HistoricalWeatherCsvImporter
         if ($windSpeed !== null && $windSpeed < 0) {
             $windSpeed = null;
         }
-        if ($windDirection !== null && $windDirection < 0) {
-            $windDirection = null;
-        }
+        $now = now()->toDateTimeString();
 
         return [
+            'date' => $parsedDate->toDateString(),
             'year' => $year,
             'month' => $month,
             'day' => $day,
             'rainfall' => $rainfall,
             'wind_speed' => $windSpeed,
             'wind_direction' => $windDirection,
+            'created_at' => $now,
+            'updated_at' => $now,
         ];
     }
 
     /**
-     * @param  array<int, array{year:int,month:int,day:int,rainfall:float|null,wind_speed:float|null,wind_direction:int|null}>  $batch
+     * @param  array<int, array{date:string,year:int,month:int,day:int,rainfall:float|null,wind_speed:float|null,wind_direction:string|null,created_at:string,updated_at:string}>  $batch
      */
     private function persistBatch(array $batch): int
     {
         DB::transaction(function () use ($batch): void {
             HistoricalWeather::query()->upsert(
                 $batch,
-                ['year', 'month', 'day'],
-                ['rainfall', 'wind_speed', 'wind_direction']
+                ['date'],
+                ['year', 'month', 'day', 'rainfall', 'wind_speed', 'wind_direction', 'updated_at']
             );
         });
 
@@ -255,5 +281,56 @@ class HistoricalWeatherCsvImporter
         }
 
         return (float) $raw;
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+
+        return $raw === '' ? null : $raw;
+    }
+
+    private function parseDate(string $raw): ?Carbon
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($raw);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function normalizeHeaderKey(string $raw): string
+    {
+        $key = strtolower(trim($raw));
+        $key = preg_replace('/^\xEF\xBB\xBF/', '', $key) ?? $key;
+
+        return str_replace([' ', '-'], '_', $key);
+    }
+
+    /**
+     * @param  array<int, string|null>  $row
+     * @return array<int, string|null>
+     */
+    private function trimTrailingEmptyColumns(array $row): array
+    {
+        while ($row !== []) {
+            $last = end($row);
+            if (trim((string) $last) !== '') {
+                break;
+            }
+
+            array_pop($row);
+        }
+
+        return array_values($row);
     }
 }

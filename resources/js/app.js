@@ -9,6 +9,7 @@ import './auth/forgot-password';
 import './user/user-navbar';
 import './user/dashboard';
 import './user/weather';
+import './user/weather-details';
 import './user/rainfall-trends';
 import './user/crop-progress';
 import './user/settings';

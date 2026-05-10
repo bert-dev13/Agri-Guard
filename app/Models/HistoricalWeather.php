@@ -14,9 +14,11 @@ class HistoricalWeather extends Model
 
     private const MAX_YEAR = 2100;
 
-    public $incrementing = false;
+    protected $primaryKey = 'id';
 
-    public $timestamps = false;
+    public $timestamps = true;
+
+    private static ?float $rainfallUnitMultiplierCache = null;
 
     protected $fillable = [
         'year',
@@ -25,6 +27,7 @@ class HistoricalWeather extends Model
         'rainfall',
         'wind_speed',
         'wind_direction',
+        'date',
     ];
 
     protected function casts(): array
@@ -32,18 +35,9 @@ class HistoricalWeather extends Model
         return [
             'rainfall' => 'float',
             'wind_speed' => 'float',
-            'wind_direction' => 'integer',
+            'wind_direction' => 'string',
+            'date' => 'date',
         ];
-    }
-
-    /**
-     * Composite primary key (year, month, day) for update/delete queries.
-     */
-    protected function setKeysForSaveQuery($query)
-    {
-        return $query->where('year', '=', $this->getAttribute('year'))
-            ->where('month', '=', $this->getAttribute('month'))
-            ->where('day', '=', $this->getAttribute('day'));
     }
 
     /**
@@ -62,9 +56,11 @@ class HistoricalWeather extends Model
      */
     public static function monthlyRainfallTrend(): \Illuminate\Database\Eloquent\Collection
     {
+        $multiplier = static::rainfallUnitMultiplier();
+
         return static::query()
             ->validCalendarRows()
-            ->selectRaw('month, AVG(GREATEST(COALESCE(rainfall, 0), 0)) as avg_rain')
+            ->selectRaw('month, AVG(GREATEST(COALESCE(rainfall, 0), 0) * ?) as avg_rain', [$multiplier])
             ->groupBy('month')
             ->orderBy('month')
             ->get();
@@ -75,9 +71,11 @@ class HistoricalWeather extends Model
      */
     public static function totalRainfallByYear(): \Illuminate\Database\Eloquent\Collection
     {
+        $multiplier = static::rainfallUnitMultiplier();
+
         return static::query()
             ->validCalendarRows()
-            ->selectRaw('year, SUM(GREATEST(COALESCE(rainfall, 0), 0)) as total_rainfall')
+            ->selectRaw('year, SUM(GREATEST(COALESCE(rainfall, 0), 0) * ?) as total_rainfall', [$multiplier])
             ->groupBy('year')
             ->orderBy('year')
             ->get();
@@ -88,9 +86,11 @@ class HistoricalWeather extends Model
      */
     public static function heavyRainfallCount(): int
     {
+        $threshold = static::rawHeavyRainThreshold();
+
         return (int) static::query()
             ->validCalendarRows()
-            ->where('rainfall', '>=', 50)
+            ->where('rainfall', '>=', $threshold)
             ->count();
     }
 
@@ -99,9 +99,11 @@ class HistoricalWeather extends Model
      */
     public static function heavyRainfallByYear(): \Illuminate\Database\Eloquent\Collection
     {
+        $threshold = static::rawHeavyRainThreshold();
+
         return static::query()
             ->validCalendarRows()
-            ->where('rainfall', '>=', 50)
+            ->where('rainfall', '>=', $threshold)
             ->selectRaw('year, COUNT(*) as count')
             ->groupBy('year')
             ->orderBy('year')
@@ -113,12 +115,41 @@ class HistoricalWeather extends Model
      */
     public static function averageRainfallForMonth(int $month): ?float
     {
+        $multiplier = static::rainfallUnitMultiplier();
+
         $row = static::query()
             ->validCalendarRows()
             ->where('month', $month)
-            ->selectRaw('AVG(GREATEST(COALESCE(rainfall, 0), 0)) as avg_rain')
+            ->selectRaw('AVG(GREATEST(COALESCE(rainfall, 0), 0) * ?) as avg_rain', [$multiplier])
             ->first();
 
         return $row && $row->avg_rain !== null ? (float) $row->avg_rain : null;
+    }
+
+    private static function rainfallUnitMultiplier(): float
+    {
+        if (self::$rainfallUnitMultiplierCache !== null) {
+            return self::$rainfallUnitMultiplierCache;
+        }
+
+        $maxRainfall = (float) (static::query()
+            ->validCalendarRows()
+            ->max('rainfall') ?? 0.0);
+
+        // Heuristic: datasets with max <= 2 are typically stored in meters, convert to millimeters.
+        self::$rainfallUnitMultiplierCache = $maxRainfall > 0 && $maxRainfall <= 2.0 ? 1000.0 : 1.0;
+
+        return self::$rainfallUnitMultiplierCache;
+    }
+
+    /** Reset unit heuristic cache after bulk CSV imports (long-lived PHP workers). */
+    public static function clearRainfallUnitMultiplierCache(): void
+    {
+        self::$rainfallUnitMultiplierCache = null;
+    }
+
+    private static function rawHeavyRainThreshold(): float
+    {
+        return 50.0 / static::rainfallUnitMultiplier();
     }
 }

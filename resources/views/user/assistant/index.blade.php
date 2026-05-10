@@ -1,6 +1,6 @@
 @extends('layouts.user')
 
-@section('title', 'AgriGuard Assistant - AGRIGUARD')
+@section('title', 'AI Assistant · AgriGuard')
 
 @push('head')
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -45,14 +45,14 @@
                             </span>
                             <div class="dashboard-hero__title-stack">
                                 <h1 id="assistant-page-hero-heading" class="dashboard-hero__title">
-                                    <span class="dashboard-hero__title-line">AgriGuard Assistant</span>
+                                    <span class="dashboard-hero__title-line">AgriGuard AI Assistant</span>
                                     <span class="dashboard-hero__title-emoji" aria-hidden="true">🌾</span>
                                 </h1>
                                 <p class="dashboard-hero__subtitle">
                                     <span class="dashboard-hero__subtitle-ic" aria-hidden="true">
                                         <i data-lucide="sparkles" class="dashboard-hero__lucide dashboard-hero__lucide--xs"></i>
                                     </span>
-                                    <span>Smart farming companion for daily decisions</span>
+                                    <span>Farming &amp; disaster-aware companion for daily decisions</span>
                                 </p>
                             </div>
                         </div>
@@ -87,11 +87,11 @@
             </header>
 
             <section class="assistant-snapshot">
-                Today&apos;s Snapshot: {{ is_numeric(data_get($ctx, 'rainfall_probability')) && (int) data_get($ctx, 'rainfall_probability') < 50 ? 'Good conditions for field work today.' : 'Stay alert for rain and choose lower-risk field tasks.' }}
+                Today&apos;s snapshot: {{ is_numeric(data_get($ctx, 'rainfall_probability')) && (int) data_get($ctx, 'rainfall_probability') < 50 ? 'Good conditions for field work today.' : 'Stay alert for rain and choose lower-risk field tasks.' }}
             </section>
 
-            <section class="assistant-summary-shell ag-card" aria-label="Farm context summary">
-                <div class="assistant-cards assistant-cards--single-row" aria-label="Farm context summary cards">
+            <section class="assistant-summary-shell ag-card" aria-label="Farm and weather context">
+                <div class="assistant-cards assistant-cards--single-row" aria-label="Crop, stage, weather, and rain chance">
                     <article class="assistant-card assistant-card--crop">
                         <div class="assistant-card-head">
                             <span class="assistant-card-icon"><i data-lucide="wheat"></i></span>
@@ -127,7 +127,7 @@
             </section>
 
             <section class="assistant-chat-shell">
-                <div class="assistant-chat-head assistant-top-info" role="region" aria-label="Assistant status">
+                <div class="assistant-chat-head assistant-top-info" role="region" aria-label="AI Assistant status">
                     <div class="assistant-top-info__left">
                         <span class="assistant-top-info__item assistant-top-info__item--weather">
                             <i data-lucide="cloud-sun" class="assistant-top-info__icon"></i>
@@ -144,11 +144,10 @@
                     <div class="assistant-welcome-head">
                         <span class="assistant-welcome-avatar">🌾</span>
                         <div>
-                            <p class="assistant-welcome-title">AgriGuard Assistant</p>
-                            <p class="assistant-intro-subtitle">Farm-aware AI guidance for smarter daily decisions.</p>
+                            <p class="assistant-welcome-title">AgriGuard AI Assistant</p>
+                            <p class="assistant-intro-subtitle">Farming and disaster-aware guidance for smarter daily decisions.</p>
                         </div>
                     </div>
-                    <p class="assistant-welcome-text" id="assistant-intro-text">Ask anything about your crops, weather, irrigation, or farm decisions.</p>
                 </div>
 
                 <div id="assistant-messages" class="assistant-messages" role="log" aria-live="polite"></div>
@@ -157,15 +156,16 @@
                     <span class="assistant-typing-dot"></span>
                     <span class="assistant-typing-dot"></span>
                     <span class="assistant-typing-dot"></span>
-                    AgriGuard is thinking...
+                    Assistant is thinking...
                 </div>
 
-                <section class="assistant-bottom-bar assistant-bottom-bar--inline" aria-label="Assistant input actions">
+                <section class="assistant-bottom-bar assistant-bottom-bar--inline" aria-label="AI Assistant input actions">
                     <div class="assistant-bottom-inner">
                         <div class="assistant-quick-actions" aria-label="Suggested quick prompts">
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="Give crop advice based on today's weather and growth stage.">🌱 Crop advice</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="What is the rain chance for my farm today?">🌧 Rain chance</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="How should I handle irrigation today?">💧 Irrigation</button>
+                            <button type="button" class="assistant-quick-chip" data-assistant-prompt="What should I do on my farm before heavy rain or a storm, including drainage, harvest timing, and securing tools or structures?">🌀 Flood &amp; storm prep</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="What pest control steps should I prioritize this week?">🐛 Pest control</button>
                             <button type="button" class="assistant-quick-chip" data-assistant-prompt="What fertilizer or nutrient timing should I consider for my crop stage, given today's weather and soil moisture outlook?">🌾 Fertilizer &amp; nutrients</button>
                         </div>
@@ -175,7 +175,7 @@
                                 id="assistant-input"
                                 class="assistant-input assistant-input--modern"
                                 rows="1"
-                                placeholder="Ask about crops, weather, irrigation..."
+                                placeholder="Ask about crops, weather, irrigation, floods, or preparedness..."
                                 @if (!data_get($ctx, 'has_gps')) disabled @endif
                             ></textarea>
                             <button id="assistant-send-btn" type="submit" class="assistant-send-btn assistant-send-btn--modern" @if (!data_get($ctx, 'has_gps')) disabled @endif>
@@ -186,7 +186,7 @@
                 </section>
 
                 @if (!data_get($ctx, 'has_gps'))
-                    <p class="assistant-note">Save GPS in <a href="{{ route('map.index') }}">Map</a> for more accurate farm-aware responses.</p>
+                    <p class="assistant-note">Save GPS in <a href="{{ route('map.index') }}">Map</a> for more accurate weather- and location-aware responses.</p>
                 @endif
             </section>
         </div>

@@ -11,12 +11,29 @@
         : (is_numeric($avg_monthly_rainfall ?? null) ? round(((float) $avg_monthly_rainfall) / 30, 1) : null);
     $weekRainfall = is_numeric($todayRainfall) ? round($todayRainfall * 7, 1) : null;
     $monthRainfall = is_numeric($avg_monthly_rainfall ?? null) ? round((float) $avg_monthly_rainfall, 1) : null;
+    $snapshot = is_array($rainfall_snapshot ?? null) ? $rainfall_snapshot : [];
+    $snapshotUsesModel = (($snapshot['source'] ?? null) === 'ml_model');
+    $snapshotDecimals = $snapshotUsesModel ? 3 : 1;
+    if (is_numeric($snapshot['today_mm'] ?? null)) {
+        $todayRainfall = (float) $snapshot['today_mm'];
+    }
+    if (is_numeric($snapshot['week_mm'] ?? null)) {
+        $weekRainfall = round((float) $snapshot['week_mm'], 1);
+    }
+    if (is_numeric($snapshot['month_mm'] ?? null)) {
+        $monthRainfall = round((float) $snapshot['month_mm'], 1);
+    }
+    $snapshotWindKmh = is_numeric($snapshot['wind_kmh'] ?? null) ? round((float) $snapshot['wind_kmh'], 3) : null;
+    $snapshotApiTempC = isset($today_api_temp_c) && is_numeric($today_api_temp_c) ? round((float) $today_api_temp_c, 1) : null;
 
     $rainStatusLabel = 'No historical data';
     if (is_numeric($monthRainfall)) {
         $rainStatusLabel = $monthRainfall >= 220
             ? 'Heavy rain'
             : ($monthRainfall >= 120 ? 'Moderate rain' : 'Light rain');
+    }
+    if (is_string($snapshot['status'] ?? null) && trim((string) $snapshot['status']) !== '') {
+        $rainStatusLabel = (string) $snapshot['status'];
     }
 
     $rainTrendWord = 'No major change';
@@ -29,6 +46,9 @@
         } elseif ($prev > 0 && $last < $prev * 0.92) {
             $rainTrendWord = 'Less rain expected';
         }
+    }
+    if (is_string($snapshot['trend'] ?? null) && trim((string) $snapshot['trend']) !== '') {
+        $rainTrendWord = (string) $snapshot['trend'];
     }
 
     $snapshotTrendValClass = match ($rainTrendWord) {
@@ -114,6 +134,13 @@
     $rImg = static function (string $key) use ($clay, $clayDataUri): string {
         return $clayDataUri($clay[$key] ?? $clay['rain']);
     };
+    $formatRainMm = static function ($value) use ($snapshotDecimals): string {
+        if (! is_numeric($value)) {
+            return '—';
+        }
+
+        return number_format((float) $value, $snapshotDecimals);
+    };
 
 @endphp
 @extends('layouts.user')
@@ -182,7 +209,7 @@
                                     <i data-lucide="cloud-rain" class="dashboard-hero__lucide dashboard-hero__lucide--sm" aria-hidden="true"></i>
                                     Rainfall today
                                 </span>
-                                <span class="dashboard-hero__weather-temp">{{ is_numeric($todayRainfall) ? number_format((float) $todayRainfall, 1) : '—' }}<span class="dashboard-hero__weather-unit">mm</span></span>
+                                <span class="dashboard-hero__weather-temp">{{ $formatRainMm($todayRainfall) }}<span class="dashboard-hero__weather-unit">mm</span></span>
                                 <span class="dashboard-hero__weather-desc">{{ $rainStatusLabel }}</span>
                             </span>
                         </span>
@@ -202,23 +229,19 @@
                             Rainfall snapshot
                         </span>
                         <div class="mt-1.5 flex flex-wrap items-end gap-x-2.5 gap-y-1">
-                            <p class="rainfall-page__snap-hero-val text-2xl font-extrabold leading-none tracking-tight text-slate-900 drop-shadow-[0_1px_0_rgb(255_255_255_/_0.65)] sm:text-3xl">{{ is_numeric($todayRainfall) ? number_format((float) $todayRainfall, 1) . ' mm' : '—' }}</p>
+                            <p class="rainfall-page__snap-hero-val text-2xl font-extrabold leading-none tracking-tight text-slate-900 drop-shadow-[0_1px_0_rgb(255_255_255_/_0.65)] sm:text-3xl">{{ is_numeric($todayRainfall) ? $formatRainMm($todayRainfall) . ' mm' : '—' }}</p>
                             <span class="inline-flex max-w-[14rem] items-center rounded-full border border-teal-200/70 bg-white/75 px-2 py-px text-[11px] font-semibold leading-tight text-teal-900/90 shadow-sm ring-1 ring-white/60 backdrop-blur-[2px] sm:text-xs">{{ $rainStatusLabel }}</span>
                         </div>
                     </div>
                 </div>
                 <div class="rainfall-page__snap-strip relative z-[1] mt-2.5 flex divide-x divide-slate-200/80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/55 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.85)] ring-1 ring-white/60 backdrop-blur-[2px]" role="list">
                     <article class="rainfall-page__snap-cell rainfall-page__snap-cell--sky min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-600">Past 7 days</p>
-                        <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ is_numeric($weekRainfall) ? number_format((float) $weekRainfall, 1) . ' mm' : '—' }}</p>
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-600">Wind Speed</p>
+                        <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ is_numeric($snapshotWindKmh) ? number_format((float) $snapshotWindKmh, 3) . ' km/h' : '—' }}</p>
                     </article>
                     <article class="rainfall-page__snap-cell rainfall-page__snap-cell--mint min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-600">Average monthly rain</p>
-                        <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ is_numeric($monthRainfall) ? number_format((float) $monthRainfall, 1) . ' mm' : '—' }}</p>
-                    </article>
-                    <article class="rainfall-page__snap-cell rainfall-page__snap-cell--violet min-w-0 flex-1 px-1 py-1.5 text-center sm:px-1.5" role="listitem">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-600">Rain trend</p>
-                        <p class="rainfall-page__snap-trend-val mt-0.5 text-xs font-bold tabular-nums sm:text-sm {{ $snapshotTrendValClass }}">{{ $rainTrendWord }}</p>
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-600">Temperature (API)</p>
+                        <p class="mt-0.5 text-xs font-bold tabular-nums text-slate-900 sm:text-sm">{{ is_numeric($snapshotApiTempC) ? number_format((float) $snapshotApiTempC, 1) . ' °C' : '—' }}</p>
                     </article>
                 </div>
             </section>

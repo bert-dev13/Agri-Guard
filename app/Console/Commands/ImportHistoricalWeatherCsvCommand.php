@@ -4,16 +4,16 @@ namespace App\Console\Commands;
 
 use App\Services\HistoricalWeatherCsvImporter;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
 class ImportHistoricalWeatherCsvCommand extends Command
 {
     protected $signature = 'historical-weather:import
                             {path : Path to the CSV file}
-                            {--truncate : Remove all existing historical_weather rows before import}
-                            {--no-header : Treat the first row as data (fixed order: year,month,day,rainfall,wind_speed,wind_direction)}';
+                            {--truncate : Remove all existing historical_weather rows before import}';
 
-    protected $description = 'Import historical_weather CSV using composite key (year, month, day).';
+    protected $description = 'Import historical_weather CSV with strict 7-column schema (id/timestamps auto-managed).';
 
     public function handle(): int
     {
@@ -22,7 +22,6 @@ class ImportHistoricalWeatherCsvCommand extends Command
         try {
             $result = app(HistoricalWeatherCsvImporter::class)->importFromPath($path, [
                 'truncate' => (bool) $this->option('truncate'),
-                'has_header' => ! (bool) $this->option('no-header'),
             ]);
         } catch (RuntimeException $e) {
             $this->error($e->getMessage());
@@ -38,6 +37,8 @@ class ImportHistoricalWeatherCsvCommand extends Command
         }
 
         $this->info("Imported {$result['imported']} row(s). Skipped {$result['skipped']}.");
+
+        Cache::forget('barangay_flood_hist_agg:v1');
 
         return self::SUCCESS;
     }

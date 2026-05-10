@@ -45,9 +45,9 @@
                 <span class="user-navbar-link-icon" aria-hidden="true"><i data-lucide="warehouse"></i></span>
                 <span class="user-navbar-link-text">Structures</span>
             </a>
-            <a href="{{ route('assistant.index') }}" class="user-navbar-link {{ request()->routeIs('assistant.*') ? 'active' : '' }}" aria-label="Assistant">
+            <a href="{{ route('assistant.index') }}" class="user-navbar-link {{ request()->routeIs('assistant.*') ? 'active' : '' }}" aria-label="AI Assistant">
                 <span class="user-navbar-link-icon" aria-hidden="true"><i data-lucide="bot"></i></span>
-                <span class="user-navbar-link-text">Assistant</span>
+                <span class="user-navbar-link-text">AI Assistant</span>
             </a>
         </nav>
 
@@ -124,7 +124,7 @@
             </a>
             <a href="{{ route('assistant.index') }}" class="user-navbar-mobile-link {{ request()->routeIs('assistant.*') ? 'active' : '' }}">
                 <span class="user-navbar-mobile-link-icon" aria-hidden="true"><i data-lucide="bot"></i></span>
-                Assistant
+                AI Assistant
             </a>
             <div class="user-navbar-mobile-divider" role="presentation"></div>
             <a href="{{ route('settings') }}" class="user-navbar-mobile-link {{ request()->routeIs('settings') ? 'active' : '' }}">

@@ -92,7 +92,7 @@ TXT;
 
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && isset($cached['_meta'])) {
-            Log::info('AiAdvisoryService cache hit', ['page' => $page, 'user_id' => $user->id]);
+            Log::debug('AiAdvisoryService cache hit', ['page' => $page, 'user_id' => $user->id]);
 
             return $cached;
         }
@@ -100,7 +100,7 @@ TXT;
         $system = $this->systemPromptFor($page);
         $userInstruction = $this->userInstructionFor($page);
 
-        Log::info('AiAdvisoryService request', [
+        Log::debug('AiAdvisoryService request', [
             'page' => $page,
             'user_id' => $user->id,
             'input' => $input,
@@ -154,7 +154,7 @@ TXT;
                 'unified' => $unified,
             ];
 
-            Log::info('AiAdvisoryService success', [
+            Log::debug('AiAdvisoryService success', [
                 'page' => $page,
                 'user_id' => $user->id,
                 'model' => $out['_meta']['model'],
@@ -218,7 +218,7 @@ TXT;
         }
 
         $system = $this->cropSystemPrompt();
-        Log::info('AiAdvisoryService crop request', ['user_id' => $user->id, 'input' => $payload]);
+        Log::debug('AiAdvisoryService crop request', ['user_id' => $user->id, 'input' => $payload]);
 
         try {
             $result = $this->together->generateRecommendation($payload, $system);

@@ -11,6 +11,7 @@ export const ASSISTANT_TOPICS = [
     'fertilizer',
     'pest_health',
     'weather_timing',
+    'disaster_risk',
     'harvest',
     'fallback',
 ];
@@ -154,6 +155,26 @@ const EN = {
             'Can I spread field work into 2 short sessions?',
             'What should I prioritize before it gets windy?',
             'How do I reduce weather-related delays?',
+        ],
+    },
+    disaster_risk: {
+        base: [
+            'What should I do if a typhoon may affect my farm?',
+            'How do I prepare drains and fields before heavy rain?',
+            'What are safe harvest decisions when flooding is possible?',
+            'How do I reduce drought stress on my crop right now?',
+            'What should I secure first—tools, structures, or livestock shelter?',
+        ],
+        followup: [
+            'What field checks matter during prolonged heavy rain?',
+            'When should I pause irrigation before a storm?',
+            'How do I protect stored harvest from wind and water?',
+            'What signs suggest soil erosion or landslide risk near my plot?',
+        ],
+        deeper: [
+            'What recovery steps help soil and crops after flooding?',
+            'How do I prioritize replanting or resowing after a disaster?',
+            'What heatwave actions matter for people, animals, and crops?',
         ],
     },
     harvest: {
@@ -336,6 +357,26 @@ const TAG = {
             'Pwede bang hatiin ang work into 2 short sessions?',
             'Ano priority bago lumakas ang hangin?',
             'Paano iwas delays dahil sa panahon?',
+        ],
+    },
+    disaster_risk: {
+        base: [
+            'Ano gagawin kung may bagyo na posibleng tumama sa farm?',
+            'Paano ihanda ang canal at bukid bago ang malakas na ulan?',
+            'Anong safe na desisyon sa ani kung may baha?',
+            'Paano bawasan ang stress ng halaman sa tagtuyot?',
+            'Ano unahin—gamtay, kubo, o kulungan?',
+        ],
+        followup: [
+            'Anong field checks ang importante sa tuloy-tuloy na ulan?',
+            'Kailan dapat ihinto ang patubig bago ang bagyo?',
+            'Paano protektahan ang naka-imbak na ani sa hangin at tubig?',
+            'Anong senyales ng soil erosion o landslide risk?',
+        ],
+        deeper: [
+            'Ano recovery steps para sa lupa at tanim after baha?',
+            'Paano pumili kung mag-replant o magpunla ulit?',
+            'Ano dapat gawin sa heatwave para sa tao, hayop, at tanim?',
         ],
     },
     harvest: {

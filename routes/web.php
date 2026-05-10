@@ -80,6 +80,7 @@ Route::middleware(['auth', 'verified.email'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [AuthController::class, 'dashboard'])->name('dashboard');
     Route::get('/api/weather', [WeatherController::class, 'index'])->name('api.weather');
+    Route::get('/api/weather-prediction', [WeatherController::class, 'getPrediction'])->name('api.weather-prediction');
     Route::get('/api/weather/by-coordinates', [WeatherController::class, 'byCoordinates'])->name('api.weather.by-coordinates');
     Route::get('/weather', [WeatherDetailsController::class, 'show'])->name('weather-details');
     Route::get('/weather/rainfall', [RainfallTrendsController::class, 'show'])->name('rainfall-trends');

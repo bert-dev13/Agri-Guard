@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\AiAdvisory\AiAdvisoryService;
 use App\Services\CropTimelineService;
 use App\Services\WeatherAdvisoryService;
+use App\Services\WeatherPredictionService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +24,7 @@ class CropProgressController extends Controller
         WeatherAdvisoryService $weatherAdvisoryService,
         AiAdvisoryService $aiAdvisoryService,
         CropTimelineService $timelineService,
+        WeatherPredictionService $weatherPredictionService,
     ): View {
         /** @var User $user */
         $user = Auth::user();
@@ -33,6 +35,7 @@ class CropProgressController extends Controller
 
         $advisoryData = $this->loadAdvisoryData($user, $weatherAdvisoryService);
         $weatherContext = $this->mapAdvisoryToWeatherContext($advisoryData);
+        $weatherContext = $this->attachModelWeatherContext($weatherContext, $weatherPredictionService);
         $stageInsights = $this->generateStageAdvice($user, $weatherContext, $aiAdvisoryService);
 
         $rec = $stageInsights['recommendation'];
@@ -209,6 +212,7 @@ class CropProgressController extends Controller
         CropTimelineService $timelineService,
         WeatherAdvisoryService $weatherAdvisoryService,
         AiAdvisoryService $aiAdvisoryService,
+        WeatherPredictionService $weatherPredictionService,
     ): RedirectResponse|JsonResponse {
         /** @var User $user */
         $user = Auth::user();
@@ -246,7 +250,7 @@ class CropProgressController extends Controller
         $user->save();
         $user->refresh();
 
-        $weatherContext = $this->buildWeatherContext($user, $weatherAdvisoryService);
+        $weatherContext = $this->buildWeatherContext($user, $weatherAdvisoryService, $weatherPredictionService);
         $stageInsights = $this->generateStageAdvice($user, $weatherContext, $aiAdvisoryService);
         $rec = $stageInsights['recommendation'];
         $offsetDays = (int) ($user->crop_timeline_offset_days ?? 0);
@@ -396,9 +400,14 @@ class CropProgressController extends Controller
         ];
     }
 
-    private function buildWeatherContext(User $user, WeatherAdvisoryService $weatherAdvisoryService): array
-    {
-        return $this->mapAdvisoryToWeatherContext($this->loadAdvisoryData($user, $weatherAdvisoryService));
+    private function buildWeatherContext(
+        User $user,
+        WeatherAdvisoryService $weatherAdvisoryService,
+        WeatherPredictionService $weatherPredictionService
+    ): array {
+        $context = $this->mapAdvisoryToWeatherContext($this->loadAdvisoryData($user, $weatherAdvisoryService));
+
+        return $this->attachModelWeatherContext($context, $weatherPredictionService);
     }
 
     /**
@@ -432,9 +441,19 @@ class CropProgressController extends Controller
                 'humidity' => null,
                 'rain_chance' => null,
                 'wind_speed' => null,
+                'current_weather' => [
+                    'condition' => 'Unknown',
+                    'temperature' => null,
+                    'humidity' => null,
+                    'rain_chance' => null,
+                    'wind_speed' => null,
+                    'model_rainfall_mm' => null,
+                    'model_wind_speed_kmh' => null,
+                ],
                 'recent_weather' => [],
                 'forecast' => [],
                 'rainfall_trend' => 'stable',
+                'model_forecast' => [],
             ];
         }
 
@@ -449,6 +468,17 @@ class CropProgressController extends Controller
                 ? (int) round((float) $advisory['rain_probability_display'])
                 : null,
             'wind_speed' => is_numeric($weather['wind_speed'] ?? null) ? (float) $weather['wind_speed'] : null,
+            'current_weather' => [
+                'condition' => (string) ($weather['condition']['main'] ?? ($weather['condition']['description'] ?? 'Unknown')),
+                'temperature' => is_numeric($weather['temp'] ?? null) ? (float) $weather['temp'] : null,
+                'humidity' => is_numeric($weather['humidity'] ?? null) ? (int) round((float) $weather['humidity']) : null,
+                'rain_chance' => is_numeric($advisory['rain_probability_display'] ?? null)
+                    ? (int) round((float) $advisory['rain_probability_display'])
+                    : null,
+                'wind_speed' => is_numeric($weather['wind_speed'] ?? null) ? (float) $weather['wind_speed'] : null,
+                'model_rainfall_mm' => null,
+                'model_wind_speed_kmh' => null,
+            ],
             'recent_weather' => [
                 'last_updated' => (string) ($advisory['last_updated'] ?? ''),
                 'condition' => (string) ($weather['condition']['description'] ?? ($weather['condition']['main'] ?? 'Unknown')),
@@ -464,7 +494,65 @@ class CropProgressController extends Controller
                 ];
             }, array_slice(($advisory['forecast'] ?? []), 0, 5)),
             'rainfall_trend' => $this->deriveRainfallTrend($monthlyTrend),
+            'model_forecast' => [],
+            'source_links' => [
+                'weather_api_connected' => true,
+                'ml_model_connected' => false,
+            ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function attachModelWeatherContext(array $context, WeatherPredictionService $weatherPredictionService): array
+    {
+        try {
+            $prediction = $weatherPredictionService->predict();
+            $forecast = is_array($prediction['forecast'] ?? null) ? $prediction['forecast'] : [];
+
+            $context['current_weather'] = array_merge(
+                is_array($context['current_weather'] ?? null) ? $context['current_weather'] : [],
+                [
+                    'model_rainfall_mm' => is_numeric($prediction['rainfall'] ?? null) ? (float) $prediction['rainfall'] : null,
+                    'model_wind_speed_kmh' => is_numeric($prediction['wind_speed'] ?? null) ? (float) $prediction['wind_speed'] : null,
+                ]
+            );
+            $context['model_forecast'] = array_map(static function (array $day): array {
+                return [
+                    'day' => (int) ($day['day'] ?? 0),
+                    'date' => (string) ($day['date'] ?? ''),
+                    'rainfall_mm' => is_numeric($day['rainfall'] ?? null) ? round((float) $day['rainfall'], 3) : null,
+                    'wind_speed_kmh' => is_numeric($day['wind_speed'] ?? null) ? round((float) $day['wind_speed'], 3) : null,
+                ];
+            }, array_slice($forecast, 0, 5));
+
+            $context['source_links'] = [
+                'weather_api_connected' => true,
+                'ml_model_connected' => true,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('Crop progress ML context unavailable', [
+                'message' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            $context['current_weather'] = array_merge(
+                is_array($context['current_weather'] ?? null) ? $context['current_weather'] : [],
+                [
+                    'model_rainfall_mm' => null,
+                    'model_wind_speed_kmh' => null,
+                ]
+            );
+            $context['model_forecast'] = [];
+            $context['source_links'] = [
+                'weather_api_connected' => true,
+                'ml_model_connected' => false,
+            ];
+        }
+
+        return $context;
     }
 
     private function deriveRainfallTrend(array $monthlyTrend): string

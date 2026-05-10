@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Services\CropImpactService;
-use App\Services\FarmWeatherService;
 use App\Services\FarmRiskSnapshotService;
+use App\Services\FarmWeatherService;
 use App\Services\RainfallHeatmapService;
 use App\Services\ThreeDayWeatherOutlookService;
+use App\Services\WeatherPredictionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Weather API for frontend (e.g. weather widget).
@@ -22,8 +24,7 @@ class WeatherController extends Controller
         CropImpactService $cropImpactService,
         FarmRiskSnapshotService $riskSnapshotService,
         ThreeDayWeatherOutlookService $threeDayOutlook
-    ): JsonResponse
-    {
+    ): JsonResponse {
         $user = $request->user();
         if (! $user) {
             return response()->json(['error' => 'Unauthenticated.'], 401);
@@ -45,7 +46,6 @@ class WeatherController extends Controller
                 'feels_like' => $data['feels_like'],
                 'humidity' => $data['humidity'],
                 'pressure' => $data['pressure'],
-                'wind_speed' => $data['wind_speed'],
                 'sunrise' => $current['sunrise_ts'] ?? null,
                 'sunset' => $current['sunset_ts'] ?? null,
                 'condition' => $current['condition'] ?? ['id' => 800, 'main' => 'Clear', 'description' => '', 'icon' => '01d'],
@@ -57,11 +57,9 @@ class WeatherController extends Controller
                     'date_display' => $day['date_display'] ?? $day['date'],
                     'temp_min' => $day['temp_min'],
                     'temp_max' => $day['temp_max'],
-                    'pop' => $day['pop'],
                     'condition' => $day['condition'],
                 ];
             }, $forecast),
-            'today_rain_probability' => $data['today_rain_probability'],
         ];
 
         $riskSnapshot = $riskSnapshotService->buildFromNormalizedWeather($user, $data);
@@ -140,6 +138,50 @@ class WeatherController extends Controller
             'heatmap_points' => $heatmapPoints,
             'coordinates' => ['lat' => $lat, 'lng' => $lng],
         ]);
+    }
+
+    public function getPrediction(Request $request, WeatherPredictionService $predictionService): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['error' => 'Unauthenticated.'], 401);
+        }
+
+        try {
+            return response()->json($predictionService->predict());
+        } catch (\Throwable $exception) {
+            $this->logWeatherPredictionFailure('Weather prediction request failed', $exception);
+
+            return $this->weatherPredictionErrorResponse(
+                'Weather prediction is temporarily unavailable. Check historical weather data, model path, and application logs.',
+                $exception->getMessage()
+            );
+        }
+    }
+
+    /**
+     * JSON error for prediction failures (503: service unavailable for this feature).
+     */
+    private function weatherPredictionErrorResponse(string $error, ?string $detail): JsonResponse
+    {
+        return response()->json([
+            'status' => 'error',
+            'error' => $error,
+            'detail' => config('app.debug') && $detail !== null && $detail !== '' ? $detail : null,
+        ], 503);
+    }
+
+    private function logWeatherPredictionFailure(string $message, \Throwable $exception): void
+    {
+        try {
+            Log::error($message, [
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+                'trace' => substr($exception->getTraceAsString(), 0, 12000),
+            ]);
+        } catch (\Throwable) {
+            // Avoid masking the original failure if logging itself throws.
+        }
     }
 
     private function rainfallAccumulationLabel(?float $todayExpectedRainfallMm): string

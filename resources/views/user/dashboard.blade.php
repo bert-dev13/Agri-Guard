@@ -20,12 +20,7 @@
         $cropTimelineSvc->stageDurationsForCrop((string) ($user->crop_type ?? ''))
     )['label'];
     $rainChance = $weather['today_rain_probability'] ?? ($advisoryData['today_rain_probability'] ?? null);
-    $rainfallMm = $weather['today_expected_rainfall'] ?? ($advisoryData['forecast_rainfall_mm'] ?? null);
-    $rainStatIsChance = is_numeric($rainChance);
-    $rainStatLabel = $rainStatIsChance ? 'Rain' : 'Rainfall';
-    $rainStatValue = $rainStatIsChance
-        ? ((int) round((float) $rainChance)) . '%'
-        : (is_numeric($rainfallMm) ? round((float) $rainfallMm, 1) . ' mm' : '—');
+    $conditionLabel = $weatherLabel ?: 'No data';
     $humidity = $weather['humidity'] ?? null;
     $windSpeed = $weather['wind_speed'] ?? null;
     $recommendationRisk = strtolower((string) ($recommendation['risk'] ?? 'moderate'));
@@ -65,8 +60,6 @@
     $waterText = $aiAdvisoryReady ? $toText($dashboardReco['water_strategy'] ?? $dashboardReco['water'] ?? null, '') : $advisoryBlockedMessage;
     $weatherAriaTemp = $weather && isset($weather['temp']) ? (string) round($weather['temp']) . ' degrees Celsius' : 'temperature unavailable';
     $weatherAriaLabel = 'Weather: ' . ($weatherLabel ?: 'conditions') . ', ' . $weatherAriaTemp . '. Tap for full weather details';
-
-    $weatherOutlookCard = is_array($weather_outlook ?? null) ? $weather_outlook : [];
 @endphp
 
 @extends('layouts.user')
@@ -177,27 +170,65 @@
                 </div>
                 <div class="mt-2.5 grid grid-cols-3 gap-1.5 sm:gap-2">
                     <article class="rounded-xl border border-sky-100 bg-sky-50 px-2 py-1.5 text-center">
-                        <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Rain</p>
-                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ $rainStatIsChance ? $rainStatValue : '—' }}</p>
+                        <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Condition</p>
+                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ $conditionLabel }}</p>
                     </article>
                     <article class="rounded-xl border border-emerald-100 bg-emerald-50 px-2 py-1.5 text-center">
                         <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Humidity</p>
                         <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ is_numeric($humidity) ? ((int) round((float) $humidity)) . '%' : '—' }}</p>
                     </article>
                     <article class="rounded-xl border border-violet-100 bg-violet-50 px-2 py-1.5 text-center">
-                        <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Wind</p>
-                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">{{ is_numeric($windSpeed) ? round((float) $windSpeed, 1) . ' km/h' : '—' }}</p>
+                        <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">Source</p>
+                        <p class="mt-0.5 text-xs font-bold text-slate-900 sm:text-sm">Live API</p>
                     </article>
                 </div>
             </section>
 
-            @include('partials.farm-advisory-card', [
-                'weather_outlook' => $weatherOutlookCard,
-                'wrapperClass' => 'rounded-2xl',
-                'detailsLinkHref' => route('weather-details'),
-                'detailsLinkAria' => 'Open full weather details',
-                'detailsLinkSr' => 'Weather details',
-            ])
+            <section class="ag-card overflow-hidden rounded-3xl border border-indigo-200/90 bg-gradient-to-br from-indigo-50 via-violet-50 to-sky-50 p-4 shadow-sm sm:p-5" aria-label="Today's AI forecast">
+                <div class="flex items-start justify-between gap-3 border-b border-indigo-100/80 pb-2.5">
+                    <h2 class="inline-flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800">
+                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200 animate-pulse">
+                            <i data-lucide="brain-circuit" class="h-4 w-4"></i>
+                        </span>
+                        Today's AI Forecast
+                    </h2>
+                    <span class="inline-flex items-center gap-1 rounded-full border border-indigo-200/90 bg-white/80 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-indigo-700">
+                        <i data-lucide="sparkles" class="h-3 w-3"></i>
+                        Live model
+                    </span>
+                </div>
+                <div class="mt-2 flex items-center justify-start">
+                    <span class="inline-flex items-center gap-1.5 rounded-full border border-indigo-200/90 bg-indigo-50/80 px-3 py-1 text-[11px] font-semibold text-indigo-700 shadow-sm">
+                        <i data-lucide="calendar-days" class="h-3.5 w-3.5"></i>
+                        <span class="uppercase tracking-wide text-[10px] font-bold text-indigo-600">Forecast</span>
+                        <span class="text-slate-700">{{ now()->format('M j, Y') }}</span>
+                    </span>
+                </div>
+
+                <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <article class="rounded-2xl border border-indigo-100 bg-white/80 px-3 py-2 transition hover:-translate-y-0.5 hover:shadow-sm">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500"><i data-lucide="thermometer" class="mr-1 inline h-3.5 w-3.5 text-rose-500"></i>Temperature (API)</p>
+                        <p class="mt-0.5 text-sm font-bold text-slate-900">{{ is_numeric($weather['temp'] ?? null) ? round((float) $weather['temp'], 1) . ' °C' : 'Not available' }}</p>
+                    </article>
+                    <article class="rounded-2xl border border-indigo-100 bg-white/80 px-3 py-2 transition hover:-translate-y-0.5 hover:shadow-sm">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500"><i data-lucide="cloud-rain" class="mr-1 inline h-3.5 w-3.5 text-blue-500"></i>Rainfall</p>
+                        <p id="dash-ai-rain" class="mt-0.5 text-sm font-bold text-slate-900">Loading...</p>
+                    </article>
+                    <article class="rounded-2xl border border-indigo-100 bg-white/80 px-3 py-2 transition hover:-translate-y-0.5 hover:shadow-sm">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500"><i data-lucide="wind" class="mr-1 inline h-3.5 w-3.5 text-cyan-600"></i>Wind Speed</p>
+                        <p id="dash-ai-wind" class="mt-0.5 text-sm font-bold text-slate-900">Loading...</p>
+                    </article>
+                    <article class="rounded-2xl border border-indigo-100 bg-white/80 px-3 py-2 transition hover:-translate-y-0.5 hover:shadow-sm">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500"><i data-lucide="shield-check" class="mr-1 inline h-3.5 w-3.5 text-emerald-600"></i>Status</p>
+                        <p id="dash-ai-status" class="mt-0.5 text-sm font-bold text-slate-900">Loading...</p>
+                    </article>
+                </div>
+
+                <small class="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                    <i data-lucide="cpu" class="h-3.5 w-3.5"></i>
+                    Powered by AgriGuard AI Model
+                </small>
+            </section>
 
             <div class="ag-advisory-toggle-row">
                 <button
@@ -286,33 +317,90 @@
             </div>
             </section>
 
-            <section class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5" aria-label="Forecast preview">
-                <h2 class="inline-flex items-center gap-1.5 border-b border-slate-200 pb-1 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800 transition-all duration-300 hover:tracking-[0.12em] hover:text-slate-900">
-                    <i data-lucide="calendar-days" class="h-4 w-4 text-violet-600"></i>
-                    Forecast preview
-                </h2>
-                <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3" role="list">
-                    @forelse (array_slice($forecast, 0, 5) as $day)
-                        @php
-                            $conditionId = (int) ($day['condition']['id'] ?? 800);
-                            $dayEmoji = \App\Http\Controllers\WeatherDetailsController::simpleWeatherEmoji($conditionId);
-                            $dayLabel = $day['day_name'] ?? \Carbon\Carbon::parse($day['date'] ?? now())->format('D');
-                            $dayCond = \App\Http\Controllers\WeatherDetailsController::simpleWeatherLabel($conditionId);
-                            $maxTemp = isset($day['temp_max']) ? round((float) $day['temp_max']) : null;
-                            $minTemp = isset($day['temp_min']) ? round((float) $day['temp_min']) : null;
-                            $dayRain = isset($day['pop']) && is_numeric($day['pop']) ? ((int) round((float) $day['pop'])) . '%' : '0%';
-                        @endphp
-                        <article class="rounded-2xl border {{ $loop->first ? 'border-slate-300 bg-slate-100' : 'border-slate-100 bg-slate-50' }} p-3 text-center" role="listitem">
-                            <p class="text-xs font-semibold text-slate-700">{{ $dayLabel }}</p>
-                            <p class="mt-1 text-2xl" aria-hidden="true">{{ $dayEmoji }}</p>
-                            <p class="mt-1 text-[11px] text-slate-500">{{ $dayCond }}</p>
-                            <p class="mt-1 text-xs font-semibold text-slate-700">{{ $maxTemp !== null && $minTemp !== null ? ($maxTemp . '° / ' . $minTemp . '°') : '—' }}</p>
-                            <p class="mt-1 text-[11px] font-medium text-slate-500">Rain {{ $dayRain }}</p>
-                        </article>
-                    @empty
-                        <p class="col-span-full text-sm text-slate-500">Forecast data is not available yet.</p>
-                    @endforelse
+            @php
+                $cropProgress = $cropProgress ?? [
+                    'has_planting_date' => false,
+                    'crop_type' => null,
+                    'stage_key' => 'planting',
+                    'stage_label' => 'Planting',
+                    'progress_percent' => 0,
+                    'days_since_planting' => null,
+                    'days_until_next_stage' => null,
+                    'next_stage_label' => null,
+                    'comparison' => 'match',
+                ];
+                $cmp = $cropProgress['comparison'] ?? 'match';
+                $cmpStyles = $cmp === 'ahead'
+                    ? 'border-sky-200 bg-sky-50 text-sky-700'
+                    : ($cmp === 'behind'
+                        ? 'border-rose-200 bg-rose-50 text-rose-700'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700');
+                $cmpLabel = $cmp === 'ahead' ? 'Ahead' : ($cmp === 'behind' ? 'Behind' : 'On track');
+                $cmpIcon = $cmp === 'ahead' ? 'trending-up' : ($cmp === 'behind' ? 'trending-down' : 'check-circle-2');
+                $progressPct = max(0, min(100, (int) ($cropProgress['progress_percent'] ?? 0)));
+            @endphp
+            <section class="ag-card overflow-hidden rounded-3xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm sm:p-5" aria-label="Crop progress snapshot">
+                <div class="flex items-start justify-between gap-3 border-b border-emerald-100/80 pb-2.5">
+                    <h2 class="inline-flex items-center gap-2 text-sm font-extrabold uppercase tracking-[0.1em] text-slate-800">
+                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200">
+                            <i data-lucide="sprout" class="h-4 w-4"></i>
+                        </span>
+                        Crop Progress
+                    </h2>
+                    <a href="{{ route('crop-progress.index') }}" class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900">
+                        View timeline
+                        <i data-lucide="arrow-right" class="h-3 w-3"></i>
+                    </a>
                 </div>
+
+                @if (! ($cropProgress['has_planting_date'] ?? false))
+                    <div class="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                        <p class="text-sm font-semibold text-amber-900">No planting date yet</p>
+                        <p class="mt-1 text-xs text-amber-800">Set your crop type and planting date in Farm Settings to track progress.</p>
+                        <a href="{{ route('settings') }}" class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-900 hover:underline">
+                            Update farm settings
+                            <i data-lucide="arrow-right" class="h-3 w-3"></i>
+                        </a>
+                    </div>
+                @else
+                    <div class="mt-3 flex items-end justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-medium uppercase tracking-wide text-slate-500">{{ $cropProgress['crop_type'] ?? 'Current crop' }} &middot; Stage</p>
+                            <p class="mt-0.5 truncate text-base font-extrabold text-slate-900">{{ $cropProgress['stage_label'] }}</p>
+                        </div>
+                        <span class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold {{ $cmpStyles }}">
+                            <i data-lucide="{{ $cmpIcon }}" class="h-3 w-3"></i>
+                            {{ $cmpLabel }}
+                        </span>
+                    </div>
+
+                    <div class="mt-2.5">
+                        <div class="h-2 w-full overflow-hidden rounded-full bg-emerald-100">
+                            <div @style(["width: {$progressPct}%"]) class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"></div>
+                        </div>
+                        <div class="mt-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                            <span>{{ $progressPct }}% complete</span>
+                            @if (! empty($cropProgress['next_stage_label']))
+                                <span>Next: {{ $cropProgress['next_stage_label'] }}</span>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-2 gap-2 sm:gap-3">
+                        <article class="rounded-2xl border border-emerald-100 bg-white/80 px-3 py-2">
+                            <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                                <i data-lucide="calendar-clock" class="mr-1 inline h-3 w-3 text-emerald-600"></i>Days since planting
+                            </p>
+                            <p class="mt-0.5 text-sm font-bold text-slate-900">{{ is_numeric($cropProgress['days_since_planting'] ?? null) ? $cropProgress['days_since_planting'] : '—' }}</p>
+                        </article>
+                        <article class="rounded-2xl border border-emerald-100 bg-white/80 px-3 py-2">
+                            <p class="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                                <i data-lucide="flag" class="mr-1 inline h-3 w-3 text-amber-600"></i>Days to next stage
+                            </p>
+                            <p class="mt-0.5 text-sm font-bold text-slate-900">{{ is_numeric($cropProgress['days_until_next_stage'] ?? null) ? $cropProgress['days_until_next_stage'] : '—' }}</p>
+                        </article>
+                    </div>
+                @endif
             </section>
 
             <section class="ag-card rounded-3xl border border-slate-200 bg-slate-50/90 p-4 sm:p-5" aria-label="Farm summary and insights">
@@ -339,9 +427,76 @@
                     <a href="{{ route('rainfall-trends') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="bar-chart-3" class="h-4 w-4"></i>Rainfall Trends</a>
                     <a href="{{ route('crop-progress.index') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="sprout" class="h-4 w-4"></i>Crop</a>
                     <a href="{{ route('map.index') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="map" class="h-4 w-4"></i>Map</a>
-                    <a href="{{ route('assistant.index') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="bot" class="h-4 w-4"></i>Assistant</a>
+                    <a href="{{ route('assistant.index') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"><i data-lucide="bot" class="h-4 w-4"></i>AI Assistant</a>
                 </div>
             </section>
         </div>
     </section>
 @endsection
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const rainEl = document.getElementById('dash-ai-rain');
+            const windEl = document.getElementById('dash-ai-wind');
+            const statusEl = document.getElementById('dash-ai-status');
+            if (!rainEl || !windEl || !statusEl) {
+                return;
+            }
+
+            const rainfallStatus = (rainfall) => {
+                if (rainfall >= 20) {
+                    return 'Heavy Rain';
+                }
+                if (rainfall >= 8) {
+                    return 'Moderate';
+                }
+                return 'Normal';
+            };
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 100000);
+
+            fetch("{{ route('api.weather-prediction', [], false) }}", {
+                signal: controller.signal,
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+                .then(async (response) => {
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        const parts = [data.error, data.detail].filter(Boolean);
+                        throw new Error(parts.length ? parts.join(' — ') : `HTTP ${response.status}`);
+                    }
+                    return data;
+                })
+                .then((data) => {
+                    if (!Array.isArray(data.forecast) || data.forecast.length === 0) {
+                        throw new Error('Invalid AI payload');
+                    }
+
+                    const today = data.forecast[0];
+                    const r = Number(today.rainfall);
+                    const w = Number(today.wind_speed);
+                    if (!Number.isFinite(r) || !Number.isFinite(w)) {
+                        throw new Error('Non-numeric AI payload');
+                    }
+
+                    rainEl.innerText = `${r.toFixed(3)} mm`;
+                    windEl.innerText = `${w.toFixed(3)} km/h`;
+                    statusEl.innerText = rainfallStatus(r);
+                })
+                .catch((err) => {
+                    rainEl.innerText = 'Not available';
+                    windEl.innerText = 'Not available';
+                    statusEl.innerText = 'Unavailable';
+                })
+                .finally(() => {
+                    clearTimeout(timeout);
+                });
+        });
+    </script>
+@endpush

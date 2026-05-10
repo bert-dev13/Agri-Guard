@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\FarmWeatherService;
+use App\Services\BarangayFloodRiskOverviewService;
 use App\Services\FarmRiskSnapshotService;
+use App\Services\FarmWeatherService;
 use App\Services\MapSmartAdvisoryService;
 use App\Services\RainfallHeatmapService;
 use App\Services\RuleBasedAdvisoryService;
 use App\Services\SmartAdvisoryEngine;
+use App\Services\WeatherPredictionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,13 +20,21 @@ class FarmMapController extends Controller
 {
     private const LOCATION_DEVICE_GPS = 'device_gps';
 
-    public function index(): View
+    public function index(BarangayFloodRiskOverviewService $barangayFloodRiskOverview): View
     {
         $user = Auth::user();
         assert($user instanceof User);
 
+        $user->loadMissing('barangay');
+
+        $riskMunicipality = trim((string) ($user->farm_municipality ?? ''));
+        if ($riskMunicipality === '') {
+            $riskMunicipality = 'Amulung';
+        }
+
         return view('user.map.index', [
             'initialHasDeviceGps' => $this->userHasDeviceGps($user),
+            'barangayFloodRiskOverview' => $barangayFloodRiskOverview->overviewForMunicipality($riskMunicipality),
         ]);
     }
 
@@ -69,7 +79,8 @@ class FarmMapController extends Controller
         RuleBasedAdvisoryService $ruleBasedAdvisory,
         SmartAdvisoryEngine $smartAdvisory,
         MapSmartAdvisoryService $mapSmartAdvisory,
-        FarmRiskSnapshotService $riskSnapshotService
+        FarmRiskSnapshotService $riskSnapshotService,
+        WeatherPredictionService $weatherPredictionService
     ): JsonResponse {
         $user = $request->user();
         if (! $user instanceof User) {
@@ -77,6 +88,7 @@ class FarmMapController extends Controller
         }
 
         $user->refresh();
+        $user->loadMissing('barangay');
 
         $mapLayer = strtolower(trim((string) $request->query('map_layer', 'farm')));
         if (! in_array($mapLayer, ['farm', 'weather', 'rainfall'], true)) {
@@ -91,6 +103,7 @@ class FarmMapController extends Controller
             $smartAdvisory,
             $mapSmartAdvisory,
             $riskSnapshotService,
+            $weatherPredictionService,
             $mapLayer
         ));
     }
@@ -106,6 +119,7 @@ class FarmMapController extends Controller
         SmartAdvisoryEngine $smartAdvisory,
         MapSmartAdvisoryService $mapSmartAdvisory,
         FarmRiskSnapshotService $riskSnapshotService,
+        WeatherPredictionService $weatherPredictionService,
         string $mapLayer = 'farm'
     ): array {
         $safeName = trim((string) ($user->name ?? ''));
@@ -158,6 +172,17 @@ class FarmMapController extends Controller
         $lng = (float) $user->farm_lng;
 
         $weather = $farmWeather->getNormalizedWeatherByCoordinates($lat, $lng);
+        $modelPrediction = null;
+        try {
+            $prediction = $weatherPredictionService->predict();
+            if (is_array($prediction) && ($prediction['status'] ?? null) === 'success') {
+                $modelPrediction = $prediction;
+            }
+        } catch (\Throwable) {
+            $modelPrediction = null;
+        }
+
+        $weather = $this->applyModelPredictionToWeather($weather, $modelPrediction);
         $riskSnapshot = $riskSnapshotService->buildFromNormalizedWeather($user, $weather);
         $rainfallAccumulationLabel = $this->rainfallAccumulationLabel(
             isset($weather['today_expected_rainfall']) ? (float) $weather['today_expected_rainfall'] : null
@@ -255,6 +280,7 @@ class FarmMapController extends Controller
                 'today_expected_rainfall' => $weather['today_expected_rainfall'] ?? null,
                 'last_updated' => $weather['last_updated'] ?? null,
                 'daily_forecast' => $weather['daily_forecast'] ?? [],
+                'source' => $modelPrediction !== null ? 'hybrid_model' : 'openweathermap',
             ],
             'rainfall_context' => [
                 'intensity_label' => $rainfallIntensityLabel,
@@ -270,6 +296,7 @@ class FarmMapController extends Controller
             'popup_summary' => $popupSummary,
             'weekly_rainfall_summary' => $weeklySummary,
             'recommendation' => $smart['short_recommendation'] ?? ($advisory['recommended_action'] ?? null),
+            'model_weather' => $modelPrediction,
             'overlays' => [
                 'rainfall' => [
                     'label' => 'Rainfall context (forecast-based)',
@@ -435,5 +462,72 @@ class FarmMapController extends Controller
         }
 
         return array_slice(array_values(array_unique($out)), 0, 5);
+    }
+
+    /**
+     * @param  array<string, mixed>  $weather
+     * @param  array<string, mixed>|null  $modelPrediction
+     * @return array<string, mixed>
+     */
+    private function applyModelPredictionToWeather(array $weather, ?array $modelPrediction): array
+    {
+        if (! is_array($modelPrediction) || ! is_array($modelPrediction['forecast'] ?? null)) {
+            return $weather;
+        }
+
+        $modelForecast = $modelPrediction['forecast'];
+        if ($modelForecast === []) {
+            return $weather;
+        }
+
+        $today = $modelForecast[0];
+        if (is_array($today)) {
+            if (is_numeric($today['rainfall'] ?? null)) {
+                $todayRainfall = round((float) $today['rainfall'], 2);
+                $weather['today_expected_rainfall'] = $todayRainfall;
+                $weather['today_rain_probability'] = $this->mapRainfallToProbability($todayRainfall);
+            }
+            if (is_numeric($today['wind_speed'] ?? null)) {
+                $weather['wind_speed'] = round((float) $today['wind_speed'], 2);
+            }
+        }
+
+        $dailyForecast = is_array($weather['daily_forecast'] ?? null) ? $weather['daily_forecast'] : [];
+        foreach ($modelForecast as $index => $modelDay) {
+            if (! is_array($modelDay)) {
+                continue;
+            }
+            if (! isset($dailyForecast[$index]) || ! is_array($dailyForecast[$index])) {
+                $dailyForecast[$index] = [];
+            }
+
+            if (is_string($modelDay['date'] ?? null) && trim((string) $modelDay['date']) !== '') {
+                $dailyForecast[$index]['date'] = trim((string) $modelDay['date']);
+            }
+            if (is_numeric($modelDay['rainfall'] ?? null)) {
+                $rainMm = round((float) $modelDay['rainfall'], 2);
+                $dailyForecast[$index]['rain_mm'] = $rainMm;
+                $dailyForecast[$index]['pop'] = $this->mapRainfallToProbability($rainMm);
+            }
+            if (is_numeric($modelDay['wind_speed'] ?? null)) {
+                $dailyForecast[$index]['wind_speed'] = round((float) $modelDay['wind_speed'], 2);
+            }
+        }
+
+        $weather['daily_forecast'] = array_values($dailyForecast);
+
+        return $weather;
+    }
+
+    private function mapRainfallToProbability(float $rainMm): int
+    {
+        return match (true) {
+            $rainMm >= 20.0 => 90,
+            $rainMm >= 10.0 => 75,
+            $rainMm >= 5.0 => 60,
+            $rainMm >= 1.0 => 45,
+            $rainMm > 0.0 => 30,
+            default => 10,
+        };
     }
 }

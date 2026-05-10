@@ -22,3 +22,11 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# AgriGuard ML pipeline (legacy ml/ layout + current python/)
+/ml/.venv
+/ml/__pycache__
+/ml/**/__pycache__
+/ml/storage/models/*.joblib
+/python/__pycache__
+/python/**/__pycache__
